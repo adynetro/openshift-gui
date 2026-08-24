@@ -12,6 +12,9 @@ import {
   AlertTriangle,
   XCircle,
   Clock,
+  Layers,
+  FlaskConical,
+  KeyRound,
 } from 'lucide-react';
 import { ResourceKind, ResourceItem, ImageStreamResource } from '../../types/k8s.js';
 
@@ -21,7 +24,12 @@ interface ResourceTableProps {
   selectedItem: ResourceItem | null;
   onSelectItem: (item: ResourceItem) => void;
   loading: boolean;
+  error?: string | null;
+  isUnauthorized?: boolean;
   onRowAction: (actionType: string, item: ResourceItem) => void;
+  onOpenContextModal?: () => void;
+  onEnableDemoMode?: () => void;
+  onRetry?: () => void;
 }
 
 export const ResourceTable: React.FC<ResourceTableProps> = ({
@@ -30,7 +38,12 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
   selectedItem,
   onSelectItem,
   loading,
+  error,
+  isUnauthorized,
   onRowAction,
+  onOpenContextModal,
+  onEnableDemoMode,
+  onRetry,
 }) => {
   const getStatusBadge = (status: string, color?: string) => {
     const s = (status || '').toLowerCase();
@@ -56,6 +69,59 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
     );
   };
 
+  // Error / Unauthorized Alert State
+  if (error && items.length === 0) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-4">
+        <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-xl shadow-amber-950/40">
+          {isUnauthorized ? <KeyRound size={32} /> : <AlertTriangle size={32} />}
+        </div>
+
+        <div className="max-w-md space-y-2">
+          <h3 className="text-base font-bold text-slate-100">
+            {isUnauthorized ? 'OpenShift Cluster Session Expired / Unauthorized' : 'Unable to Load Cluster Resources'}
+          </h3>
+          <p className="text-xs text-slate-400 leading-relaxed font-mono">
+            {error}
+          </p>
+        </div>
+
+        {/* Action Buttons to resolve immediately */}
+        <div className="flex items-center gap-3 pt-2">
+          {onOpenContextModal && (
+            <button
+              onClick={onOpenContextModal}
+              className="px-3.5 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-cyan-950 transition-all"
+            >
+              <Layers size={14} />
+              <span>Switch Context</span>
+            </button>
+          )}
+
+          {onEnableDemoMode && (
+            <button
+              onClick={onEnableDemoMode}
+              className="px-3.5 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-purple-950 transition-all"
+            >
+              <FlaskConical size={14} />
+              <span>Load Demo Data Mode</span>
+            </button>
+          )}
+
+          {onRetry && (
+            <button
+              onClick={onRetry}
+              className="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 flex items-center gap-2 transition-all"
+            >
+              <RefreshCw size={14} />
+              <span>Retry</span>
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   if (loading && items.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-12 text-slate-400 space-y-3">
@@ -67,9 +133,20 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
 
   if (items.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-12 text-slate-500 space-y-2">
-        <p className="text-base font-semibold text-slate-400">No {kind} found in this project</p>
-        <p className="text-xs text-slate-500">Try switching projects or changing your search filter.</p>
+      <div className="flex-1 flex flex-col items-center justify-center p-12 text-slate-500 space-y-3 text-center">
+        <p className="text-base font-semibold text-slate-300">No {kind} found in this project</p>
+        <p className="text-xs text-slate-500 max-w-sm">
+          Try switching to another project / namespace or load demo data to test UI actions.
+        </p>
+        {onEnableDemoMode && (
+          <button
+            onClick={onEnableDemoMode}
+            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-800/60 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+          >
+            <FlaskConical size={13} />
+            <span>Enable Demo Data</span>
+          </button>
+        )}
       </div>
     );
   }

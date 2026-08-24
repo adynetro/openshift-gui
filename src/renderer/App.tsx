@@ -20,6 +20,8 @@ export const App: React.FC = () => {
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
   const [currentProject, setCurrentProject] = useState<string>('default');
   const [clusterInfo, setClusterInfo] = useState<any>(null);
+  const [isUnauthorized, setIsUnauthorized] = useState<boolean>(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Resource State
   const [currentKind, setCurrentKind] = useState<ResourceKind>('pods');
@@ -29,6 +31,7 @@ export const App: React.FC = () => {
   const [query, setQuery] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
+  const [demoMode, setDemoMode] = useState<boolean>(false);
   const [statusNotification, setStatusNotification] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   // Modal State
@@ -41,6 +44,19 @@ export const App: React.FC = () => {
     setTimeout(() => {
       setStatusNotification((curr) => (curr?.text === text ? null : curr));
     }, 4000);
+  };
+
+  // Toggle Demo Mode
+  const handleToggleDemoMode = async () => {
+    const api = (window as any).electronAPI;
+    const next = !demoMode;
+    setDemoMode(next);
+    if (api) {
+      await api.setDemoMode(next);
+    }
+    showToast(next ? 'Enabled Demo Data Mode' : 'Connected to Live Cluster', 'success');
+    await loadKubeInfo();
+    fetchResources(false);
   };
 
   // Load Kubeconfig contexts and active project
@@ -74,11 +90,20 @@ export const App: React.FC = () => {
 
       if (!isBackground) setLoading(true);
       try {
-        const items: ResourceItem[] = await api.getResources(currentKind, currentProject);
-        setResources(items || []);
-        setCounts((prev) => ({ ...prev, [currentKind]: items?.length || 0 }));
+        const res = await api.getResources(currentKind, currentProject);
+        if (res && res.items) {
+          setResources(res.items);
+          setCounts((prev) => ({ ...prev, [currentKind]: res.items.length }));
+          setFetchError(res.error || null);
+          setIsUnauthorized(!!res.isUnauthorized);
+        } else if (Array.isArray(res)) {
+          setResources(res);
+          setCounts((prev) => ({ ...prev, [currentKind]: res.length }));
+          setFetchError(null);
+          setIsUnauthorized(false);
+        }
       } catch (err: any) {
-        console.error('Error fetching resources:', err);
+        setFetchError(err.message || 'Failed to fetch resources');
       } finally {
         if (!isBackground) setLoading(false);
       }
@@ -99,12 +124,12 @@ export const App: React.FC = () => {
 
   // Auto-polling interval
   useEffect(() => {
-    if (!autoRefresh) return;
+    if (!autoRefresh || demoMode) return;
     const interval = setInterval(() => {
       fetchResources(true);
     }, 4000);
     return () => clearInterval(interval);
-  }, [autoRefresh, fetchResources]);
+  }, [autoRefresh, demoMode, fetchResources]);
 
   // Filter items by search query
   const filteredItems = useMemo(() => {
@@ -181,7 +206,6 @@ export const App: React.FC = () => {
   // Keyboard shortcut listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore when typing in inputs or when a modal is open
       if (modalMode !== 'none' || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         if (e.key === 'Escape') setModalMode('none');
         return;
@@ -223,8 +247,11 @@ export const App: React.FC = () => {
         clusterServer={clusterInfo?.server || ''}
         clusterUser={clusterInfo?.user || ''}
         isConnected={clusterInfo?.connected ?? true}
+        isUnauthorized={isUnauthorized}
         loading={loading}
         autoRefresh={autoRefresh}
+        demoMode={demoMode}
+        onToggleDemoMode={handleToggleDemoMode}
         onToggleAutoRefresh={() => setAutoRefresh((prev) => !prev)}
         onRefresh={() => fetchResources(false)}
         onOpenContextModal={() => setModalMode('context')}
@@ -275,7 +302,12 @@ export const App: React.FC = () => {
             selectedItem={selectedItem}
             onSelectItem={(item) => setSelectedItem(item)}
             loading={loading}
+            error={fetchError}
+            isUnauthorized={isUnauthorized}
             onRowAction={(action, item) => handleAction(action, item)}
+            onOpenContextModal={() => setModalMode('context')}
+            onEnableDemoMode={handleToggleDemoMode}
+            onRetry={() => fetchResources(false)}
           />
         </main>
       </div>

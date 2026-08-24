@@ -1,23 +1,65 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
+import os from 'node:os';
 import { ResourceKind, ResourceItem, ImageStreamResource } from '../types/k8s.js';
 import { formatAge, getStatusColor } from '../utils/formatters.js';
 import { SemverSorter } from './semver-sorter.js';
+import {
+  MOCK_PODS,
+  MOCK_DEPLOYMENTS,
+  MOCK_ROUTES,
+  MOCK_SERVICES,
+  MOCK_IMAGESTREAMS,
+  MOCK_HELM,
+  MOCK_NODES,
+} from './mock-data.js';
 
 const execAsync = promisify(exec);
 
+export function getExecEnv(): NodeJS.ProcessEnv {
+  const home = process.env['HOME'] || os.homedir();
+  const customPaths = [
+    '/opt/homebrew/bin',
+    '/opt/homebrew/sbin',
+    '/usr/local/bin',
+    '/usr/local/sbin',
+    '/usr/bin',
+    '/bin',
+    '/usr/sbin',
+    '/sbin',
+    `${home}/bin`,
+    `${home}/.local/bin`,
+    `${home}/.nvm/versions/node/v22.23.1/bin`,
+  ];
+  const existingPath = process.env['PATH'] || '';
+  const mergedPath = Array.from(new Set([...customPaths, ...existingPath.split(':')])).join(':');
+
+  return {
+    ...process.env,
+    PATH: mergedPath,
+    KUBECONFIG: process.env['KUBECONFIG'] || `${home}/.kube/config`,
+  };
+}
+
 export class OcClient {
+  public static isDemoMode = false;
+
   /**
    * Run a CLI command safely with timeout and error handling.
    */
-  static async runCommand(command: string, timeout = 10000): Promise<{ stdout: string; stderr: string }> {
+  static async runCommand(command: string, timeout = 12000): Promise<{ stdout: string; stderr: string; exitCode: number }> {
     try {
-      const result = await execAsync(command, { timeout });
-      return result;
+      const result = await execAsync(command, {
+        timeout,
+        env: getExecEnv(),
+        maxBuffer: 10 * 1024 * 1024,
+      });
+      return { stdout: result.stdout || '', stderr: result.stderr || '', exitCode: 0 };
     } catch (error: any) {
       return {
         stdout: error.stdout || '',
         stderr: error.stderr || error.message || 'Command failed',
+        exitCode: error.code || 1,
       };
     }
   }
@@ -25,9 +67,26 @@ export class OcClient {
   /**
    * Fetches resources of a given kind in the specified namespace.
    */
-  static async getResources(kind: ResourceKind, namespace: string): Promise<ResourceItem[]> {
+  static async getResources(
+    kind: ResourceKind,
+    namespace: string
+  ): Promise<{ items: ResourceItem[]; error?: string; isUnauthorized?: boolean }> {
+    if (this.isDemoMode) {
+      switch (kind) {
+        case 'pods': return { items: MOCK_PODS };
+        case 'deployments':
+        case 'statefulsets': return { items: MOCK_DEPLOYMENTS };
+        case 'routes': return { items: MOCK_ROUTES };
+        case 'services': return { items: MOCK_SERVICES };
+        case 'imagestreams': return { items: MOCK_IMAGESTREAMS };
+        case 'helm': return { items: MOCK_HELM };
+        case 'nodes': return { items: MOCK_NODES };
+        default: return { items: [] };
+      }
+    }
+
     if (kind === 'helm') {
-      return []; // Handled by HelmService
+      return { items: [] }; // Handled by HelmService
     }
 
     const nsFlag = namespace ? `-n "${namespace}"` : '';
@@ -37,18 +96,39 @@ export class OcClient {
     if (kind === 'configmaps') cmdKind = 'cm';
 
     const cmd = `oc get ${cmdKind} ${nsFlag} -o json || kubectl get ${cmdKind} ${nsFlag} -o json`;
-    const { stdout, stderr } = await this.runCommand(cmd);
+    const { stdout, stderr, exitCode } = await this.runCommand(cmd);
+
+    // Check for authorization or connectivity errors
+    const lowerErr = (stderr || '').toLowerCase();
+    if (lowerErr.includes('unauthorized') || lowerErr.includes('you must be logged in') || lowerErr.includes('token expired')) {
+      return {
+        items: [],
+        error: 'Unauthorized: Session has expired or cluster login required. Run "oc login" or switch context.',
+        isUnauthorized: true,
+      };
+    }
+
+    if (lowerErr.includes('dial tcp') || lowerErr.includes('connection refused') || lowerErr.includes('no route to host') || lowerErr.includes('timeout')) {
+      return {
+        items: [],
+        error: `Cluster Connection Error: Unable to reach cluster endpoint (${stderr.trim().split('\n')[0]}). Check VPN or switch context.`,
+      };
+    }
 
     if (!stdout.trim()) {
-      return [];
+      if (stderr.trim()) {
+        return { items: [], error: stderr.trim() };
+      }
+      return { items: [] };
     }
 
     try {
       const json = JSON.parse(stdout);
-      const items = json.items || (json.kind && json.metadata ? [json] : []);
-      return this.transformResources(kind, items, namespace);
-    } catch (err) {
-      return [];
+      const rawItems = json.items || (json.kind && json.metadata ? [json] : []);
+      const items = this.transformResources(kind, rawItems, namespace);
+      return { items };
+    } catch (err: any) {
+      return { items: [], error: `Failed to parse cluster response: ${err.message}` };
     }
   }
 
@@ -72,7 +152,6 @@ export class OcClient {
           const restarts = containerStatuses.reduce((acc: number, c: any) => acc + (c.restartCount || 0), 0);
 
           let status = phase;
-          // Check for container waiting reasons like CrashLoopBackOff or ImagePullBackOff
           for (const cs of containerStatuses) {
             if (cs.state?.waiting?.reason) {
               status = cs.state.waiting.reason;
@@ -196,7 +275,7 @@ export class OcClient {
             const tagName = t.tag || t.name || '';
             const created = t.items?.[0]?.created || raw.metadata?.creationTimestamp || '';
             const dockerImageReference = t.items?.[0]?.dockerImageReference || t.from?.name || '';
-            const imageSize = t.items?.[0]?.image ? 100 * 1024 * 1024 : undefined; // approximation if not in metadata
+            const imageSize = t.items?.[0]?.image ? 100 * 1024 * 1024 : undefined;
 
             return {
               tag: tagName,
@@ -291,6 +370,10 @@ export class OcClient {
    * Describes a resource.
    */
   static async describe(kind: string, name: string, namespace: string): Promise<string> {
+    if (this.isDemoMode) {
+      return `Name:         ${name}\nNamespace:    ${namespace}\nKind:         ${kind}\nStatus:       Active / Running\nCreated:      2026-08-20T10:00:00Z\nLabels:       app=${name}, env=production\n\nEvents:\n  Type    Reason     Age   From               Message\n  ----    ------     ----  ----               -------\n  Normal  Scheduled  10m   default-scheduler  Successfully assigned ${namespace}/${name}\n  Normal  Pulled     10m   kubelet            Container image pulled successfully\n  Normal  Created    10m   kubelet            Created container\n  Normal  Started    10m   kubelet            Started container`;
+    }
+
     const nsFlag = namespace ? `-n "${namespace}"` : '';
     const cmd = `oc describe ${kind} "${name}" ${nsFlag} || kubectl describe ${kind} "${name}" ${nsFlag}`;
     const { stdout, stderr } = await this.runCommand(cmd, 15000);
@@ -301,6 +384,10 @@ export class OcClient {
    * Gets the YAML definition of a resource.
    */
   static async getYaml(kind: string, name: string, namespace: string): Promise<string> {
+    if (this.isDemoMode) {
+      return `apiVersion: v1\nkind: ${kind}\nmetadata:\n  name: ${name}\n  namespace: ${namespace}\n  creationTimestamp: "2026-08-20T10:00:00Z"\n  labels:\n    app: ${name}\n    env: production\nspec:\n  replicas: 3\n  template:\n    spec:\n      containers:\n      - name: app\n        image: image-registry.openshift-image-registry.svc:5000/${namespace}/${name}:v2.4.1\nstatus:\n  phase: Running\n  readyReplicas: 3`;
+    }
+
     const nsFlag = namespace ? `-n "${namespace}"` : '';
     const cmd = `oc get ${kind} "${name}" ${nsFlag} -o yaml || kubectl get ${kind} "${name}" ${nsFlag} -o yaml`;
     const { stdout, stderr } = await this.runCommand(cmd, 15000);
@@ -311,6 +398,10 @@ export class OcClient {
    * Scales a deployment or statefulset.
    */
   static async scale(kind: string, name: string, namespace: string, replicas: number): Promise<{ success: boolean; message: string }> {
+    if (this.isDemoMode) {
+      return { success: true, message: `[Demo] Scaled ${kind}/${name} to ${replicas} replicas.` };
+    }
+
     const nsFlag = namespace ? `-n "${namespace}"` : '';
     const cmd = `oc scale ${kind} "${name}" --replicas=${replicas} ${nsFlag} || kubectl scale ${kind} "${name}" --replicas=${replicas} ${nsFlag}`;
     const { stdout, stderr } = await this.runCommand(cmd);
@@ -324,6 +415,10 @@ export class OcClient {
    * Triggers a rollout restart for a workload.
    */
   static async rolloutRestart(kind: string, name: string, namespace: string): Promise<{ success: boolean; message: string }> {
+    if (this.isDemoMode) {
+      return { success: true, message: `[Demo] Restart initiated for ${kind}/${name}.` };
+    }
+
     const nsFlag = namespace ? `-n "${namespace}"` : '';
     const cmd = `oc rollout restart ${kind}/${name} ${nsFlag} || kubectl rollout restart ${kind}/${name} ${nsFlag}`;
     const { stdout, stderr } = await this.runCommand(cmd);
@@ -337,6 +432,10 @@ export class OcClient {
    * Deletes a resource.
    */
   static async deleteResource(kind: string, name: string, namespace: string): Promise<{ success: boolean; message: string }> {
+    if (this.isDemoMode) {
+      return { success: true, message: `[Demo] Deleted ${kind}/${name}.` };
+    }
+
     const nsFlag = namespace ? `-n "${namespace}"` : '';
     const cmd = `oc delete ${kind} "${name}" ${nsFlag} || kubectl delete ${kind} "${name}" ${nsFlag}`;
     const { stdout, stderr } = await this.runCommand(cmd);
@@ -350,6 +449,10 @@ export class OcClient {
    * Deletes a specific ImageStream tag (oc tag -d <is>:<tag>).
    */
   static async deleteImageStreamTag(isName: string, tag: string, namespace: string): Promise<{ success: boolean; message: string }> {
+    if (this.isDemoMode) {
+      return { success: true, message: `[Demo] Deleted tag ${isName}:${tag}` };
+    }
+
     const nsFlag = namespace ? `-n "${namespace}"` : '';
     const cmd = `oc tag -d "${isName}:${tag}" ${nsFlag}`;
     const { stdout, stderr } = await this.runCommand(cmd);

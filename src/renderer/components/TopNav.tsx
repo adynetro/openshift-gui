@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layers, FolderGit2, RefreshCw, Server, User, Wifi, WifiOff } from 'lucide-react';
+import { Layers, FolderGit2, RefreshCw, Server, User, FlaskConical, AlertTriangle } from 'lucide-react';
 
 interface TopNavProps {
   currentContext: string | null;
@@ -7,8 +7,11 @@ interface TopNavProps {
   clusterServer: string;
   clusterUser: string;
   isConnected: boolean;
+  isUnauthorized?: boolean;
   loading: boolean;
   autoRefresh: boolean;
+  demoMode: boolean;
+  onToggleDemoMode: () => void;
   onToggleAutoRefresh: () => void;
   onRefresh: () => void;
   onOpenContextModal: () => void;
@@ -21,8 +24,11 @@ export const TopNav: React.FC<TopNavProps> = ({
   clusterServer,
   clusterUser,
   isConnected,
+  isUnauthorized,
   loading,
   autoRefresh,
+  demoMode,
+  onToggleDemoMode,
   onToggleAutoRefresh,
   onRefresh,
   onOpenContextModal,
@@ -86,10 +92,10 @@ export const TopNav: React.FC<TopNavProps> = ({
         </button>
       </div>
 
-      {/* Right: Cluster Status, Refresh & Controls */}
+      {/* Right: Cluster Status, Demo Mode, Refresh & Controls */}
       <div className="no-drag flex items-center space-x-3">
         {/* User & Server metadata */}
-        <div className="hidden lg:flex flex-col items-end text-right">
+        <div className="hidden xl:flex flex-col items-end text-right">
           <div className="text-[11px] font-medium text-slate-300 flex items-center gap-1">
             <User size={11} className="text-slate-400" />
             <span className="truncate max-w-[150px]">{clusterUser || 'Logged In'}</span>
@@ -100,9 +106,33 @@ export const TopNav: React.FC<TopNavProps> = ({
           </div>
         </div>
 
+        {/* Demo Mode Toggle Button */}
+        <button
+          onClick={onToggleDemoMode}
+          className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 ${
+            demoMode
+              ? 'bg-purple-950/80 border-purple-500 text-purple-200 shadow-md shadow-purple-950'
+              : 'bg-slate-800/80 border-slate-700 text-slate-400 hover:text-purple-300 hover:border-purple-500/50'
+          }`}
+          title="Toggle Demo Mock Data (Test all UI features without active cluster login)"
+        >
+          <FlaskConical size={13} className={demoMode ? 'text-purple-400 animate-bounce' : 'text-slate-400'} />
+          <span>Demo Data {demoMode ? 'ON' : 'OFF'}</span>
+        </button>
+
         {/* Live Status Pill */}
         <div className="flex items-center gap-2 bg-slate-900/90 px-2.5 py-1.5 rounded-lg border border-slate-800 text-xs">
-          {isConnected ? (
+          {demoMode ? (
+            <div className="flex items-center gap-1.5 text-purple-400 font-bold">
+              <span className="w-2 h-2 rounded-full bg-purple-400" />
+              <span>Demo Mode</span>
+            </div>
+          ) : isUnauthorized ? (
+            <div className="flex items-center gap-1.5 text-amber-400 font-medium">
+              <AlertTriangle size={12} className="text-amber-400" />
+              <span>Unauthorized (Expired)</span>
+            </div>
+          ) : isConnected ? (
             <div className="flex items-center gap-1.5 text-emerald-400 font-medium">
               <span className="w-2 h-2 rounded-full bg-emerald-500 pulse-dot" />
               <span>Connected</span>
