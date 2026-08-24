@@ -118,8 +118,8 @@ export const EditYamlModal: React.FC<EditYamlModalProps> = ({
   const isDirty = yamlText !== originalYaml;
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
-      <div className="bg-[#1e1f1c] border border-[#49483e] rounded-xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 z-50 animate-in fade-in duration-150">
+      <div className="bg-[#1e1f1c] border border-[#49483e] rounded-xl shadow-2xl w-[96vw] max-w-[1750px] h-[94vh] flex flex-col overflow-hidden">
         {/* Monokai Header */}
         <div className="p-3 bg-[#272822] border-b border-[#3e3d32] flex items-center justify-between">
           <div className="flex items-center gap-3">
