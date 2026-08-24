@@ -497,31 +497,35 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                         </button>
                       )}
 
-                      {/* Describe Resource */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onRowAction('describe', item);
-                        }}
-                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors"
-                        title="Describe Resource Details"
-                        aria-label="Describe Details"
-                      >
-                        <FileText size={14} />
-                      </button>
+                      {/* Describe Resource (Not applicable to Helm) */}
+                      {kind !== 'helm' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRowAction('describe', item);
+                          }}
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors"
+                          title="Describe Resource Details"
+                          aria-label="Describe Details"
+                        >
+                          <FileText size={14} />
+                        </button>
+                      )}
 
-                      {/* View & Edit YAML */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onRowAction('yaml', item);
-                        }}
-                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors"
-                        title="View & Edit YAML Definition"
-                        aria-label="View & Edit YAML"
-                      >
-                        <Code2 size={14} />
-                      </button>
+                      {/* View & Edit YAML (Not applicable to Helm) */}
+                      {kind !== 'helm' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRowAction('yaml', item);
+                          }}
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors"
+                          title="View & Edit YAML Definition"
+                          aria-label="View & Edit YAML"
+                        >
+                          <Code2 size={14} />
+                        </button>
+                      )}
 
                       {/* Delete Resource */}
                       <button

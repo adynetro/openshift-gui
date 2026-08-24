@@ -99,23 +99,25 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       });
     }
 
-    pills.push({
-      id: 'describe',
-      label: 'Describe',
-      tooltip: 'Describe Resource Details',
-      icon: FileText,
-      color: 'hover:border-slate-500 hover:text-slate-200 hover:bg-slate-800 text-slate-300 border-slate-700 bg-slate-800/40',
-      disabled: !selectedItem,
-    });
+    if (currentKind !== 'helm') {
+      pills.push({
+        id: 'describe',
+        label: 'Describe',
+        tooltip: 'Describe Resource Details',
+        icon: FileText,
+        color: 'hover:border-slate-500 hover:text-slate-200 hover:bg-slate-800 text-slate-300 border-slate-700 bg-slate-800/40',
+        disabled: !selectedItem,
+      });
 
-    pills.push({
-      id: 'yaml',
-      label: 'YAML',
-      tooltip: 'View & Edit YAML Definition',
-      icon: Code2,
-      color: 'hover:border-emerald-500 hover:text-emerald-300 hover:bg-slate-800 text-slate-300 border-slate-700 bg-slate-800/40',
-      disabled: !selectedItem,
-    });
+      pills.push({
+        id: 'yaml',
+        label: 'YAML',
+        tooltip: 'View & Edit YAML Definition',
+        icon: Code2,
+        color: 'hover:border-emerald-500 hover:text-emerald-300 hover:bg-slate-800 text-slate-300 border-slate-700 bg-slate-800/40',
+        disabled: !selectedItem,
+      });
+    }
 
     pills.push({
       id: 'delete',
