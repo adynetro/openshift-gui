@@ -13,7 +13,7 @@ export interface LogEntry {
 export class LogStreamer extends EventEmitter {
   private process: ChildProcess | null = null;
   private logs: LogEntry[] = [];
-  private maxLines = 2500;
+  private maxLines = 3000;
   private currentId = 0;
   private isStreaming = false;
 
@@ -22,7 +22,7 @@ export class LogStreamer extends EventEmitter {
     private namespace: string,
     private kind: string = 'pods',
     private container?: string,
-    private tailLines = 200
+    private tailLines = 250
   ) {
     super();
   }
@@ -43,6 +43,7 @@ export class LogStreamer extends EventEmitter {
         `--tail=${this.tailLines}`,
         '--prefix=true',
         '--all-containers=true',
+        '--max-log-requests=100',
       ];
     } else if (this.kind === 'deploymentconfigs') {
       // Stream multi-pod aggregated logs from all pods belonging to this DeploymentConfig
@@ -56,6 +57,7 @@ export class LogStreamer extends EventEmitter {
         `--tail=${this.tailLines}`,
         '--prefix=true',
         '--all-containers=true',
+        '--max-log-requests=100',
       ];
     } else if (this.kind === 'statefulsets') {
       args = [
@@ -67,6 +69,7 @@ export class LogStreamer extends EventEmitter {
         `--tail=${this.tailLines}`,
         '--prefix=true',
         '--all-containers=true',
+        '--max-log-requests=100',
       ];
     } else if (this.kind === 'daemonsets') {
       args = [
@@ -78,10 +81,20 @@ export class LogStreamer extends EventEmitter {
         `--tail=${this.tailLines}`,
         '--prefix=true',
         '--all-containers=true',
+        '--max-log-requests=100',
       ];
     } else {
       // Pod logs
-      args = ['logs', this.targetName, '-n', ns, '-f', `--tail=${this.tailLines}`, '--timestamps=true'];
+      args = [
+        'logs',
+        this.targetName,
+        '-n',
+        ns,
+        '-f',
+        `--tail=${this.tailLines}`,
+        '--timestamps=true',
+        '--max-log-requests=50',
+      ];
       if (this.container) {
         args.push('-c', this.container);
       }
@@ -108,7 +121,7 @@ export class LogStreamer extends EventEmitter {
         if (!line.trim()) continue;
 
         // Filter out CLI deprecation warning noise
-        if (line.startsWith('Warning: apps.openshift.io/v1') || line.startsWith('Warning: DeploymentConfig')) {
+        if (line.startsWith('Warning: apps.openshift.io/v1') || line.startsWith('Warning: DeploymentConfig') || line.startsWith('Warning: DeploymentLog')) {
           continue;
         }
 
