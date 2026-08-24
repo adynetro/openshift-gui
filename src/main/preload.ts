@@ -32,6 +32,10 @@ export interface IpcApi {
   startLogStream: (targetName: string, namespace: string, kind?: string, container?: string) => Promise<string>;
   stopLogStream: (streamId: string) => Promise<void>;
   onLogLine: (callback: (data: { streamId: string; line: any }) => void) => () => void;
+  startTerminal: (targetName: string, namespace: string, container?: string) => Promise<string>;
+  writeTerminal: (sessionId: string, data: string) => Promise<void>;
+  stopTerminal: (sessionId: string) => Promise<void>;
+  onTerminalData: (callback: (data: { sessionId: string; data: string }) => void) => () => void;
 }
 
 const api: IpcApi = {
@@ -66,9 +70,17 @@ const api: IpcApi = {
   startLogStream: (target, ns, kind, container) => ipcRenderer.invoke('logs:startStream', target, ns, kind, container),
   stopLogStream: (streamId) => ipcRenderer.invoke('logs:stopStream', streamId),
   onLogLine: (callback) => {
-    const handler = (_event: any, data: any) => callback(data);
-    ipcRenderer.on('logs:line', handler);
-    return () => ipcRenderer.removeListener('logs:line', handler);
+    const sub = (_e: any, data: any) => callback(data);
+    ipcRenderer.on('logs:line', sub);
+    return () => ipcRenderer.removeListener('logs:line', sub);
+  },
+  startTerminal: (target, ns, container) => ipcRenderer.invoke('terminal:start', target, ns, container),
+  writeTerminal: (sessionId, data) => ipcRenderer.invoke('terminal:write', sessionId, data),
+  stopTerminal: (sessionId) => ipcRenderer.invoke('terminal:stop', sessionId),
+  onTerminalData: (callback) => {
+    const sub = (_e: any, data: any) => callback(data);
+    ipcRenderer.on('terminal:data', sub);
+    return () => ipcRenderer.removeListener('terminal:data', sub);
   },
 };
 

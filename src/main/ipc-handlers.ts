@@ -3,6 +3,7 @@ import { KubeConfigService } from '../services/kubeconfig.js';
 import { OcClient } from '../services/oc-client.js';
 import { HelmService } from '../services/helm.js';
 import { LogStreamer, LogEntry } from '../services/log-streamer.js';
+import { TerminalService } from '../services/terminal-service.js';
 import { ResourceKind } from '../types/k8s.js';
 
 const { ipcMain, shell } = electron;
@@ -152,5 +153,18 @@ export function registerIpcHandlers(mainWindow: electron.BrowserWindow): void {
       streamer.stop();
       activeStreamers.delete(streamId);
     }
+  });
+
+  // Interactive Pod Terminal Handlers
+  ipcMain.handle('terminal:start', async (_event, targetName: string, namespace: string, container?: string) => {
+    return TerminalService.startSession(targetName, namespace, container, mainWindow);
+  });
+
+  ipcMain.handle('terminal:write', async (_event, sessionId: string, data: string) => {
+    TerminalService.writeData(sessionId, data);
+  });
+
+  ipcMain.handle('terminal:stop', async (_event, sessionId: string) => {
+    TerminalService.stopSession(sessionId);
   });
 }

@@ -18,6 +18,8 @@ import {
   Maximize2,
   Database,
   Boxes,
+  SquareTerminal,
+  ScrollText,
 } from 'lucide-react';
 import { ResourceKind, ResourceItem, ImageStreamResource } from '../../types/k8s.js';
 
@@ -585,19 +587,33 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                 {kind !== 'events' && !isWorkload && (
                   <td className="py-2 px-4 text-right">
                     <div className="flex items-center justify-end gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
-                      {/* Live Logs for Pods */}
+                      {/* Live Logs and Interactive Terminal for Pods */}
                       {kind === 'pods' && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onRowAction('logs', item);
-                          }}
-                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-emerald-950 text-emerald-400 border border-slate-700 hover:border-emerald-500 transition-colors"
-                          title="Stream Live Aggregated Logs"
-                          aria-label="Live Logs"
-                        >
-                          <Terminal size={14} />
-                        </button>
+                        <>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onRowAction('terminal', item);
+                            }}
+                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-cyan-950 text-cyan-400 border border-slate-700 hover:border-cyan-500 transition-colors"
+                            title="Open Interactive Pod Terminal (Shell)"
+                            aria-label="Open Terminal"
+                          >
+                            <SquareTerminal size={14} />
+                          </button>
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onRowAction('logs', item);
+                            }}
+                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-emerald-950 text-emerald-400 border border-slate-700 hover:border-emerald-500 transition-colors"
+                            title="Stream Live Aggregated Logs"
+                            aria-label="Live Logs"
+                          >
+                            <ScrollText size={14} />
+                          </button>
+                        </>
                       )}
 
                       {/* Edit Secret Action */}

@@ -15,6 +15,7 @@ import { ContextModal } from './components/ContextModal.js';
 import { SecretEditorModal } from './components/SecretEditorModal.js';
 import { ResizePvcModal } from './components/ResizePvcModal.js';
 import { CrdInstancesModal } from './components/CrdInstancesModal.js';
+import { PodTerminalModal } from './components/PodTerminalModal.js';
 import { ResourceKind, ResourceItem, KubeContext, ProjectInfo, ImageStreamResource } from '../types/k8s.js';
 import { FuzzyMatcher } from '../utils/fuzzy.js';
 import { CheckCircle2, AlertTriangle } from 'lucide-react';
@@ -25,6 +26,7 @@ type ModalMode =
   | 'project'
   | 'workload-details'
   | 'logs'
+  | 'terminal'
   | 'yaml'
   | 'edit-yaml'
   | 'edit-secret'
@@ -301,6 +303,9 @@ export const App: React.FC = () => {
       case 'logs':
         openModal('logs', item);
         break;
+      case 'terminal':
+        openModal('terminal', item);
+        break;
       case 'scale':
         openModal('scale', item);
         break;
@@ -511,6 +516,16 @@ export const App: React.FC = () => {
           namespace={selectedItem.namespace || currentProject}
           onClose={closeModal}
           onAction={(act, target) => handleAction(act, target || selectedItem)}
+          onOpenPodTerminal={(podName) => {
+            openModal('terminal', {
+              id: podName,
+              name: podName,
+              namespace: selectedItem.namespace || currentProject,
+              kind: 'pods',
+              status: 'Running',
+              age: '',
+            });
+          }}
           onOpenPodLogs={(podName) => {
             openModal('logs', {
               id: podName,
@@ -541,6 +556,15 @@ export const App: React.FC = () => {
               age: '',
             });
           }}
+        />
+      )}
+
+      {/* Interactive Pod Terminal Modal */}
+      {modalMode === 'terminal' && selectedItem && (
+        <PodTerminalModal
+          item={selectedItem}
+          namespace={selectedItem.namespace || currentProject}
+          onClose={closeModal}
         />
       )}
 

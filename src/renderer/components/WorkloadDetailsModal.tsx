@@ -21,6 +21,8 @@ import {
   Copy,
   Check,
   Zap,
+  SquareTerminal,
+  ScrollText,
 } from 'lucide-react';
 import { ResourceItem, WorkloadDetails, WorkloadRevisionItem, WorkloadPodItem } from '../../types/k8s.js';
 
@@ -29,6 +31,7 @@ interface WorkloadDetailsModalProps {
   namespace: string;
   onClose: () => void;
   onAction: (actionType: string, targetItem?: ResourceItem) => void;
+  onOpenPodTerminal?: (podName: string) => void;
   onOpenPodLogs?: (podName: string) => void;
   onOpenPodDescribe?: (podName: string) => void;
   onOpenPodYaml?: (podName: string) => void;
@@ -39,6 +42,7 @@ export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
   namespace,
   onClose,
   onAction,
+  onOpenPodTerminal,
   onOpenPodLogs,
   onOpenPodDescribe,
   onOpenPodYaml,
@@ -460,6 +464,27 @@ export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
                               <div className="flex items-center justify-end gap-1">
                                 <button
                                   onClick={() => {
+                                    if (onOpenPodTerminal) {
+                                      onOpenPodTerminal(pod.name);
+                                    } else {
+                                      onAction('terminal', {
+                                        id: pod.name,
+                                        name: pod.name,
+                                        namespace: pod.namespace,
+                                        kind: 'pods',
+                                        status: pod.status,
+                                        age: pod.age,
+                                      });
+                                    }
+                                  }}
+                                  className="p-1 rounded bg-[#1e1f1c] hover:bg-cyan-950 text-cyan-400 border border-[#3e3d32] hover:border-cyan-500 transition-colors"
+                                  title="Open interactive terminal (Shell)"
+                                >
+                                  <SquareTerminal size={12} />
+                                </button>
+
+                                <button
+                                  onClick={() => {
                                     if (onOpenPodLogs) {
                                       onOpenPodLogs(pod.name);
                                     } else {
@@ -476,7 +501,7 @@ export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
                                   className="p-1 rounded bg-[#1e1f1c] hover:bg-emerald-950 text-emerald-400 border border-[#3e3d32] hover:border-emerald-500 transition-colors"
                                   title="Stream logs for this pod"
                                 >
-                                  <Terminal size={12} />
+                                  <ScrollText size={12} />
                                 </button>
 
                                 <button
