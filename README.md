@@ -1,101 +1,79 @@
-# OpenShift & Kubernetes CLI TUI (`openshift-gui` / `oc-gui`)
+# OpenShift GUI (Desktop Application & CLI)
 
-An interactive, modern Terminal User Interface (TUI) for OpenShift and Kubernetes command-line workflows. Built with Node.js, TypeScript, React, and Ink.
+A modern, high-performance Graphical Desktop Application (GUI) & Terminal CLI for OpenShift and Kubernetes cluster management.
 
-![OpenShift CLI TUI](https://img.shields.io/badge/OpenShift-CLI%20TUI-EE0000?style=for-the-badge&logo=redhatopenshift&logoColor=white)
-![Kubernetes](https://img.shields.io/badge/Kubernetes-Blue-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white)
+![OpenShift GUI](https://img.shields.io/badge/OpenShift-Desktop%20GUI-EE0000?style=for-the-badge&logo=redhatopenshift&logoColor=white)
+![Electron](https://img.shields.io/badge/Electron-43.4-47848F?style=for-the-badge&logo=electron&logoColor=white)
+![React](https://img.shields.io/badge/React-18.3-61DAFB?style=for-the-badge&logo=react&logoColor=black)
+![Tailwind](https://img.shields.io/badge/Tailwind-CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
 ![Helm](https://img.shields.io/badge/Helm-3-0F1689?style=for-the-badge&logo=helm&logoColor=white)
 
 ---
 
-## ✨ Features
+## 🖥 Desktop GUI Features
 
-- **⚡ Instant Context & Project Switcher**:
-  - Hotkey `c` to fuzzy search and switch active kubeconfig contexts on the fly.
-  - Hotkey `p` to fuzzy search and switch OpenShift projects (`oc project`) or Kubernetes namespaces.
-- **🔍 Autocomplete & Command Palette (`/` or `:`)**:
-  - Type `/` to filter any resource view with real-time fuzzy search.
-  - Type `:` to open command suggestions (`:scale`, `:logs`, `:clean-imagestream`, `:helm`, `:restart`, `:delete`, `:context`, `:project`).
-  - Suggestion pills with `[Tab]` autocomplete.
-- **📦 ImageStream Management & Semantic Versioning Cleanup**:
-  - Automatically parses tags into semantic versions (e.g. `v2.4.1`, `2.0.0-rc1`).
-  - Sorts tags in true SemVer descending order (newest version first).
-  - Interactive **Cleanup Wizard (`i` -> `c`)**: choose how many latest SemVer versions to retain (e.g., keep top 3), preview tags to prune vs retain, calculate space, and batch delete (`oc tag -d`).
-- **⎈ Native Helm Support**:
+- **🪟 Real Native Desktop Window**: Built with Electron, React, Vite, Tailwind CSS, and Lucide icons.
+- **⚡ Interactive Context & Project Dropdown Selectors**:
+  - Click the **Context** button in the top bar to fuzzy search and switch active kubeconfig contexts immediately.
+  - Click the **Project** button in the top bar to fuzzy search and switch OpenShift projects (`oc project`) with one click.
+  - Live connection status badge with auto-polling toggle and instant refresh.
+- **🔍 Clickable Autocomplete Search & Action Suggestion Pills**:
+  - Live resource filtering by name, status, IP, node, or labels.
+  - Action pills appear below the search bar (`[ ⚡ Scale Replicas ]`, `[ 📜 Live Logs ]`, `[ 🧹 Clean ImageStream SemVer ]`, `[ ⎈ Helm Values ]`, `[ 🔄 Rollout Restart ]`, `[ 🗑 Delete ]`).
+- **📦 ImageStream & Semantic Versioning Cleanup Wizard (`SemVer Clean`)**:
+  - Automatic tag parsing into Semantic Versions (`v2.4.1`, `2.0.0-rc1`, etc.).
+  - True SemVer descending sorting (newest release first).
+  - **Interactive Wizard**: Keep latest `N` SemVer versions (e.g. keep 3), protect common tags (`latest`, `stable`, `main`), toggle Non-SemVer tags.
+  - Interactive checkboxes on every tag to customize inclusion/exclusion.
+  - Live count preview (Retained vs Pruned tags).
+  - Clickable **"Execute Batch Cleanup"** button (`oc tag -d`).
+- **⎈ Native Helm Release Manager**:
   - View Helm releases, revisions, chart versions, app versions, and status.
-  - Inspect Helm values (`v`) and manifests (`m`).
-  - Rollback to any historical revision (`r`) or uninstall (`u`).
-- **📜 Real-Time Log Streaming**:
-  - Streams logs live from any Pod container (`l`).
-  - Auto-scroll toggle (`a`), pause/resume (`p`), and live in-log regex filtering (`/`).
-- **⚙ Core Workload Operations**:
-  - Interactive scaling for Deployments and StatefulSets (`s`).
-  - Rollout restarts (`r`).
-  - Describe / YAML syntax viewers (`d` / `y` / `Enter`).
-  - Safe deletion dialogs (`x` / `Delete`).
+  - Clickable tabs for **User Values (`helm get values`)**, **Manifest (`helm get manifest`)**, **Revision History & Rollback (`helm history` / `helm rollback`)**, and **Uninstall (`helm uninstall`)**.
+- **📜 Real-Time Log Streaming Window**:
+  - Live scrolling log terminal with container switcher.
+  - Clickable Pause / Resume, Auto-scroll toggle, Clear buffer, Copy all logs, and live in-log regex filter.
+- **↕ Interactive Scale Dialog**:
+  - Big clickable `+` and `-` buttons, number input, and range slider to scale Deployments & StatefulSets easily.
+- **{ } YAML & Describe Details Modals**:
+  - Clean syntax viewers with search and copy-to-clipboard buttons.
 
 ---
 
-## 🚀 Quick Start
+## 🚀 How to Run the Desktop GUI
 
-### Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/alexandruchiscari/openshift-gui.git
-cd openshift-gui
-
-# Install dependencies and build
-npm install
-npm run build
-
-# Link binary globally (optional)
-npm link
-```
-
-### Usage
+### 1. Launch from Source (Development or Local)
 
 ```bash
-# Start the TUI
-openshift-gui
+# Start the Desktop GUI Window
+npm run gui
 # or
-oc-gui
-
-# Launch with a specific project/namespace
-openshift-gui -n my-project
-
-# Launch directly on ImageStreams or Helm tab
-openshift-gui -k imagestreams
-openshift-gui -k helm
-
-# Launch with a specific context
-openshift-gui -c my-cluster-context
+npm start
 ```
+
+### 2. Launch the Packaged macOS App
+
+```bash
+# Open the packaged macOS Application directly
+open "release/mac-arm64/OpenShift GUI.app"
+```
+
+Or extract [`release/OpenShift-GUI-macOS-arm64.zip`](file:///Users/alexandru.chiscari/git/openshift-gui/release/OpenShift-GUI-macOS-arm64.zip) into your `/Applications` folder!
 
 ---
 
-## ⌨ Keyboard Shortcuts
+## 📦 Build & Packaging Commands
 
-| Shortcut | Description |
-| :--- | :--- |
-| **`1` - `9`, `0`** | Switch Resource Tab (Pods, Deployments, StatefulSets, Services, Routes, ImageStreams, ConfigMaps, Secrets, Helm, Nodes) |
-| **`c`** | **Context Switcher**: Fuzzy search & switch cluster context |
-| **`p`** | **Project Switcher**: Fuzzy search & switch OpenShift project / namespace |
-| **`/`** | Open search / filter bar with autocomplete suggestion pills |
-| **`:`** | Open command palette (`:scale`, `:logs`, `:clean-imagestream`, `:helm`, etc.) |
-| **`Enter` / `d`** | View Resource Description / Details |
-| **`y`** | View Resource YAML definition |
-| **`l`** | Open Live Log Streamer (Pods / Workloads) |
-| **`s`** | Scale Deployment / StatefulSet replicas interactively |
-| **`r`** | Trigger Rollout Restart |
-| **`i`** | Open ImageStream SemVer Tag Manager & Cleanup Wizard |
-| **`v`** | View Helm Values (when in Helm view) |
-| **`m`** | View Helm Manifest (when in Helm view) |
-| **`x` / `Del`** | Delete selected resource (with safety confirmation) |
-| **`↑` / `↓` (`k` / `j`)** | Navigate through resource list |
-| **`?` / `h`** | Open Help / Shortcuts cheatsheet |
-| **`Esc`** | Close active modal / cancel filter |
-| **`q`** | Quit application |
+```bash
+# Build the Desktop GUI (Vite + Electron)
+npm run build:gui
+
+# Package the macOS .app bundle
+npm run pack:app
+
+# Build Standalone CLI Binary
+npm run build:mac
+```
 
 ---
 
