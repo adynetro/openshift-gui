@@ -252,37 +252,40 @@ export const LogViewer: React.FC<LogViewerProps> = ({ item, namespace, onClose }
               </div>
             )}
 
-            {/* Pause / Resume */}
+            {/* Pause / Resume (Icon only with tooltip) */}
             <button
               onClick={() => setIsPaused((prev) => !prev)}
-              className={`px-2.5 py-1 rounded text-xs font-semibold border flex items-center gap-1.5 transition-colors ${
+              className={`p-1.5 rounded-lg border flex items-center justify-center transition-colors ${
                 isPaused
                   ? 'bg-[#fd971f]/20 border-[#fd971f]/60 text-[#fd971f]'
                   : 'bg-[#a6e22e]/20 border-[#a6e22e]/60 text-[#a6e22e]'
               }`}
+              title={isPaused ? 'Resume Streaming' : 'Pause Streaming'}
+              aria-label={isPaused ? 'Resume' : 'Pause'}
             >
-              {isPaused ? <Play size={12} /> : <Pause size={12} />}
-              <span>{isPaused ? 'Resume' : 'Pause'}</span>
+              {isPaused ? <Play size={14} /> : <Pause size={14} />}
             </button>
 
-            {/* Auto-scroll */}
+            {/* Auto-scroll (Icon only with tooltip) */}
             <button
               onClick={() => setAutoScroll((prev) => !prev)}
-              className={`px-2.5 py-1 rounded text-xs font-medium border flex items-center gap-1.5 transition-colors ${
+              className={`p-1.5 rounded-lg border flex items-center justify-center transition-colors ${
                 autoScroll
                   ? 'bg-[#66d9ef]/20 border-[#66d9ef]/60 text-[#66d9ef]'
-                  : 'bg-[#272822] border-[#49483e] text-[#75715e]'
+                  : 'bg-[#272822] border-[#49483e] text-[#75715e] hover:text-[#f8f8f2]'
               }`}
+              title={autoScroll ? 'Auto-Scroll: Enabled (Click to disable)' : 'Auto-Scroll: Disabled (Click to enable)'}
+              aria-label="Toggle Auto-Scroll"
             >
-              <ArrowDown size={12} />
-              <span>Auto-Scroll</span>
+              <ArrowDown size={14} />
             </button>
 
             {/* Clear */}
             <button
               onClick={() => setLogs([])}
-              className="p-1.5 rounded bg-[#272822] hover:bg-[#3e3d32] text-[#75715e] hover:text-[#f8f8f2] border border-[#49483e]"
+              className="p-1.5 rounded-lg bg-[#272822] hover:bg-[#3e3d32] text-[#75715e] hover:text-[#f8f8f2] border border-[#49483e] transition-colors"
               title="Clear Log Buffer"
+              aria-label="Clear Buffer"
             >
               <Trash2 size={14} />
             </button>
@@ -290,8 +293,9 @@ export const LogViewer: React.FC<LogViewerProps> = ({ item, namespace, onClose }
             {/* Copy */}
             <button
               onClick={handleCopyAll}
-              className="p-1.5 rounded bg-[#272822] hover:bg-[#3e3d32] text-[#75715e] hover:text-[#f8f8f2] border border-[#49483e]"
-              title="Copy all logs to clipboard"
+              className="p-1.5 rounded-lg bg-[#272822] hover:bg-[#3e3d32] text-[#75715e] hover:text-[#f8f8f2] border border-[#49483e] transition-colors"
+              title="Copy All Logs to Clipboard"
+              aria-label="Copy Logs"
             >
               {copied ? <Check size={14} className="text-[#a6e22e]" /> : <Copy size={14} />}
             </button>
