@@ -1183,4 +1183,104 @@ export class OcClient {
       return { error: err.message || 'Failed to fetch topology data' };
     }
   }
+
+  /**
+   * Fetches Secret and returns decoded plaintext key-value pairs.
+   */
+  static async getSecretData(
+    name: string,
+    namespace: string
+  ): Promise<{ data?: Record<string, string>; type?: string; error?: string }> {
+    try {
+      const nsFlag = namespace && namespace !== 'all-projects' ? `-n "${namespace}"` : '';
+      const cmd = `oc get secret "${name}" ${nsFlag} -o json || kubectl get secret "${name}" ${nsFlag} -o json`;
+      const { stdout, stderr } = await this.runCommand(cmd);
+      if (!stdout.trim()) {
+        return { error: stderr || `Secret '${name}' not found` };
+      }
+      const json = JSON.parse(stdout);
+      const rawData = json.data || {};
+      const decoded: Record<string, string> = {};
+      for (const [k, v] of Object.entries(rawData)) {
+        try {
+          decoded[k] = Buffer.from(v as string, 'base64').toString('utf-8');
+        } catch {
+          decoded[k] = v as string;
+        }
+      }
+      return { data: decoded, type: json.type || 'Opaque' };
+    } catch (err: any) {
+      return { error: err.message || 'Failed to get secret data' };
+    }
+  }
+
+  /**
+   * Updates or creates a Secret with key-value data (automatically base64 encoded).
+   */
+  static async saveSecret(
+    name: string,
+    namespace: string,
+    data: Record<string, string>,
+    type = 'Opaque'
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      const nsFlag = namespace && namespace !== 'all-projects' ? `-n "${namespace}"` : '';
+      const encodedData: Record<string, string> = {};
+      for (const [k, v] of Object.entries(data)) {
+        encodedData[k] = Buffer.from(v, 'utf-8').toString('base64');
+      }
+
+      const secretManifest = {
+        apiVersion: 'v1',
+        kind: 'Secret',
+        metadata: {
+          name,
+          namespace: namespace && namespace !== 'all-projects' ? namespace : 'default',
+        },
+        type,
+        data: encodedData,
+      };
+
+      const jsonStr = JSON.stringify(secretManifest).replace(/'/g, "'\\''");
+      const cmd = `echo '${jsonStr}' | oc apply ${nsFlag} -f - || echo '${jsonStr}' | kubectl apply ${nsFlag} -f -`;
+      const { stdout, stderr } = await this.runCommand(cmd);
+      if (stderr && !stdout) {
+        return { success: false, message: stderr };
+      }
+      return { success: true, message: `Secret '${name}' saved successfully.` };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Failed to save secret' };
+    }
+  }
+
+  /**
+   * Resizes a PersistentVolumeClaim storage request.
+   */
+  static async resizePvc(
+    name: string,
+    namespace: string,
+    newSize: string
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      const nsFlag = namespace && namespace !== 'all-projects' ? `-n "${namespace}"` : '';
+      const patch = JSON.stringify({
+        spec: {
+          resources: {
+            requests: {
+              storage: newSize,
+            },
+          },
+        },
+      }).replace(/'/g, "'\\''");
+
+      const cmd = `oc patch pvc "${name}" ${nsFlag} -p '${patch}' || kubectl patch pvc "${name}" ${nsFlag} -p '${patch}'`;
+      const { stdout, stderr } = await this.runCommand(cmd);
+      if (stderr && !stdout) {
+        return { success: false, message: stderr };
+      }
+      return { success: true, message: `PVC '${name}' storage resized to ${newSize}.` };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Failed to resize PVC' };
+    }
+  }
 }

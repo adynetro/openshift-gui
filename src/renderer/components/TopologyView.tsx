@@ -28,6 +28,7 @@ interface TopologyViewProps {
   onOpenWorkloadLogs: (item: ResourceItem) => void;
   onOpenWorkloadYaml: (item: ResourceItem) => void;
   onOpenWorkloadScale: (item: ResourceItem) => void;
+  onOpenPvcResize: (item: ResourceItem) => void;
   onOpenExternal: (url: string) => void;
 }
 
@@ -37,6 +38,7 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
   onOpenWorkloadLogs,
   onOpenWorkloadYaml,
   onOpenWorkloadScale,
+  onOpenPvcResize,
   onOpenExternal,
 }) => {
   const [data, setData] = useState<TopologyData | null>(null);
@@ -326,14 +328,30 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
                         {node.pvcs.length > 0 && (
                           <div className="flex flex-wrap gap-1">
                             {node.pvcs.map((pvc, i) => (
-                              <span
+                              <button
                                 key={i}
-                                className="px-2 py-0.5 rounded bg-purple-950/50 border border-purple-900 text-[10px] font-mono text-purple-300 flex items-center gap-1"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onOpenPvcResize({
+                                    id: `${node.namespace}/${pvc.name}`,
+                                    name: pvc.name,
+                                    namespace: node.namespace,
+                                    kind: 'pvc',
+                                    status: pvc.status,
+                                    extra: {
+                                      capacity: pvc.capacity,
+                                      storageClass: pvc.storageClass,
+                                    },
+                                    age: '',
+                                  });
+                                }}
+                                className="px-2 py-0.5 rounded bg-purple-950/60 hover:bg-purple-900/80 border border-purple-900 hover:border-purple-600 text-[10px] font-mono text-purple-300 flex items-center gap-1 transition-colors cursor-pointer"
+                                title={`Click to resize/expand storage for ${pvc.name}`}
                               >
-                                <Database size={10} />
+                                <Database size={10} className="text-purple-400" />
                                 <span>{pvc.name}</span>
-                                <span className="text-slate-400">({pvc.capacity})</span>
-                              </span>
+                                <span className="text-purple-200 font-bold">({pvc.capacity})</span>
+                              </button>
                             ))}
                           </div>
                         )}

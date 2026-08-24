@@ -12,6 +12,8 @@ import { ActionDialog } from './components/ActionDialog.js';
 import { WorkloadDetailsModal } from './components/WorkloadDetailsModal.js';
 import { TopologyView } from './components/TopologyView.js';
 import { ContextModal } from './components/ContextModal.js';
+import { SecretEditorModal } from './components/SecretEditorModal.js';
+import { ResizePvcModal } from './components/ResizePvcModal.js';
 import { ResourceKind, ResourceItem, KubeContext, ProjectInfo, ImageStreamResource } from '../types/k8s.js';
 import { FuzzyMatcher } from '../utils/fuzzy.js';
 import { CheckCircle2, AlertTriangle } from 'lucide-react';
@@ -24,6 +26,8 @@ type ModalMode =
   | 'logs'
   | 'yaml'
   | 'edit-yaml'
+  | 'edit-secret'
+  | 'resize-pvc'
   | 'describe'
   | 'scale'
   | 'restart'
@@ -283,6 +287,12 @@ export const App: React.FC = () => {
       case 'edit-yaml':
         openModal('edit-yaml', item);
         break;
+      case 'edit-secret':
+        openModal('edit-secret', item);
+        break;
+      case 'resize-pvc':
+        openModal('resize-pvc', item);
+        break;
       case 'logs':
         openModal('logs', item);
         break;
@@ -412,6 +422,7 @@ export const App: React.FC = () => {
               onOpenWorkloadLogs={(item) => openModal('logs', item)}
               onOpenWorkloadYaml={(item) => openModal('edit-yaml', item)}
               onOpenWorkloadScale={(item) => openModal('scale', item)}
+              onOpenPvcResize={(item) => openModal('resize-pvc', item)}
               onOpenExternal={async (url) => {
                 const api = (window as any).electronAPI;
                 if (api && api.openExternal) await api.openExternal(url);
@@ -551,6 +562,32 @@ export const App: React.FC = () => {
       {/* Interactive Edit YAML Modal */}
       {modalMode === 'edit-yaml' && selectedItem && (
         <EditYamlModal
+          item={selectedItem}
+          namespace={selectedItem.namespace || currentProject}
+          onClose={closeModal}
+          onSuccess={(msg) => {
+            showToast(msg, 'success');
+            fetchResources(false);
+          }}
+        />
+      )}
+
+      {/* GUI Secret Editor Modal (Decoded Plaintext Key-Values) */}
+      {modalMode === 'edit-secret' && selectedItem && (
+        <SecretEditorModal
+          item={selectedItem}
+          namespace={selectedItem.namespace || currentProject}
+          onClose={closeModal}
+          onSuccess={(msg) => {
+            showToast(msg, 'success');
+            fetchResources(false);
+          }}
+        />
+      )}
+
+      {/* PVC Storage Capacity Resize Modal */}
+      {modalMode === 'resize-pvc' && selectedItem && (
+        <ResizePvcModal
           item={selectedItem}
           namespace={selectedItem.namespace || currentProject}
           onClose={closeModal}

@@ -89,6 +89,18 @@ export function registerIpcHandlers(mainWindow: electron.BrowserWindow): void {
     return await OcClient.getTopologyData(namespace);
   });
 
+  ipcMain.handle('secret:getData', async (_event, name: string, namespace: string) => {
+    return await OcClient.getSecretData(name, namespace);
+  });
+
+  ipcMain.handle('secret:save', async (_event, name: string, namespace: string, data: Record<string, string>, type?: string) => {
+    return await OcClient.saveSecret(name, namespace, data, type);
+  });
+
+  ipcMain.handle('pvc:resize', async (_event, name: string, namespace: string, newSize: string) => {
+    return await OcClient.resizePvc(name, namespace, newSize);
+  });
+
   // Helm Handlers
   ipcMain.handle('helm:getValues', async (_event, releaseName: string, namespace: string) => {
     return await HelmService.getValues(releaseName, namespace);

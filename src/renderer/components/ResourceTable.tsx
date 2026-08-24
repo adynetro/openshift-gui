@@ -12,8 +12,11 @@ import {
   XCircle,
   Clock,
   KeyRound,
+  Key,
   Layers,
   ExternalLink,
+  Maximize2,
+  Database,
 } from 'lucide-react';
 import { ResourceKind, ResourceItem, ImageStreamResource } from '../../types/k8s.js';
 
@@ -297,6 +300,32 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                     >
                       {item.name}
                     </button>
+                  ) : kind === 'secrets' ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectItem(item);
+                        onRowAction('edit-secret', item);
+                      }}
+                      className="text-left font-bold text-slate-100 hover:text-[#a6e22e] hover:underline truncate max-w-[280px] transition-colors cursor-pointer flex items-center gap-1.5"
+                      title={`Click to open GUI Secret Editor for ${item.name}`}
+                    >
+                      <Key size={12} className="text-[#a6e22e] shrink-0" />
+                      <span className="truncate">{item.name}</span>
+                    </button>
+                  ) : kind === 'pvc' ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectItem(item);
+                        onRowAction('resize-pvc', item);
+                      }}
+                      className="text-left font-bold text-slate-100 hover:text-cyan-300 hover:underline truncate max-w-[280px] transition-colors cursor-pointer flex items-center gap-1.5"
+                      title={`Click to resize/expand storage for ${item.name}`}
+                    >
+                      <Database size={12} className="text-cyan-400 shrink-0" />
+                      <span className="truncate">{item.name}</span>
+                    </button>
                   ) : (
                     <span className="truncate max-w-[280px]" title={item.name}>
                       {item.name}
@@ -554,6 +583,36 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                           aria-label="Live Logs"
                         >
                           <Terminal size={14} />
+                        </button>
+                      )}
+
+                      {/* Edit Secret Action */}
+                      {kind === 'secrets' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRowAction('edit-secret', item);
+                          }}
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-amber-950 text-amber-400 border border-slate-700 hover:border-amber-500 transition-colors"
+                          title="Open GUI Secret Editor (Decoded Keys)"
+                          aria-label="Edit Secret"
+                        >
+                          <Key size={14} />
+                        </button>
+                      )}
+
+                      {/* Resize PVC Action */}
+                      {kind === 'pvc' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRowAction('resize-pvc', item);
+                          }}
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-emerald-950 text-emerald-400 border border-slate-700 hover:border-emerald-500 transition-colors"
+                          title="Resize / Expand PVC Storage"
+                          aria-label="Resize Storage"
+                        >
+                          <Maximize2 size={14} />
                         </button>
                       )}
 
