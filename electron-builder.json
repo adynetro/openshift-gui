@@ -2,13 +2,15 @@
   "appId": "com.alexandruchiscari.openshift-gui",
   "productName": "OpenShift GUI",
   "directories": {
-    "output": "release"
+    "output": "release",
+    "buildResources": "build"
   },
   "files": [
     "dist/**/*",
     "package.json"
   ],
   "mac": {
+    "icon": "build/icon.icns",
     "target": [
       {
         "target": "dir",
@@ -21,5 +23,12 @@
     ],
     "category": "public.app-category.developer-tools",
     "identity": null
+  },
+  "linux": {
+    "icon": "build/icon.png",
+    "category": "Development"
+  },
+  "win": {
+    "icon": "build/icon.png"
   }
 }

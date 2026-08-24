@@ -151,11 +151,11 @@ export const ImageStreamModal: React.FC<ImageStreamModalProps> = ({
 
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-lg bg-slate-800 hover:bg-rose-950/80 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-700/80 flex items-center justify-center transition-all cursor-pointer shadow-sm shrink-0 ml-1"
-            title="Close window (Esc or click backdrop)"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            title="Close window (Esc)"
             aria-label="Close window"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 

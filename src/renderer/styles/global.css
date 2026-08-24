@@ -78,21 +78,27 @@ body {
   animation: pulse-glow 2s infinite ease-in-out;
 }
 
-/* Button & Input Base */
+/* Button & Input Base - Rock Solid Click Areas */
 button {
   font-family: var(--font-sans);
   cursor: pointer;
   outline: none;
-  transition: all 0.15s ease-in-out;
+  -webkit-app-region: no-drag;
+  user-select: none;
+}
+
+button svg, a svg {
+  pointer-events: none;
 }
 
 button:active {
-  transform: scale(0.98);
+  opacity: 0.85;
 }
 
-input, select, textarea {
+input, select, textarea, a {
   font-family: var(--font-sans);
   outline: none;
+  -webkit-app-region: no-drag;
 }
 
 /* CodeMirror IDE Custom Styling */

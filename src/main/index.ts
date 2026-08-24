@@ -1,6 +1,7 @@
 import electron from 'electron';
 import path from 'node:path';
 import os from 'node:os';
+import fs from 'node:fs';
 import { registerIpcHandlers } from './ipc-handlers.js';
 
 const { app, BrowserWindow } = electron;
@@ -31,6 +32,8 @@ if (!process.env['KUBECONFIG']) {
 let mainWindow: electron.BrowserWindow | null = null;
 
 async function createWindow() {
+  const iconPath = path.join(__dirname, '../../build/icon.png');
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 840,
@@ -40,6 +43,7 @@ async function createWindow() {
     backgroundColor: '#0b0f19',
     vibrancy: 'under-window',
     visualEffectState: 'active',
+    icon: fs.existsSync(iconPath) ? iconPath : undefined,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,

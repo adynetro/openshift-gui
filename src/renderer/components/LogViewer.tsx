@@ -316,14 +316,14 @@ export const LogViewer: React.FC<LogViewerProps> = ({ item, namespace, onClose }
               {copied ? <Check size={14} className="text-[#a6e22e]" /> : <Copy size={14} />}
             </button>
 
-            {/* Close Button with generous action zone */}
+            {/* Close Button */}
             <button
               onClick={onClose}
-              className="w-9 h-9 rounded-lg bg-[#272822] hover:bg-rose-950/80 text-[#75715e] hover:text-rose-300 border border-[#49483e] hover:border-rose-700/80 flex items-center justify-center transition-all cursor-pointer shadow-sm shrink-0 ml-1"
-              title="Close window (Esc or click backdrop)"
+              className="p-1.5 rounded-lg text-[#75715e] hover:text-[#f8f8f2] hover:bg-[#3e3d32] transition-colors"
+              title="Close window (Esc)"
               aria-label="Close window"
             >
-              <X size={20} />
+              <X size={18} />
             </button>
           </div>
         </div>
