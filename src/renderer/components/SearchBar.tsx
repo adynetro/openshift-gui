@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, X, Zap, Terminal, Sparkles, RefreshCw, SlidersHorizontal, FileText, Code2, Trash2, Filter, Eraser, Anchor } from 'lucide-react';
+import { Search, X, Zap, Terminal, Sparkles, RefreshCw, SlidersHorizontal, FileText, Code2, Trash2, Filter, Eraser, Anchor, Box } from 'lucide-react';
 import { ResourceKind, ResourceItem } from '../../types/k8s.js';
 
 interface SearchBarProps {
@@ -31,6 +31,26 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   const getActionPills = () => {
     if (currentKind === 'events') return [];
     const pills: { id: string; label: string; tooltip: string; icon: any; color: string; disabled?: boolean }[] = [];
+
+    // View Pods action pill for workloads
+    if (
+      currentKind === 'deployments' ||
+      currentKind === 'deploymentconfigs' ||
+      currentKind === 'statefulsets' ||
+      currentKind === 'daemonsets' ||
+      currentKind === 'services' ||
+      currentKind === 'nodes' ||
+      currentKind === 'helm'
+    ) {
+      pills.push({
+        id: 'view-pods',
+        label: 'Pods',
+        tooltip: 'View Pods for this resource',
+        icon: Box,
+        color: 'hover:border-amber-500 hover:text-amber-300 hover:bg-amber-950/40 text-amber-400 border-amber-900/50 bg-amber-950/20 font-semibold',
+        disabled: !selectedItem,
+      });
+    }
 
     // Live logs for pods, deployments, deploymentconfigs, statefulsets, daemonsets
     if (

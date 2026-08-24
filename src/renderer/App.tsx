@@ -227,6 +227,17 @@ export const App: React.FC = () => {
     if (item) setSelectedItem(item);
 
     switch (actionType) {
+      case 'view-pods':
+        if (item) {
+          if (item.namespace && currentProject !== 'all-projects' && item.namespace !== currentProject) {
+            setCurrentProject(item.namespace);
+          }
+          setCurrentKind('pods');
+          setQuery(item.name);
+          setSelectedItem(null);
+          showToast(`Showing Pods for ${item.kind}/${item.name}`);
+        }
+        break;
       case 'edit-yaml':
         setModalMode('edit-yaml');
         break;

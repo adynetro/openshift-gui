@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  Box,
   Terminal,
   SlidersHorizontal,
   RefreshCw,
@@ -311,7 +312,18 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                 {/* DeploymentConfig Columns */}
                 {kind === 'deploymentconfigs' && (
                   <>
-                    <td className="py-2.5 px-3 font-mono font-bold text-slate-200">{item.ready || '-'}</td>
+                    <td className="py-2.5 px-3 font-mono font-bold text-slate-200">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRowAction('view-pods', item);
+                        }}
+                        className="hover:text-cyan-300 hover:underline flex items-center gap-1 group/pods"
+                        title={`Click to view Pods for ${item.name}`}
+                      >
+                        <span>{item.ready || '-'}</span>
+                      </button>
+                    </td>
                     <td className="py-2.5 px-3 font-mono text-cyan-300">rev {item.extra?.revision || '1'}</td>
                     <td className="py-2.5 px-3 font-mono text-slate-400 text-[11px] truncate max-w-[160px]" title={item.extra?.triggers}>
                       {item.extra?.triggers || 'Config'}
@@ -324,7 +336,18 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                 {/* Workload Columns */}
                 {(kind === 'deployments' || kind === 'statefulsets' || kind === 'daemonsets') && (
                   <>
-                    <td className="py-2.5 px-3 font-mono font-bold text-slate-200">{item.ready || '-'}</td>
+                    <td className="py-2.5 px-3 font-mono font-bold text-slate-200">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRowAction('view-pods', item);
+                        }}
+                        className="hover:text-cyan-300 hover:underline flex items-center gap-1 group/pods"
+                        title={`Click to view Pods for ${item.name}`}
+                      >
+                        <span>{item.ready || '-'}</span>
+                      </button>
+                    </td>
                     <td className="py-2.5 px-3 font-mono text-slate-400">{item.extra?.upToDate ?? '-'}</td>
                     <td className="py-2.5 px-3 font-mono text-slate-400">{item.extra?.available ?? '-'}</td>
                     <td className="py-2.5 px-3">{getStatusBadge(item.status, item.statusColor)}</td>
@@ -433,6 +456,27 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                 {kind !== 'events' && (
                   <td className="py-2 px-4 text-right">
                     <div className="flex items-center justify-end gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
+                      {/* View Workload Pods */}
+                      {(kind === 'deployments' ||
+                        kind === 'deploymentconfigs' ||
+                        kind === 'statefulsets' ||
+                        kind === 'daemonsets' ||
+                        kind === 'services' ||
+                        kind === 'nodes' ||
+                        kind === 'helm') && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRowAction('view-pods', item);
+                          }}
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-amber-950 text-amber-300 border border-slate-700 hover:border-amber-500 transition-colors"
+                          title={`View Pods for ${item.name}`}
+                          aria-label="View Pods"
+                        >
+                          <Box size={14} />
+                        </button>
+                      )}
+
                       {/* Live Logs: Pods, Deployments, DeploymentConfigs, StatefulSets, DaemonSets */}
                       {(kind === 'pods' ||
                         kind === 'deployments' ||
