@@ -1283,4 +1283,79 @@ export class OcClient {
       return { success: false, message: err.message || 'Failed to resize PVC' };
     }
   }
+
+  /**
+   * Fetches all Custom Resource instances for a given CRD name.
+   */
+  static async getCrdInstances(
+    crdName: string,
+    namespace: string
+  ): Promise<{ items: ResourceItem[]; scope?: string; crdKind?: string; group?: string; error?: string }> {
+    try {
+      // First get the CRD definition to determine scope, group, and kind
+      const crdRes = await this.runCommand(`oc get crd "${crdName}" -o json || kubectl get crd "${crdName}" -o json`);
+      let scope = 'Namespaced';
+      let crdKind = crdName;
+      let group = '';
+      if (crdRes.stdout.trim()) {
+        try {
+          const crdJson = JSON.parse(crdRes.stdout);
+          scope = crdJson.spec?.scope || 'Namespaced';
+          crdKind = crdJson.spec?.names?.kind || crdName;
+          group = crdJson.spec?.group || '';
+        } catch {}
+      }
+
+      const isCluster = scope === 'Cluster';
+      const isAll = !namespace || namespace === 'all-projects' || namespace === '__all__';
+      const nsFlag = isCluster ? '' : (isAll ? '-A' : `-n "${namespace}"`);
+
+      const cmd = `oc get "${crdName}" ${nsFlag} -o json || kubectl get "${crdName}" ${nsFlag} -o json`;
+      const { stdout, stderr } = await this.runCommand(cmd);
+
+      if (!stdout.trim()) {
+        return { items: [], scope, crdKind, group, error: stderr || undefined };
+      }
+
+      const json = JSON.parse(stdout);
+      const rawList = json.items || (json.kind ? [json] : []);
+      const items: ResourceItem[] = rawList.map((raw: any) => {
+        const meta = raw.metadata || {};
+        const ns = meta.namespace || (isCluster ? 'cluster' : namespace);
+        const name = meta.name || '';
+        const age = formatAge(meta.creationTimestamp);
+
+        // Status extraction
+        const status =
+          raw.status?.phase ||
+          raw.status?.state ||
+          raw.status?.conditions?.find((c: any) => c.status === 'True')?.type ||
+          'Active';
+
+        let statusColor: 'green' | 'yellow' | 'red' | 'gray' = 'green';
+        const stLower = String(status).toLowerCase();
+        if (stLower.includes('fail') || stLower.includes('err') || stLower.includes('degraded') || stLower.includes('false')) {
+          statusColor = 'red';
+        } else if (stLower.includes('progress') || stLower.includes('pending') || stLower.includes('warn')) {
+          statusColor = 'yellow';
+        }
+
+        return {
+          id: `${ns}/${name}`,
+          name,
+          namespace: ns,
+          kind: crdName as any,
+          status,
+          statusColor,
+          age,
+          labels: meta.labels || {},
+          raw,
+        };
+      });
+
+      return { items, scope, crdKind, group };
+    } catch (err: any) {
+      return { items: [], error: err.message || 'Failed to fetch CRD instances' };
+    }
+  }
 }

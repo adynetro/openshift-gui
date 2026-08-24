@@ -17,6 +17,7 @@ import {
   ExternalLink,
   Maximize2,
   Database,
+  Boxes,
 } from 'lucide-react';
 import { ResourceKind, ResourceItem, ImageStreamResource } from '../../types/k8s.js';
 
@@ -326,6 +327,19 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                       <Database size={12} className="text-cyan-400 shrink-0" />
                       <span className="truncate">{item.name}</span>
                     </button>
+                  ) : kind === 'crd' ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectItem(item);
+                        onRowAction('crd-instances', item);
+                      }}
+                      className="text-left font-bold text-slate-100 hover:text-[#ae81ff] hover:underline truncate max-w-[280px] transition-colors cursor-pointer flex items-center gap-1.5"
+                      title={`Click to view and edit Custom Resource instances for ${item.name}`}
+                    >
+                      <Boxes size={12} className="text-[#ae81ff] shrink-0" />
+                      <span className="truncate">{item.name}</span>
+                    </button>
                   ) : (
                     <span className="truncate max-w-[280px]" title={item.name}>
                       {item.name}
@@ -613,6 +627,21 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                           aria-label="Resize Storage"
                         >
                           <Maximize2 size={14} />
+                        </button>
+                      )}
+
+                      {/* CRD Instances Action */}
+                      {kind === 'crd' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRowAction('crd-instances', item);
+                          }}
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-purple-950 text-[#ae81ff] border border-slate-700 hover:border-purple-500 transition-colors"
+                          title="View and Edit Custom Resource Instances"
+                          aria-label="View Instances"
+                        >
+                          <Boxes size={14} />
                         </button>
                       )}
 

@@ -101,6 +101,10 @@ export function registerIpcHandlers(mainWindow: electron.BrowserWindow): void {
     return await OcClient.resizePvc(name, namespace, newSize);
   });
 
+  ipcMain.handle('crd:getInstances', async (_event, crdName: string, namespace: string) => {
+    return await OcClient.getCrdInstances(crdName, namespace);
+  });
+
   // Helm Handlers
   ipcMain.handle('helm:getValues', async (_event, releaseName: string, namespace: string) => {
     return await HelmService.getValues(releaseName, namespace);

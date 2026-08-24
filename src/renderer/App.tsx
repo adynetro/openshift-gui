@@ -14,6 +14,7 @@ import { TopologyView } from './components/TopologyView.js';
 import { ContextModal } from './components/ContextModal.js';
 import { SecretEditorModal } from './components/SecretEditorModal.js';
 import { ResizePvcModal } from './components/ResizePvcModal.js';
+import { CrdInstancesModal } from './components/CrdInstancesModal.js';
 import { ResourceKind, ResourceItem, KubeContext, ProjectInfo, ImageStreamResource } from '../types/k8s.js';
 import { FuzzyMatcher } from '../utils/fuzzy.js';
 import { CheckCircle2, AlertTriangle } from 'lucide-react';
@@ -28,6 +29,7 @@ type ModalMode =
   | 'edit-yaml'
   | 'edit-secret'
   | 'resize-pvc'
+  | 'crd-instances'
   | 'describe'
   | 'scale'
   | 'restart'
@@ -292,6 +294,9 @@ export const App: React.FC = () => {
         break;
       case 'resize-pvc':
         openModal('resize-pvc', item);
+        break;
+      case 'crd-instances':
+        openModal('crd-instances', item);
         break;
       case 'logs':
         openModal('logs', item);
@@ -595,6 +600,18 @@ export const App: React.FC = () => {
             showToast(msg, 'success');
             fetchResources(false);
           }}
+        />
+      )}
+
+      {/* CRD Custom Resource Instances Explorer & Editor Modal */}
+      {modalMode === 'crd-instances' && selectedItem && (
+        <CrdInstancesModal
+          crdItem={selectedItem}
+          namespace={currentProject}
+          onClose={closeModal}
+          onEditInstance={(inst) => openModal('edit-yaml', inst)}
+          onDescribeInstance={(inst) => openModal('describe', inst)}
+          onDeleteInstance={(inst) => openModal('delete', inst)}
         />
       )}
 

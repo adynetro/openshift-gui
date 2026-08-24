@@ -22,6 +22,7 @@ export interface IpcApi {
   getSecretData: (name: string, namespace: string) => Promise<{ data?: Record<string, string>; type?: string; error?: string }>;
   saveSecret: (name: string, namespace: string, data: Record<string, string>, type?: string) => Promise<{ success: boolean; message: string }>;
   resizePvc: (name: string, namespace: string, newSize: string) => Promise<{ success: boolean; message: string }>;
+  getCrdInstances: (crdName: string, namespace: string) => Promise<{ items: any[]; scope?: string; crdKind?: string; group?: string; error?: string }>;
   getHelmValues: (releaseName: string, namespace: string) => Promise<string>;
   upgradeHelmValues: (releaseName: string, valuesYaml: string, namespace: string) => Promise<{ success: boolean; message: string }>;
   getHelmManifest: (releaseName: string, namespace: string) => Promise<string>;
@@ -55,6 +56,7 @@ const api: IpcApi = {
   getSecretData: (name, ns) => ipcRenderer.invoke('secret:getData', name, ns),
   saveSecret: (name, ns, data, type) => ipcRenderer.invoke('secret:save', name, ns, data, type),
   resizePvc: (name, ns, size) => ipcRenderer.invoke('pvc:resize', name, ns, size),
+  getCrdInstances: (crdName, ns) => ipcRenderer.invoke('crd:getInstances', crdName, ns),
   getHelmValues: (rel, ns) => ipcRenderer.invoke('helm:getValues', rel, ns),
   upgradeHelmValues: (rel, yaml, ns) => ipcRenderer.invoke('helm:upgradeValues', rel, yaml, ns),
   getHelmManifest: (rel, ns) => ipcRenderer.invoke('helm:getManifest', rel, ns),
