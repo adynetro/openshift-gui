@@ -89,20 +89,33 @@ export const ActionDialog: React.FC<ActionDialogProps> = ({
   return (
     <div
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget && !loading) onClose();
       }}
-      className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150"
+      className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150 select-none"
     >
-      <div className={`bg-[#0f172a] border ${config.borderColor} rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col`}>
+      <div
+        className={`border ${config.borderColor} rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col transition-colors`}
+        style={{
+          backgroundColor: 'var(--bg-card, #1e293b)',
+          borderColor: 'var(--border-color, #334155)',
+          color: 'var(--text-main, #f8fafc)',
+        }}
+      >
         {/* Header */}
-        <div className="p-4 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between">
+        <div
+          className="p-4 border-b flex items-center justify-between"
+          style={{
+            backgroundColor: 'var(--bg-card-header, #0f172a)',
+            borderColor: 'var(--border-color, #334155)',
+          }}
+        >
           <div className="flex items-center gap-3">
             <div className={`w-9 h-9 rounded-lg flex items-center justify-center border ${config.iconColor}`}>
               <Icon size={18} />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-white">{config.title}</h2>
-              <p className="text-xs text-slate-400 font-mono">
+              <h2 className="text-sm font-bold">{config.title}</h2>
+              <p className="text-xs opacity-60 font-mono">
                 {item.kind}/{item.name}
               </p>
             </div>
@@ -110,7 +123,8 @@ export const ActionDialog: React.FC<ActionDialogProps> = ({
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            disabled={loading}
+            className="p-1.5 rounded-lg opacity-60 hover:opacity-100 hover:bg-white/10 transition-colors"
             title="Close window (Esc)"
             aria-label="Close window"
           >
@@ -122,16 +136,26 @@ export const ActionDialog: React.FC<ActionDialogProps> = ({
         <div className="p-5 space-y-4">
           {mode === 'scale' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between text-xs text-slate-300">
+              <div className="flex items-center justify-between text-xs opacity-80">
                 <span>Current Replicas: <strong className="text-cyan-400 font-mono">{currentDesired}</strong></span>
-                <span>Namespace: <strong className="text-slate-200 font-mono">{namespace}</strong></span>
+                <span>Namespace: <strong className="font-mono">{namespace}</strong></span>
               </div>
 
               {/* Counter Input */}
-              <div className="flex items-center justify-center gap-3 p-3 bg-slate-900 rounded-lg border border-slate-800">
+              <div
+                className="flex items-center justify-center gap-3 p-3 rounded-lg border"
+                style={{
+                  backgroundColor: 'var(--bg-input, #0f172a)',
+                  borderColor: 'var(--border-subtle, #334155)',
+                }}
+              >
                 <button
                   onClick={() => setReplicas((prev) => Math.max(0, prev - 1))}
-                  className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-lg flex items-center justify-center border border-slate-700 active:scale-95 transition-all"
+                  className="w-10 h-10 rounded-lg border opacity-80 hover:opacity-100 font-bold text-lg flex items-center justify-center active:scale-95 transition-all"
+                  style={{
+                    backgroundColor: 'var(--bg-card, #1e293b)',
+                    borderColor: 'var(--border-color, #334155)',
+                  }}
                 >
                   -
                 </button>
@@ -142,7 +166,11 @@ export const ActionDialog: React.FC<ActionDialogProps> = ({
 
                 <button
                   onClick={() => setReplicas((prev) => prev + 1)}
-                  className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-lg flex items-center justify-center border border-slate-700 active:scale-95 transition-all"
+                  className="w-10 h-10 rounded-lg border opacity-80 hover:opacity-100 font-bold text-lg flex items-center justify-center active:scale-95 transition-all"
+                  style={{
+                    backgroundColor: 'var(--bg-card, #1e293b)',
+                    borderColor: 'var(--border-color, #334155)',
+                  }}
                 >
                   +
                 </button>
@@ -162,26 +190,32 @@ export const ActionDialog: React.FC<ActionDialogProps> = ({
 
           {mode === 'restart' && (
             <div className="space-y-2">
-              <p className="text-sm text-slate-200">
+              <p className="text-sm">
                 Are you sure you want to trigger a rolling restart for{' '}
-                <strong className="text-white font-mono">{item.name}</strong>?
+                <strong className="font-mono">{item.name}</strong>?
               </p>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs opacity-70">
                 This triggers a safe zero-downtime rolling replacement of all running pod replicas.
               </p>
             </div>
           )}
 
           {mode === 'delete' && (
-            <div className="p-3 bg-rose-950/40 border border-rose-800/80 rounded-lg space-y-2">
+            <div
+              className="p-3 border rounded-lg space-y-2"
+              style={{
+                backgroundColor: 'rgba(225, 29, 72, 0.1)',
+                borderColor: 'rgba(225, 29, 72, 0.3)',
+              }}
+            >
               <div className="flex items-center gap-2 text-rose-400 font-bold text-xs">
                 <AlertTriangle size={15} />
                 <span>Permanent Deletion Warning</span>
               </div>
               <p className="text-xs text-rose-200">
-                Are you sure you want to delete <strong className="font-mono text-white">{item.kind}/{item.name}</strong> in project <strong className="font-mono text-white">{namespace}</strong>?
+                Are you sure you want to delete <strong className="font-mono">{item.kind}/{item.name}</strong> in project <strong className="font-mono">{namespace}</strong>?
               </p>
-              <p className="text-[11px] text-rose-300/80">
+              <p className="text-[11px] opacity-70">
                 This action cannot be undone.
               </p>
             </div>
@@ -189,11 +223,20 @@ export const ActionDialog: React.FC<ActionDialogProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 bg-slate-900 border-t border-slate-800 flex items-center justify-end gap-2">
+        <div
+          className="p-4 border-t flex items-center justify-end gap-2"
+          style={{
+            backgroundColor: 'var(--bg-card-header, #0f172a)',
+            borderColor: 'var(--border-color, #334155)',
+          }}
+        >
           <button
             onClick={onClose}
             disabled={loading}
-            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition-colors"
+            className="px-3.5 py-1.5 rounded-lg text-xs font-medium border opacity-80 hover:opacity-100 hover:bg-white/5 transition-colors disabled:opacity-30"
+            style={{
+              borderColor: 'var(--border-subtle, #334155)',
+            }}
           >
             Cancel
           </button>

@@ -144,17 +144,17 @@ export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
       }}
       className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 z-50 animate-in fade-in duration-150 select-none"
     >
-      <div className="bg-[#1e1f1c] border border-[#49483e] rounded-xl shadow-2xl w-[96vw] max-w-[1750px] h-[94vh] flex flex-col overflow-hidden text-[#f8f8f2]">
+      <div className="rounded-xl shadow-2xl w-[96vw] max-w-[1750px] h-[94vh] flex flex-col overflow-hidden border transition-colors" style={{ backgroundColor: "var(--bg-card, #1e293b)", borderColor: "var(--border-color, #334155)", color: "var(--text-main, #f8fafc)" }}>
         {/* Monokai Header */}
-        <div className="p-3.5 bg-[#272822] border-b border-[#3e3d32] flex items-center justify-between shrink-0">
+        <div className="p-3.5 border-b flex items-center justify-between shrink-0" style={{ backgroundColor: "var(--bg-card-header, #0f172a)", borderColor: "var(--border-color, #334155)" }}>
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-[#3e3d32] flex items-center justify-center border border-[#49483e]">
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center border" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)" }}>
               {getKindIcon()}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-sm font-bold text-[#f8f8f2] flex items-center gap-2">
-                  <span className="text-[#66d9ef] font-mono">{item.name}</span>
+                <h2 className="text-sm font-bold flex items-center gap-2">
+                  <span className="font-mono font-bold text-cyan-400">{item.name}</span>
                 </h2>
                 <span className="px-2 py-0.2 rounded bg-slate-800 border border-slate-700 text-[10px] text-slate-300 font-mono">
                   {item.kind}
@@ -163,12 +163,12 @@ export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
                   Project: {details?.namespace || namespace}
                 </span>
                 {details && (
-                  <span className="px-2 py-0.2 rounded bg-[#a6e22e]/20 border border-[#a6e22e]/40 text-[10px] text-[#a6e22e] font-mono font-bold">
+                  <span className="px-2 py-0.2 rounded bg-[#a6e22e]/20 border border-[#a6e22e]/40 text-[10px] text-emerald-400 font-mono font-bold">
                     Replicas: {details.readyReplicas}/{details.desiredReplicas} Ready
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-[#75715e] font-mono">
+              <p className="text-[11px] opacity-60 font-mono">
                 Hierarchy drilldown: Workload → Replicas & Revisions → Live Pods
               </p>
             </div>
@@ -178,7 +178,7 @@ export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={() => onAction('logs', item)}
-              className="px-2.5 py-1.5 rounded-lg bg-[#a6e22e]/15 hover:bg-[#a6e22e]/30 text-[#a6e22e] border border-[#a6e22e]/40 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              className="px-2.5 py-1.5 rounded-lg bg-[#a6e22e]/15 hover:bg-[#a6e22e]/30 text-emerald-400 border border-[#a6e22e]/40 text-xs font-semibold flex items-center gap-1.5 transition-colors"
               title="Stream aggregated logs across all pods"
             >
               <Terminal size={13} />
@@ -187,7 +187,7 @@ export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
 
             <button
               onClick={() => onAction('edit-yaml', item)}
-              className="px-2.5 py-1.5 rounded-lg bg-[#66d9ef]/15 hover:bg-[#66d9ef]/30 text-[#66d9ef] border border-[#66d9ef]/40 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              className="px-2.5 py-1.5 rounded-lg bg-[#66d9ef]/15 hover:bg-[#66d9ef]/30 text-cyan-400 border border-[#66d9ef]/40 text-xs font-semibold flex items-center gap-1.5 transition-colors"
               title="Open interactive IDE YAML editor"
             >
               <FileCode2 size={13} />
@@ -196,7 +196,7 @@ export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
 
             <button
               onClick={() => onAction('scale', item)}
-              className="px-2.5 py-1.5 rounded-lg bg-[#ae81ff]/15 hover:bg-[#ae81ff]/30 text-[#ae81ff] border border-[#ae81ff]/40 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              className="px-2.5 py-1.5 rounded-lg bg-[#ae81ff]/15 hover:bg-[#ae81ff]/30 text-purple-400 border border-[#ae81ff]/40 text-xs font-semibold flex items-center gap-1.5 transition-colors"
               title="Scale Replicas"
             >
               <SlidersHorizontal size={13} />
@@ -205,7 +205,7 @@ export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
 
             <button
               onClick={() => onAction('restart', item)}
-              className="px-2.5 py-1.5 rounded-lg bg-[#fd971f]/15 hover:bg-[#fd971f]/30 text-[#fd971f] border border-[#fd971f]/40 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              className="px-2.5 py-1.5 rounded-lg bg-[#fd971f]/15 hover:bg-[#fd971f]/30 text-amber-400 border border-[#fd971f]/40 text-xs font-semibold flex items-center gap-1.5 transition-colors"
               title="Rollout Restart / Latest"
             >
               <RefreshCw size={13} />
@@ -214,7 +214,7 @@ export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
 
             <button
               onClick={() => onAction('describe', item)}
-              className="px-2.5 py-1.5 rounded-lg bg-[#272822] hover:bg-[#3e3d32] text-slate-300 hover:text-white border border-[#49483e] text-xs font-medium flex items-center gap-1.5 transition-colors"
+              className="px-2.5 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-colors opacity-80 hover:opacity-100" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)" }}
               title="Describe Resource Details"
             >
               <FileText size={13} />
@@ -224,15 +224,15 @@ export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
             <button
               onClick={() => fetchDetails(false)}
               disabled={loading}
-              className="p-1.5 rounded-lg bg-[#272822] hover:bg-[#3e3d32] text-[#75715e] hover:text-[#f8f8f2] border border-[#49483e] transition-colors disabled:opacity-50"
+              className="p-1.5 rounded-lg border transition-colors opacity-80 hover:opacity-100 disabled:opacity-50" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)" }}
               title="Refresh workload details"
             >
-              <RefreshCw size={15} className={loading ? 'animate-spin text-[#66d9ef]' : ''} />
+              <RefreshCw size={15} className={loading ? 'animate-spin text-cyan-400' : ''} />
             </button>
 
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-[#75715e] hover:text-[#f8f8f2] hover:bg-[#3e3d32] transition-colors ml-1"
+              className="p-1.5 rounded-lg opacity-60 hover:opacity-100 hover:bg-white/10 transition-colors ml-1"
               title="Close window (Esc)"
               aria-label="Close window"
             >
@@ -245,8 +245,8 @@ export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {loading && !details && (
             <div className="h-64 flex flex-col items-center justify-center space-y-3">
-              <RefreshCw className="animate-spin text-[#66d9ef]" size={28} />
-              <p className="text-sm font-mono text-[#75715e]">Loading revisions and live pod statuses...</p>
+              <RefreshCw className="animate-spin text-cyan-400" size={28} />
+              <p className="text-sm font-mono opacity-60">Loading revisions and live pod statuses...</p>
             </div>
           )}
 
@@ -264,26 +264,26 @@ export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
             <>
               {/* Overview Cards */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <div className="p-3 bg-[#272822] border border-[#3e3d32] rounded-lg">
-                  <div className="text-[11px] font-bold text-[#75715e] uppercase tracking-wider mb-1">Strategy</div>
-                  <div className="text-sm font-semibold font-mono text-[#66d9ef]">{details.strategy || 'Rolling'}</div>
+                <div className="p-3 rounded-lg border" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)" }}>
+                  <div className="text-[11px] font-bold opacity-60 uppercase tracking-wider mb-1">Strategy</div>
+                  <div className="text-sm font-semibold font-mono text-cyan-400">{details.strategy || 'Rolling'}</div>
                 </div>
 
-                <div className="p-3 bg-[#272822] border border-[#3e3d32] rounded-lg">
-                  <div className="text-[11px] font-bold text-[#75715e] uppercase tracking-wider mb-1">Triggers</div>
-                  <div className="text-sm font-semibold font-mono text-[#fd971f]">{details.triggers || 'Config'}</div>
+                <div className="p-3 rounded-lg border" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)" }}>
+                  <div className="text-[11px] font-bold opacity-60 uppercase tracking-wider mb-1">Triggers</div>
+                  <div className="text-sm font-semibold font-mono text-amber-400">{details.triggers || 'Config'}</div>
                 </div>
 
-                <div className="p-3 bg-[#272822] border border-[#3e3d32] rounded-lg">
-                  <div className="text-[11px] font-bold text-[#75715e] uppercase tracking-wider mb-1">Replicas</div>
-                  <div className="text-sm font-semibold font-mono text-[#a6e22e]">
+                <div className="p-3 rounded-lg border" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)" }}>
+                  <div className="text-[11px] font-bold opacity-60 uppercase tracking-wider mb-1">Replicas</div>
+                  <div className="text-sm font-semibold font-mono text-emerald-400">
                     {details.readyReplicas} / {details.desiredReplicas} Ready
                   </div>
                 </div>
 
-                <div className="p-3 bg-[#272822] border border-[#3e3d32] rounded-lg">
-                  <div className="text-[11px] font-bold text-[#75715e] uppercase tracking-wider mb-1">Active Revisions</div>
-                  <div className="text-sm font-semibold font-mono text-[#ae81ff]">
+                <div className="p-3 rounded-lg border" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)" }}>
+                  <div className="text-[11px] font-bold opacity-60 uppercase tracking-wider mb-1">Active Revisions</div>
+                  <div className="text-sm font-semibold font-mono text-purple-400">
                     {details.revisions.length} total ({details.revisions.filter((r) => r.active).length} active)
                   </div>
                 </div>
@@ -292,29 +292,29 @@ export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
               {/* Images & Selectors */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {/* Images */}
-                <div className="p-3 bg-[#272822] border border-[#3e3d32] rounded-lg space-y-1.5">
-                  <div className="text-[11px] font-bold text-[#75715e] uppercase tracking-wider flex items-center gap-1.5">
-                    <HardDrive size={12} className="text-[#66d9ef]" />
+                <div className="p-3 rounded-lg border space-y-1.5" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)" }}>
+                  <div className="text-[11px] font-bold opacity-60 uppercase tracking-wider flex items-center gap-1.5">
+                    <HardDrive size={12} className="text-cyan-400" />
                     <span>Container Images</span>
                   </div>
                   <div className="space-y-1">
                     {details.images.length === 0 ? (
-                      <span className="text-xs text-[#75715e] font-mono">No images defined</span>
+                      <span className="text-xs opacity-60 font-mono">No images defined</span>
                     ) : (
                       details.images.map((img, i) => (
                         <div
                           key={i}
-                          className="flex items-center justify-between bg-[#1e1f1c] px-2.5 py-1 rounded border border-[#3e3d32] text-xs font-mono text-slate-200 group"
+                          className="flex items-center justify-between bg-white/5 px-2.5 py-1 rounded border border-[var(--border-subtle,#334155)] text-xs font-mono text-slate-200 group"
                         >
                           <span className="truncate max-w-[480px]" title={img}>
                             {img}
                           </span>
                           <button
                             onClick={() => handleCopy(img)}
-                            className="text-[#75715e] hover:text-[#a6e22e] transition-colors p-1"
+                            className="opacity-60 hover:text-emerald-400 transition-colors p-1"
                             title="Copy image reference"
                           >
-                            {copiedImage === img ? <Check size={12} className="text-[#a6e22e]" /> : <Copy size={12} />}
+                            {copiedImage === img ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
                           </button>
                         </div>
                       ))
@@ -323,21 +323,21 @@ export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
                 </div>
 
                 {/* Selectors */}
-                <div className="p-3 bg-[#272822] border border-[#3e3d32] rounded-lg space-y-1.5">
-                  <div className="text-[11px] font-bold text-[#75715e] uppercase tracking-wider flex items-center gap-1.5">
-                    <Tag size={12} className="text-[#ae81ff]" />
+                <div className="p-3 rounded-lg border space-y-1.5" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)" }}>
+                  <div className="text-[11px] font-bold opacity-60 uppercase tracking-wider flex items-center gap-1.5">
+                    <Tag size={12} className="text-purple-400" />
                     <span>Selector Labels</span>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {Object.keys(details.selectors || {}).length === 0 ? (
-                      <span className="text-xs text-[#75715e] font-mono">No selector labels</span>
+                      <span className="text-xs opacity-60 font-mono">No selector labels</span>
                     ) : (
                       Object.entries(details.selectors || {}).map(([k, v]) => (
                         <span
                           key={k}
-                          className="px-2 py-0.5 rounded bg-[#1e1f1c] border border-[#3e3d32] text-[11px] font-mono text-slate-300"
+                          className="px-2 py-0.5 rounded bg-white/5 border border-[var(--border-subtle,#334155)] text-[11px] font-mono text-slate-300"
                         >
-                          <strong className="text-[#66d9ef]">{k}</strong>: {v}
+                          <strong className="text-cyan-400">{k}</strong>: {v}
                         </span>
                       ))
                     )}
@@ -346,19 +346,19 @@ export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
               </div>
 
               {/* 1. Replication Controllers / ReplicaSets Section */}
-              <div className="bg-[#272822] border border-[#3e3d32] rounded-lg overflow-hidden">
-                <div className="px-4 py-2.5 bg-[#1e1f1c] border-b border-[#3e3d32] flex items-center justify-between">
+              <div className="bg-[var(--bg-input,#0f172a)] border border-[var(--border-subtle,#334155)] rounded-lg overflow-hidden">
+                <div className="px-4 py-2.5 bg-white/5 border-b border-[var(--border-subtle,#334155)] flex items-center justify-between">
                   <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
-                    <Layers2 size={14} className="text-[#fd971f]" />
+                    <Layers2 size={14} className="text-amber-400" />
                     <span>{revisionKindLabel} ({details.revisions.length})</span>
                   </h3>
-                  <span className="text-[11px] text-[#75715e] font-mono">Sorted by latest revision</span>
+                  <span className="text-[11px] opacity-60 font-mono">Sorted by latest revision</span>
                 </div>
 
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
                     <thead>
-                      <tr className="border-b border-[#3e3d32] text-[#75715e] font-mono text-[11px] bg-[#272822]/60">
+                      <tr className="border-b border-[var(--border-subtle,#334155)] opacity-60 font-mono text-[11px] bg-[var(--bg-input,#0f172a)]/60">
                         <th className="py-2 px-3 font-semibold">Revision</th>
                         <th className="py-2 px-3 font-semibold">Name</th>
                         <th className="py-2 px-3 font-semibold">Status / Phase</th>
@@ -366,10 +366,10 @@ export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
                         <th className="py-2 px-3 font-semibold">Age</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#3e3d32]/60 font-mono">
+                    <tbody className="divide-y divide-[var(--border-subtle,#334155)] font-mono">
                       {details.revisions.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="py-4 text-center text-[#75715e]">
+                          <td colSpan={5} className="py-4 text-center opacity-60">
                             No {revisionKindLabel.toLowerCase()} found for this workload.
                           </td>
                         </tr>
@@ -377,7 +377,7 @@ export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
                         details.revisions.map((rev) => (
                           <tr
                             key={rev.name}
-                            className={`hover:bg-[#3e3d32]/30 transition-colors ${
+                            className={`hover:bg-white/5 transition-colors ${
                               rev.active ? 'bg-[#a6e22e]/5' : ''
                             }`}
                           >
@@ -385,19 +385,19 @@ export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
                               <span
                                 className={`px-2 py-0.5 rounded font-bold text-[11px] border ${
                                   rev.active
-                                    ? 'bg-[#a6e22e]/20 text-[#a6e22e] border-[#a6e22e]/40'
+                                    ? 'bg-[#a6e22e]/20 text-emerald-400 border-[#a6e22e]/40'
                                     : 'bg-slate-800 text-slate-400 border-slate-700'
                                 }`}
                               >
                                 rev {rev.revision} {rev.active && '• Active'}
                               </span>
                             </td>
-                            <td className="py-2.5 px-3 font-bold text-[#f8f8f2]">{rev.name}</td>
+                            <td className="py-2.5 px-3 font-bold font-bold">{rev.name}</td>
                             <td className="py-2.5 px-3">{getStatusBadge(rev.status, rev.statusColor)}</td>
                             <td className="py-2.5 px-3 font-bold text-slate-200">
                               {rev.ready} / {rev.desired}
                             </td>
-                            <td className="py-2.5 px-3 text-[#75715e]">{rev.age}</td>
+                            <td className="py-2.5 px-3 opacity-60">{rev.age}</td>
                           </tr>
                         ))
                       )}
@@ -407,13 +407,13 @@ export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
               </div>
 
               {/* 2. Live Pods Section */}
-              <div className="bg-[#272822] border border-[#3e3d32] rounded-lg overflow-hidden">
-                <div className="px-4 py-2.5 bg-[#1e1f1c] border-b border-[#3e3d32] flex items-center justify-between">
+              <div className="bg-[var(--bg-input,#0f172a)] border border-[var(--border-subtle,#334155)] rounded-lg overflow-hidden">
+                <div className="px-4 py-2.5 bg-white/5 border-b border-[var(--border-subtle,#334155)] flex items-center justify-between">
                   <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
-                    <Box size={14} className="text-[#66d9ef]" />
+                    <Box size={14} className="text-cyan-400" />
                     <span>Live Pods ({details.pods.length})</span>
                   </h3>
-                  <span className="text-[11px] text-[#75715e] font-mono">
+                  <span className="text-[11px] opacity-60 font-mono">
                     Direct actions available per pod
                   </span>
                 </div>
@@ -421,7 +421,7 @@ export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
                     <thead>
-                      <tr className="border-b border-[#3e3d32] text-[#75715e] font-mono text-[11px] bg-[#272822]/60">
+                      <tr className="border-b border-[var(--border-subtle,#334155)] opacity-60 font-mono text-[11px] bg-[var(--bg-input,#0f172a)]/60">
                         <th className="py-2 px-3 font-semibold">Pod Name</th>
                         <th className="py-2 px-3 font-semibold">Status</th>
                         <th className="py-2 px-3 font-semibold">Containers Ready</th>
@@ -432,34 +432,34 @@ export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
                         <th className="py-2 px-3 font-semibold text-right">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#3e3d32]/60 font-mono">
+                    <tbody className="divide-y divide-[var(--border-subtle,#334155)] font-mono">
                       {details.pods.length === 0 ? (
                         <tr>
-                          <td colSpan={8} className="py-6 text-center text-[#75715e]">
+                          <td colSpan={8} className="py-6 text-center opacity-60">
                             No active pods currently running for this workload (Replicas = 0).
                           </td>
                         </tr>
                       ) : (
                         details.pods.map((pod) => (
-                          <tr key={pod.name} className="hover:bg-[#3e3d32]/30 transition-colors group">
-                            <td className="py-2.5 px-3 font-bold text-[#66d9ef]">{pod.name}</td>
+                          <tr key={pod.name} className="hover:bg-white/5 transition-colors group">
+                            <td className="py-2.5 px-3 font-bold text-cyan-400">{pod.name}</td>
                             <td className="py-2.5 px-3">{getStatusBadge(pod.status, pod.statusColor)}</td>
                             <td className="py-2.5 px-3 font-bold text-slate-200">{pod.ready}</td>
                             <td className="py-2.5 px-3">
                               <span
                                 className={`px-1.5 py-0.2 rounded text-[11px] ${
-                                  pod.restarts > 0 ? 'bg-amber-950 text-amber-300 border border-amber-800' : 'text-[#75715e]'
+                                  pod.restarts > 0 ? 'bg-amber-950 text-amber-300 border border-amber-800' : 'opacity-60'
                                 }`}
                               >
                                 {pod.restarts}
                               </span>
                             </td>
                             <td className="py-2.5 px-3 text-slate-300 flex items-center gap-1">
-                              <HardDrive size={11} className="text-[#75715e]" />
+                              <HardDrive size={11} className="opacity-60" />
                               <span>{pod.node}</span>
                             </td>
                             <td className="py-2.5 px-3 text-slate-400">{pod.ip}</td>
-                            <td className="py-2.5 px-3 text-[#75715e]">{pod.age}</td>
+                            <td className="py-2.5 px-3 opacity-60">{pod.age}</td>
                             <td className="py-2.5 px-3 text-right">
                               <div className="flex items-center justify-end gap-1">
                                 <button
@@ -477,7 +477,7 @@ export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
                                       });
                                     }
                                   }}
-                                  className="p-1 rounded bg-[#1e1f1c] hover:bg-cyan-950 text-cyan-400 border border-[#3e3d32] hover:border-cyan-500 transition-colors"
+                                  className="p-1 rounded bg-white/5 hover:bg-cyan-950 text-cyan-400 border border-[var(--border-subtle,#334155)] hover:border-cyan-500 transition-colors"
                                   title="Open interactive terminal (Shell)"
                                 >
                                   <SquareTerminal size={12} />
@@ -498,7 +498,7 @@ export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
                                       });
                                     }
                                   }}
-                                  className="p-1 rounded bg-[#1e1f1c] hover:bg-emerald-950 text-emerald-400 border border-[#3e3d32] hover:border-emerald-500 transition-colors"
+                                  className="p-1 rounded bg-white/5 hover:bg-emerald-950 text-emerald-400 border border-[var(--border-subtle,#334155)] hover:border-emerald-500 transition-colors"
                                   title="Stream logs for this pod"
                                 >
                                   <ScrollText size={12} />
@@ -519,7 +519,7 @@ export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
                                       });
                                     }
                                   }}
-                                  className="p-1 rounded bg-[#1e1f1c] hover:bg-slate-700 text-slate-300 hover:text-white border border-[#3e3d32] transition-colors"
+                                  className="p-1 rounded bg-white/5 hover:bg-slate-700 text-slate-300 hover:text-white border border-[var(--border-subtle,#334155)] transition-colors"
                                   title="Describe this pod"
                                 >
                                   <FileText size={12} />
@@ -540,7 +540,7 @@ export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
                                       });
                                     }
                                   }}
-                                  className="p-1 rounded bg-[#1e1f1c] hover:bg-slate-700 text-slate-300 hover:text-white border border-[#3e3d32] transition-colors"
+                                  className="p-1 rounded bg-white/5 hover:bg-slate-700 text-slate-300 hover:text-white border border-[var(--border-subtle,#334155)] transition-colors"
                                   title="View YAML definition for this pod"
                                 >
                                   <FileCode2 size={12} />

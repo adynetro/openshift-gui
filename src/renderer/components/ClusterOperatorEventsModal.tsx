@@ -92,16 +92,16 @@ export const ClusterOperatorEventsModal: React.FC<ClusterOperatorEventsModalProp
       }}
       className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150 select-none"
     >
-      <div className="bg-[#1e1f1c] border border-[#49483e] rounded-xl shadow-2xl w-[94vw] max-w-[1300px] h-[88vh] flex flex-col overflow-hidden text-[#f8f8f2]">
+      <div className="rounded-xl shadow-2xl w-[94vw] max-w-[1300px] h-[88vh] flex flex-col overflow-hidden border transition-colors" style={{ backgroundColor: "var(--bg-card, #1e293b)", borderColor: "var(--border-color, #334155)", color: "var(--text-main, #f8fafc)" }}>
         {/* Header */}
-        <div className="p-4 bg-[#272822] border-b border-[#3e3d32] flex items-center justify-between shrink-0">
+        <div className="p-4 border-b flex items-center justify-between shrink-0" style={{ backgroundColor: "var(--bg-card-header, #0f172a)", borderColor: "var(--border-color, #334155)" }}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-[#3e3d32] flex items-center justify-center border border-[#49483e] text-cyan-400">
               <ShieldCheck size={20} />
             </div>
             <div>
               <div className="flex items-center gap-2.5">
-                <h2 className="text-base font-bold text-[#f8f8f2] font-mono flex items-center gap-2">
+                <h2 className="text-base font-bold text-[var(--text-main,#f8fafc)] font-mono flex items-center gap-2">
                   <span>Cluster Operator:</span>
                   <span className="text-cyan-400">{operatorItem.name}</span>
                 </h2>
@@ -122,7 +122,7 @@ export const ClusterOperatorEventsModal: React.FC<ClusterOperatorEventsModalProp
                   </span>
                 )}
               </div>
-              <p className="text-xs text-[#75715e] font-mono mt-0.5">
+              <p className="text-xs text-[var(--text-muted,#94a3b8)] font-mono mt-0.5">
                 Live events and condition state transition history
               </p>
             </div>
@@ -132,7 +132,7 @@ export const ClusterOperatorEventsModal: React.FC<ClusterOperatorEventsModalProp
             <button
               onClick={fetchEvents}
               disabled={loading}
-              className="px-3 py-1.5 rounded-lg bg-[#272822] hover:bg-[#3e3d32] text-slate-300 hover:text-white border border-[#49483e] text-xs font-mono flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              className="px-3 py-1.5 rounded-lg bg-[var(--bg-card-header,#0f172a)] hover:bg-[#3e3d32] text-slate-300 hover:text-white border border-[#49483e] text-xs font-mono flex items-center gap-1.5 transition-colors disabled:opacity-50"
               title="Refresh events"
             >
               <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
@@ -141,7 +141,7 @@ export const ClusterOperatorEventsModal: React.FC<ClusterOperatorEventsModalProp
 
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-[#75715e] hover:text-[#f8f8f2] hover:bg-[#3e3d32] transition-colors ml-1"
+              className="p-1.5 rounded-lg text-[var(--text-muted,#94a3b8)] hover:text-[var(--text-main,#f8fafc)] hover:bg-[#3e3d32] transition-colors ml-1"
               title="Close (Esc)"
               aria-label="Close"
             >
@@ -152,8 +152,8 @@ export const ClusterOperatorEventsModal: React.FC<ClusterOperatorEventsModalProp
 
         {/* Operator Conditions Bar */}
         {data?.conditions && data.conditions.length > 0 && (
-          <div className="px-4 py-3 bg-[#272822]/80 border-b border-[#3e3d32] shrink-0">
-            <div className="text-[11px] font-bold text-[#75715e] uppercase tracking-wider font-mono mb-2">
+          <div className="px-4 py-3 border-b shrink-0" style={{ backgroundColor: "var(--bg-card-header, #0f172a)", borderColor: "var(--border-color, #334155)" }}>
+            <div className="text-[11px] font-bold text-[var(--text-muted,#94a3b8)] uppercase tracking-wider font-mono mb-2">
               Operator Conditions & Transition State
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
@@ -174,12 +174,12 @@ export const ClusterOperatorEventsModal: React.FC<ClusterOperatorEventsModalProp
                     key={cond.type}
                     className={`p-2.5 rounded-lg border flex flex-col justify-between ${
                       isGood
-                        ? 'bg-[#1e1f1c] border-[#3e3d32]'
+                        ? 'bg-[var(--bg-input,#0f172a)] border-[var(--border-subtle,#334155)]'
                         : isDeg && cond.status === 'True'
                         ? 'bg-rose-950/40 border-rose-800'
                         : isProg && cond.status === 'True'
                         ? 'bg-amber-950/40 border-amber-800'
-                        : 'bg-[#1e1f1c] border-[#3e3d32]'
+                        : 'bg-[var(--bg-input,#0f172a)] border-[var(--border-subtle,#334155)]'
                     }`}
                   >
                     <div className="flex items-center justify-between">
@@ -193,7 +193,7 @@ export const ClusterOperatorEventsModal: React.FC<ClusterOperatorEventsModalProp
                       </span>
                     </div>
                     {cond.message && (
-                      <p className="text-[11px] text-[#75715e] font-mono truncate mt-1" title={cond.message}>
+                      <p className="text-[11px] text-[var(--text-muted,#94a3b8)] font-mono truncate mt-1" title={cond.message}>
                         {cond.message}
                       </p>
                     )}
@@ -210,23 +210,23 @@ export const ClusterOperatorEventsModal: React.FC<ClusterOperatorEventsModalProp
         )}
 
         {/* Toolbar Filter */}
-        <div className="p-3 bg-[#1e1f1c] border-b border-[#3e3d32] flex items-center justify-between gap-3 shrink-0">
+        <div className="p-3 border-b flex items-center justify-between gap-3 shrink-0" style={{ backgroundColor: "var(--bg-card-header, #0f172a)", borderColor: "var(--border-color, #334155)" }}>
           <div className="relative flex-1 max-w-md">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#75715e]" />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted,#94a3b8)]" />
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Filter events by object, reason, or message..."
-              className="w-full bg-[#272822] text-[#f8f8f2] text-xs font-mono rounded-lg pl-9 pr-3 py-1.5 border border-[#49483e] focus:outline-none focus:border-cyan-400 transition-colors"
+              className="w-full text-xs font-mono rounded-lg pl-9 pr-3 py-1.5 border focus:outline-none transition-colors" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)", color: "var(--text-main, #f8fafc)" }}
             />
           </div>
 
-          <div className="flex items-center gap-1 bg-[#272822] p-0.5 rounded-lg border border-[#3e3d32] text-xs font-mono">
+          <div className="flex items-center gap-1 bg-[var(--bg-card-header,#0f172a)] p-0.5 rounded-lg border border-[var(--border-subtle,#334155)] text-xs font-mono">
             <button
               onClick={() => setTypeFilter('ALL')}
               className={`px-2.5 py-1 rounded-md transition-colors ${
-                typeFilter === 'ALL' ? 'bg-[#3e3d32] text-white font-bold' : 'text-[#75715e] hover:text-slate-200'
+                typeFilter === 'ALL' ? 'bg-[#3e3d32] text-white font-bold' : 'text-[var(--text-muted,#94a3b8)] hover:text-slate-200'
               }`}
             >
               All ({data?.events?.length || 0})
@@ -234,7 +234,7 @@ export const ClusterOperatorEventsModal: React.FC<ClusterOperatorEventsModalProp
             <button
               onClick={() => setTypeFilter('Warning')}
               className={`px-2.5 py-1 rounded-md transition-colors ${
-                typeFilter === 'Warning' ? 'bg-rose-950 text-rose-300 font-bold border border-rose-800' : 'text-[#75715e] hover:text-rose-300'
+                typeFilter === 'Warning' ? 'bg-rose-950 text-rose-300 font-bold border border-rose-800' : 'text-[var(--text-muted,#94a3b8)] hover:text-rose-300'
               }`}
             >
               Warnings ({data?.events?.filter((e) => e.extra?.eventType === 'Warning').length || 0})
@@ -242,7 +242,7 @@ export const ClusterOperatorEventsModal: React.FC<ClusterOperatorEventsModalProp
             <button
               onClick={() => setTypeFilter('Normal')}
               className={`px-2.5 py-1 rounded-md transition-colors ${
-                typeFilter === 'Normal' ? 'bg-emerald-950 text-emerald-300 font-bold border border-emerald-800' : 'text-[#75715e] hover:text-emerald-300'
+                typeFilter === 'Normal' ? 'bg-emerald-950 text-emerald-300 font-bold border border-emerald-800' : 'text-[var(--text-muted,#94a3b8)] hover:text-emerald-300'
               }`}
             >
               Normal ({data?.events?.filter((e) => e.extra?.eventType === 'Normal').length || 0})
@@ -251,24 +251,24 @@ export const ClusterOperatorEventsModal: React.FC<ClusterOperatorEventsModalProp
         </div>
 
         {/* Events Table Container */}
-        <div className="flex-1 overflow-auto bg-[#1e1f1c]">
+        <div className="flex-1 overflow-auto" style={{ backgroundColor: "var(--bg-input, #0f172a)" }}>
           {loading ? (
             <div className="flex flex-col items-center justify-center h-full p-8 text-center">
               <RefreshCw size={28} className="animate-spin text-cyan-400 mb-3" />
-              <p className="text-xs font-mono text-[#75715e]">Loading events for {operatorItem.name}...</p>
+              <p className="text-xs font-mono text-[var(--text-muted,#94a3b8)]">Loading events for {operatorItem.name}...</p>
             </div>
           ) : filteredEvents.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full p-8 text-center">
               <CheckCircle2 size={36} className="text-[#a6e22e] mb-2 opacity-80" />
               <h3 className="text-sm font-bold text-slate-200 font-mono">No Events Recorded</h3>
-              <p className="text-xs text-[#75715e] font-mono mt-1 max-w-md">
+              <p className="text-xs text-[var(--text-muted,#94a3b8)] font-mono mt-1 max-w-md">
                 No active events found for {operatorItem.name} and its operands in the cluster event buffer. The operator is running steadily.
               </p>
             </div>
           ) : (
             <table className="w-full text-left text-xs">
-              <thead className="sticky top-0 bg-[#272822] z-10 border-b border-[#3e3d32]">
-                <tr className="text-[#75715e] font-mono text-[11px]">
+              <thead className="sticky top-0 z-10 border-b" style={{ backgroundColor: "var(--bg-card-header, #0f172a)", borderColor: "var(--border-color, #334155)", color: "var(--text-muted, #94a3b8)" }}>
+                <tr className="text-[var(--text-muted,#94a3b8)] font-mono text-[11px]">
                   <th className="py-2.5 px-3 font-semibold">Type</th>
                   <th className="py-2.5 px-3 font-semibold">Reason</th>
                   <th className="py-2.5 px-3 font-semibold">Involved Object</th>
@@ -299,9 +299,9 @@ export const ClusterOperatorEventsModal: React.FC<ClusterOperatorEventsModalProp
                         {ev.namespace}
                       </span>
                     </td>
-                    <td className="py-2 px-3 text-[#f8f8f2] break-words max-w-[400px] leading-relaxed">{ev.extra?.message}</td>
+                    <td className="py-2 px-3 text-[var(--text-main,#f8fafc)] break-words max-w-[400px] leading-relaxed">{ev.extra?.message}</td>
                     <td className="py-2 px-3 text-amber-300">{ev.extra?.count ? `${ev.extra.count}x` : '1x'}</td>
-                    <td className="py-2 px-3 text-[#75715e] whitespace-nowrap">{ev.age}</td>
+                    <td className="py-2 px-3 text-[var(--text-muted,#94a3b8)] whitespace-nowrap">{ev.age}</td>
                   </tr>
                 ))}
               </tbody>
@@ -310,7 +310,7 @@ export const ClusterOperatorEventsModal: React.FC<ClusterOperatorEventsModalProp
         </div>
 
         {/* Footer */}
-        <div className="p-3 bg-[#272822] border-t border-[#3e3d32] flex items-center justify-between text-xs text-[#75715e] font-mono shrink-0">
+        <div className="p-3 border-t flex items-center justify-between text-xs font-mono shrink-0" style={{ backgroundColor: "var(--bg-card-header, #0f172a)", borderColor: "var(--border-color, #334155)", color: "var(--text-muted, #94a3b8)" }}>
           <div>
             <span>Showing <strong>{filteredEvents.length}</strong> of <strong>{data?.events?.length || 0}</strong> events</span>
             {data?.relatedObjects && data.relatedObjects.length > 0 && (

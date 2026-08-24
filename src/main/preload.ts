@@ -16,6 +16,7 @@ export interface IpcApi {
   scaleResource: (kind: string, name: string, namespace: string, replicas: number) => Promise<{ success: boolean; message: string }>;
   rolloutRestart: (kind: string, name: string, namespace: string) => Promise<{ success: boolean; message: string }>;
   deleteResource: (kind: string, name: string, namespace: string) => Promise<{ success: boolean; message: string }>;
+  deleteMultiplePods: (podNames: string[], namespace: string) => Promise<{ success: boolean; deleted: string[]; failed: string[]; message: string }>;
   deleteImageStreamTag: (isName: string, tag: string, namespace: string) => Promise<{ success: boolean; message: string }>;
   getWorkloadDetails: (kind: string, name: string, namespace: string) => Promise<{ details?: any; error?: string }>;
   getTopologyData: (namespace: string) => Promise<{ data?: any; error?: string }>;
@@ -55,6 +56,7 @@ const api: IpcApi = {
   scaleResource: (kind, name, ns, replicas) => ipcRenderer.invoke('kube:scaleResource', kind, name, ns, replicas),
   rolloutRestart: (kind, name, ns) => ipcRenderer.invoke('kube:rolloutRestart', kind, name, ns),
   deleteResource: (kind, name, ns) => ipcRenderer.invoke('kube:deleteResource', kind, name, ns),
+  deleteMultiplePods: (podNames, ns) => ipcRenderer.invoke('kube:deleteMultiplePods', podNames, ns),
   deleteImageStreamTag: (isName, tag, ns) => ipcRenderer.invoke('kube:deleteImageStreamTag', isName, tag, ns),
   getWorkloadDetails: (kind, name, ns) => ipcRenderer.invoke('kube:getWorkloadDetails', kind, name, ns),
   getTopologyData: (ns) => ipcRenderer.invoke('kube:getTopologyData', ns),

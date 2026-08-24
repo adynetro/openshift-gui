@@ -24,6 +24,8 @@ import {
   HardDrive,
   Network,
   ShieldCheck,
+  CheckSquare,
+  Square,
 } from 'lucide-react';
 import { ResourceKind, ResourceItem, ImageStreamResource } from '../../types/k8s.js';
 
@@ -40,6 +42,8 @@ interface ResourceTableProps {
   onNavigate?: (kind: ResourceKind, searchTarget?: string, targetNs?: string) => void;
   onOpenContextModal?: () => void;
   onRetry?: () => void;
+  selectedPodIds?: Set<string>;
+  onSelectedPodsChange?: (ids: Set<string>) => void;
 }
 
 export const ResourceTable: React.FC<ResourceTableProps> = ({
@@ -55,9 +59,36 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
   onNavigate,
   onOpenContextModal,
   onRetry,
+  selectedPodIds = new Set(),
+  onSelectedPodsChange,
 }) => {
   const isAllProjects = !currentProject || currentProject === 'all-projects' || currentProject === '__all__';
   const isWorkload = kind === 'deployments' || kind === 'deploymentconfigs' || kind === 'statefulsets' || kind === 'daemonsets';
+  const isPodMultiSelect = kind === 'pods' && !isAllProjects && !!onSelectedPodsChange;
+
+  const togglePodSelection = (podId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!onSelectedPodsChange) return;
+    const next = new Set(selectedPodIds);
+    if (next.has(podId)) {
+      next.delete(podId);
+    } else {
+      next.add(podId);
+    }
+    onSelectedPodsChange(next);
+  };
+
+  const toggleSelectAll = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!onSelectedPodsChange) return;
+    if (selectedPodIds.size === items.length && items.length > 0) {
+      onSelectedPodsChange(new Set());
+    } else {
+      onSelectedPodsChange(new Set(items.map((item) => item.id)));
+    }
+  };
+
+  const allSelected = items.length > 0 && selectedPodIds.size === items.length;
 
   const handleOpenExternal = (url: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -161,10 +192,35 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
   }
 
   return (
-    <div className="flex-1 overflow-auto bg-[#0b0f19]">
+    <div
+      className="flex-1 overflow-auto transition-colors duration-150"
+      style={{
+        backgroundColor: 'var(--bg-main, #0b0f19)',
+        color: 'var(--text-main, #f8fafc)',
+      }}
+    >
       <table className="w-full text-left border-collapse text-xs">
-        <thead className="sticky top-0 bg-[#0f172a] border-b border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider z-10 select-none shadow-sm">
+        <thead
+          className="sticky top-0 border-b text-[11px] font-bold uppercase tracking-wider z-10 select-none shadow-sm transition-colors duration-150 opacity-90"
+          style={{
+            backgroundColor: 'var(--bg-header, #0f172a)',
+            borderColor: 'var(--border-color, #1e293b)',
+            color: 'var(--text-muted, #94a3b8)',
+          }}
+        >
           <tr>
+            {isPodMultiSelect && (
+              <th className="py-3 px-2 w-8">
+                <button
+                  onClick={toggleSelectAll}
+                  className="p-0.5 rounded hover:bg-slate-800 transition-colors text-slate-400 hover:text-cyan-300"
+                  title={allSelected ? 'Deselect All Pods' : 'Select All Pods'}
+                  aria-label={allSelected ? 'Deselect all' : 'Select all'}
+                >
+                  {allSelected ? <CheckSquare size={14} /> : <Square size={14} />}
+                </button>
+              </th>
+            )}
             <th className="py-3 px-4">{kind === 'events' ? 'Involved Object' : 'Name'}</th>
             {isAllProjects && kind !== 'nodes' && (
               <th className="py-3 px-3">Project</th>
@@ -297,17 +353,37 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
         <tbody className="divide-y divide-slate-800/60 font-sans">
           {items.map((item) => {
             const isSelected = selectedItem?.id === item.id;
+            const isPodChecked = isPodMultiSelect && selectedPodIds.has(item.id);
 
             return (
               <tr
                 key={item.id}
                 onClick={() => onSelectItem(item)}
                 className={`cursor-pointer transition-colors group ${
-                  isSelected
-                    ? 'bg-slate-800/90 text-white'
-                    : 'hover:bg-slate-800/40 text-slate-200'
+                  isPodChecked
+                    ? 'bg-cyan-950/40 text-white'
+                    : isSelected
+                      ? 'bg-slate-800/90 text-white'
+                      : 'hover:bg-slate-800/40 text-slate-200'
                 }`}
               >
+                {/* Multi-Select Checkbox for Pods */}
+                {isPodMultiSelect && (
+                  <td className="py-2.5 px-2 w-8">
+                    <button
+                      onClick={(e) => togglePodSelection(item.id, e)}
+                      className={`p-0.5 rounded transition-colors ${
+                        isPodChecked
+                          ? 'text-cyan-400 hover:text-cyan-300'
+                          : 'text-slate-500 hover:text-slate-300'
+                      }`}
+                      title={isPodChecked ? 'Deselect pod' : 'Select pod for batch deletion'}
+                      aria-label={isPodChecked ? 'Deselect' : 'Select'}
+                    >
+                      {isPodChecked ? <CheckSquare size={14} /> : <Square size={14} />}
+                    </button>
+                  </td>
+                )}
                 {/* Name / Involved Object */}
                 <td className="py-2.5 px-4 font-mono font-semibold text-slate-100 flex items-center gap-2">
                   <span

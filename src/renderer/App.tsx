@@ -17,6 +17,8 @@ import { ResizePvcModal } from './components/ResizePvcModal.js';
 import { CrdInstancesModal } from './components/CrdInstancesModal.js';
 import { PodTerminalModal } from './components/PodTerminalModal.js';
 import { ClusterOperatorEventsModal } from './components/ClusterOperatorEventsModal.js';
+import { HelpModal } from './components/HelpModal.js';
+import { BatchDeleteModal } from './components/BatchDeleteModal.js';
 import { ResourceKind, ResourceItem, KubeContext, ProjectInfo, ImageStreamResource } from '../types/k8s.js';
 import { FuzzyMatcher } from '../utils/fuzzy.js';
 import { CheckCircle2, AlertTriangle } from 'lucide-react';
@@ -66,6 +68,8 @@ export const App: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [loading, setLoading] = useState<boolean>(true);
   const [statusNotification, setStatusNotification] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [selectedPodIds, setSelectedPodIds] = useState<Set<string>>(new Set());
+  const [batchDeleteModalOpen, setBatchDeleteModalOpen] = useState<boolean>(false);
 
   // Modal Navigation Stack for deep child modal back navigation
   const [modalMode, setModalMode] = useState<ModalMode>('none');
@@ -159,6 +163,7 @@ export const App: React.FC = () => {
   useEffect(() => {
     setSelectedItem(null);
     setStatusFilter('ALL');
+    setSelectedPodIds(new Set());
     if (currentKind !== 'topology') {
       fetchResources(false);
     }
@@ -239,6 +244,18 @@ export const App: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Handle Batch Delete Selected Pods
+  const handleDeleteSelectedPods = () => {
+    if (selectedPodIds.size === 0) return;
+
+    if (!currentProject || currentProject === 'all-projects' || currentProject === '__all__') {
+      showToast('Batch pod deletion is only available within a specific project. Please select a project first.', 'error');
+      return;
+    }
+
+    setBatchDeleteModalOpen(true);
   };
 
   // Handle Switch Context
@@ -398,7 +415,7 @@ export const App: React.FC = () => {
   }, [modalMode, loadKubeInfo]);
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-[#0b0f19] text-slate-100 overflow-hidden font-sans select-none">
+    <div className="h-screen w-screen flex flex-col bg-[var(--bg-main)] text-[var(--text-main)] overflow-hidden font-sans select-none transition-colors duration-150">
       {/* Top Bar with traffic lights & cluster context */}
       <TopNav
         currentContext={currentContext}
@@ -428,7 +445,7 @@ export const App: React.FC = () => {
         />
 
         {/* Center Main Content Area */}
-        <main className="flex-1 flex flex-col overflow-hidden bg-[#0b0f19]">
+        <main className="flex-1 flex flex-col overflow-hidden bg-[var(--bg-main)] transition-colors duration-150">
           {/* Toast Notification Banner */}
           {statusNotification && (
             <div
@@ -472,10 +489,13 @@ export const App: React.FC = () => {
                 onChangeStatusFilter={setStatusFilter}
                 availableStatuses={availableStatuses}
                 currentKind={currentKind}
+                currentProject={currentProject}
                 selectedItem={selectedItem}
                 onAction={handleAction}
                 onClearCompletedFailed={handleClearCompletedFailedPods}
                 clearablePodsCount={clearablePodsCount}
+                selectedPodCount={selectedPodIds.size}
+                onDeleteSelectedPods={handleDeleteSelectedPods}
               />
 
               {/* Resource Table */}
@@ -495,6 +515,8 @@ export const App: React.FC = () => {
                   openModal('context');
                 }}
                 onRetry={() => fetchResources(false)}
+                selectedPodIds={selectedPodIds}
+                onSelectedPodsChange={setSelectedPodIds}
               />
             </>
           )}
@@ -705,6 +727,30 @@ export const App: React.FC = () => {
           }}
           onError={(msg) => {
             closeModal();
+            showToast(msg, 'error');
+          }}
+        />
+      )}
+
+      {/* Keyboard Shortcuts & Help Modal */}
+      {modalMode === 'help' && (
+        <HelpModal onClose={closeModal} />
+      )}
+
+      {/* Themed Batch Delete Confirmation Modal */}
+      {batchDeleteModalOpen && (
+        <BatchDeleteModal
+          items={resources.filter((r) => selectedPodIds.has(r.id))}
+          namespace={currentProject}
+          onClose={() => setBatchDeleteModalOpen(false)}
+          onSuccess={(msg) => {
+            setBatchDeleteModalOpen(false);
+            showToast(msg, 'success');
+            setSelectedPodIds(new Set());
+            fetchResources(false);
+          }}
+          onError={(msg) => {
+            setBatchDeleteModalOpen(false);
             showToast(msg, 'error');
           }}
         />

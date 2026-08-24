@@ -178,16 +178,16 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-[#0b0f19] select-none">
+    <div className="flex-1 flex flex-col overflow-hidden select-none transition-colors duration-150" style={{ backgroundColor: "var(--bg-main, #0b0f19)", color: "var(--text-main, #f8fafc)" }}>
       {/* 🌟 Top Summary Toolbar */}
-      <div className="p-3 bg-[#0f172a] border-b border-[#1e293b] flex items-center justify-between gap-4 shrink-0">
+      <div className="p-3 border-b flex items-center justify-between gap-4 shrink-0 transition-colors" style={{ backgroundColor: "var(--bg-header, #0f172a)", borderColor: "var(--border-color, #1e293b)" }}>
         <div className="flex items-center space-x-3">
           <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center border border-cyan-500/30 text-cyan-400">
             <Workflow size={18} />
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <h2 className="text-sm font-bold text-white tracking-wide font-mono">Topology Flow Canvas</h2>
+              <h2 className="text-sm font-bold tracking-wide font-mono">Topology Flow Canvas</h2>
               <span className="px-2 py-0.2 rounded bg-slate-800 border border-slate-700 text-[10px] text-slate-300 font-mono">
                 {currentProject === 'all-projects' ? 'Cluster-Wide' : currentProject}
               </span>
@@ -224,17 +224,20 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Filter topology..."
-              className="w-full bg-[#1e293b] border border-slate-700 rounded-lg pl-8 pr-3 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
+              className="w-full border rounded-lg pl-8 pr-3 py-1 text-xs placeholder-slate-500 focus:outline-none font-mono" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)", color: "var(--text-main, #f8fafc)" }}
             />
           </div>
 
           {/* Layout Toggle */}
-          <div className="flex items-center bg-[#1e293b] p-0.5 rounded-lg border border-slate-700 text-xs font-mono">
+          <div className="flex items-center p-0.5 rounded-lg border text-xs font-mono" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)" }}>
             <button
               onClick={() => setViewMode('circular')}
-              className={`px-2.5 py-1 rounded flex items-center gap-1.5 transition-colors ${
-                viewMode === 'circular' ? 'bg-cyan-950 text-cyan-300 font-bold border border-cyan-800' : 'text-slate-400 hover:text-slate-200'
-              }`}
+              className="px-2.5 py-1 rounded flex items-center gap-1.5 transition-colors border"
+              style={
+                viewMode === 'circular'
+                  ? { backgroundColor: "var(--bg-card, #1e293b)", borderColor: "var(--accent-cyan, #06b6d4)", color: "var(--accent-cyan, #06b6d4)", fontWeight: "bold" }
+                  : { backgroundColor: "transparent", borderColor: "transparent", color: "var(--text-muted, #94a3b8)" }
+              }
               title="OpenShift Radial Circular Graph View"
             >
               <CircleDot size={13} />
@@ -242,9 +245,12 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
             </button>
             <button
               onClick={() => setViewMode('pipeline')}
-              className={`px-2.5 py-1 rounded flex items-center gap-1.5 transition-colors ${
-                viewMode === 'pipeline' ? 'bg-cyan-950 text-cyan-300 font-bold border border-cyan-800' : 'text-slate-400 hover:text-slate-200'
-              }`}
+              className="px-2.5 py-1 rounded flex items-center gap-1.5 transition-colors border"
+              style={
+                viewMode === 'pipeline'
+                  ? { backgroundColor: "var(--bg-card, #1e293b)", borderColor: "var(--accent-cyan, #06b6d4)", color: "var(--accent-cyan, #06b6d4)", fontWeight: "bold" }
+                  : { backgroundColor: "transparent", borderColor: "transparent", color: "var(--text-muted, #94a3b8)" }
+              }
               title="Horizontal Relational Pipeline View"
             >
               <Workflow size={13} />
@@ -252,9 +258,12 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
             </button>
             <button
               onClick={() => setViewMode('grid')}
-              className={`px-2.5 py-1 rounded flex items-center gap-1.5 transition-colors ${
-                viewMode === 'grid' ? 'bg-cyan-950 text-cyan-300 font-bold border border-cyan-800' : 'text-slate-400 hover:text-slate-200'
-              }`}
+              className="px-2.5 py-1 rounded flex items-center gap-1.5 transition-colors border"
+              style={
+                viewMode === 'grid'
+                  ? { backgroundColor: "var(--bg-card, #1e293b)", borderColor: "var(--accent-cyan, #06b6d4)", color: "var(--accent-cyan, #06b6d4)", fontWeight: "bold" }
+                  : { backgroundColor: "transparent", borderColor: "transparent", color: "var(--text-muted, #94a3b8)" }
+              }
               title="Compact Card Grid View"
             >
               <Grid3X3 size={13} />
@@ -312,7 +321,7 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
             Object.entries(groupedWorkloads).map(([appName, workloads]) => (
               <div
                 key={appName}
-                className="bg-[#0f172a]/95 border border-slate-800/90 rounded-xl p-4 shadow-xl backdrop-blur-sm"
+                className="rounded-xl p-4 shadow-xl border backdrop-blur-sm transition-colors" style={{ backgroundColor: "var(--bg-card, #1e293b)", borderColor: "var(--border-color, #334155)" }}
               >
                 {/* Application Group Header */}
                 <div className="flex items-center justify-between pb-3 mb-3.5 border-b border-slate-800/80">
@@ -321,7 +330,7 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
                       <FolderGit2 size={13} />
                     </div>
                     <span className="text-xs font-bold font-mono text-purple-300 uppercase tracking-wider">
-                      Application: <span className="text-white">{appName}</span>
+                      Application: <span className="font-bold">{appName}</span>
                     </span>
                     <span className="px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 text-[10px] font-mono">
                       {workloads.length} {workloads.length === 1 ? 'workload' : 'workloads'}
@@ -350,8 +359,8 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
                           }}
                           className={`rounded-xl border p-3.5 transition-all cursor-pointer ${
                             isSelected
-                              ? 'bg-[#1e293b] border-cyan-500 ring-1 ring-cyan-500 shadow-lg shadow-cyan-950/40'
-                              : 'bg-[#162032]/80 hover:bg-[#1e293b]/90 border-slate-800 hover:border-slate-700'
+                              ? 'ring-1 ring-cyan-500 shadow-lg shadow-cyan-950/40'
+                              : 'hover:border-cyan-500/50'
                           }`}
                         >
                           <div className="grid grid-cols-1 xl:grid-cols-12 gap-3 items-center">
@@ -365,7 +374,7 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
                                 node.routes.map((r) => (
                                   <div
                                     key={r.name}
-                                    className="p-2 rounded-lg bg-[#0b0f19] border border-slate-800 flex items-center justify-between gap-2 group/rt"
+                                    className="p-2 rounded-lg border flex items-center justify-between gap-2 group/rt" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)" }}
                                   >
                                     <div className="truncate flex items-center gap-1.5">
                                       {r.tls && <Lock size={11} className="text-emerald-400 shrink-0" />}
@@ -387,7 +396,7 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
                                   </div>
                                 ))
                               ) : (
-                                <div className="p-2 rounded-lg bg-[#0b0f19]/60 border border-slate-800/80 text-[11px] text-slate-500 font-mono">
+                                <div className="p-2 rounded-lg border opacity-60 text-[11px] text-slate-500 font-mono" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)" }}>
                                   No Public Ingress Route
                                 </div>
                               )}
@@ -408,7 +417,7 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
                                 node.services.map((svc) => (
                                   <div
                                     key={svc.name}
-                                    className="p-2 rounded-lg bg-[#0b0f19] border border-slate-800 flex items-center justify-between gap-2"
+                                    className="p-2 rounded-lg border flex items-center justify-between gap-2" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)" }}
                                   >
                                     <div className="truncate">
                                       <div className="text-xs font-mono font-bold text-slate-200 truncate">{svc.name}</div>
@@ -420,7 +429,7 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
                                   </div>
                                 ))
                               ) : (
-                                <div className="p-2 rounded-lg bg-[#0b0f19]/60 border border-slate-800/80 text-[11px] text-slate-500 font-mono">
+                                <div className="p-2 rounded-lg border opacity-60 text-[11px] font-mono" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)", color: "var(--text-muted, #94a3b8)" }}>
                                   No Service Bound
                                 </div>
                               )}
@@ -432,7 +441,7 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
                             </div>
 
                             {/* STAGE 3: Compute Workload & Pods (4 Cols) */}
-                            <div className="xl:col-span-4 flex items-center justify-between p-2.5 rounded-lg bg-[#0b0f19] border border-slate-800">
+                            <div className="xl:col-span-4 flex items-center justify-between p-2.5 rounded-lg border" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)" }}>
                               <div className="flex items-center space-x-3 truncate">
                                 {/* Pod Status Donut SVG */}
                                 <div className="relative w-10 h-10 flex items-center justify-center shrink-0">
@@ -463,7 +472,7 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
                                 <div className="truncate">
                                   <div className="flex items-center gap-1.5">
                                     {getKindIcon(node.kind)}
-                                    <span className="text-xs font-bold font-mono text-white truncate">{node.name}</span>
+                                    <span className="text-xs font-bold font-mono truncate" style={{ color: "var(--text-main, #f8fafc)" }}>{node.name}</span>
                                   </div>
                                   <div className="text-[10px] font-mono text-slate-400 mt-0.5 truncate">
                                     {node.images[0] ? node.images[0].split('/').pop() : 'No image'}
@@ -503,7 +512,7 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
                   </div>
                 ) : viewMode === 'circular' ? (
                   /* 🌟 VIEW MODE 2: Authentic OpenShift Radial Circular Graph */
-                  <div className="flex flex-wrap gap-8 items-center justify-center p-6 bg-[#0b0f19]/70 rounded-xl border border-slate-800/80">
+                  <div className="flex flex-wrap gap-8 items-center justify-center p-6 rounded-xl border" style={{ backgroundColor: "var(--bg-main, #0b0f19)", borderColor: "var(--border-subtle, #334155)" }}>
                     {workloads.map((node) => {
                       const ringColor = getPodDonutColor(node.readyReplicas, node.desiredReplicas);
                       const isSelected = selectedNode?.id === node.id;
@@ -524,7 +533,7 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
                                 e.stopPropagation();
                                 onOpenExternal(node.routes[0].url);
                               }}
-                              className="absolute -top-3 -right-2 z-20 px-2 py-0.5 rounded-full bg-[#1e293b] hover:bg-cyan-950 text-cyan-400 border border-slate-700 hover:border-cyan-500 text-[10px] font-mono font-bold flex items-center gap-1 shadow-lg transition-all"
+                              className="absolute -top-3 -right-2 z-20 px-2 py-0.5 rounded-full border text-[10px] font-mono font-bold flex items-center gap-1 shadow-lg transition-all" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)", color: "var(--accent-cyan, #06b6d4)" }}
                               title={`Open ${node.routes[0].host} in browser`}
                             >
                               <ExternalLink size={10} />
@@ -569,9 +578,9 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
                             </svg>
 
                             {/* Inner Circle Disc */}
-                            <div className="w-[84px] h-[84px] rounded-full bg-[#162032] border border-slate-700/80 flex flex-col items-center justify-center p-1 text-center shadow-inner group-hover:bg-[#1e293b] transition-colors">
+                            <div className="w-[84px] h-[84px] rounded-full border flex flex-col items-center justify-center p-1 text-center shadow-inner transition-colors" style={{ backgroundColor: "var(--bg-card, #1e293b)", borderColor: "var(--border-color, #334155)" }}>
                               <div className="mb-0.5">{getKindIcon(node.kind)}</div>
-                              <span className="text-xs font-bold font-mono text-white">
+                              <span className="text-xs font-bold font-mono">
                                 {node.readyReplicas}/{node.desiredReplicas}
                               </span>
                               <span className="text-[9px] font-mono text-slate-400 capitalize truncate max-w-[70px]">
@@ -608,7 +617,7 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
                           </div>
 
                           {/* Node Label Pill */}
-                          <div className="mt-2.5 px-2.5 py-1 rounded-lg bg-[#162032] border border-slate-800 text-center max-w-[150px] group-hover:border-slate-600 transition-colors">
+                          <div className="mt-2.5 px-2.5 py-1 rounded-lg border text-center max-w-[150px] transition-colors" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)" }}>
                             <div className="text-xs font-bold font-mono text-slate-100 truncate" title={node.name}>
                               {node.name}
                             </div>
@@ -636,10 +645,13 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
                             setIsInspectorOpen(true);
                           }}
                           className={`rounded-xl border p-4 transition-all cursor-pointer flex flex-col justify-between space-y-3 ${
-                            isSelected
-                              ? 'bg-[#1e293b] border-cyan-500 ring-1 ring-cyan-500 shadow-lg shadow-cyan-950/40'
-                              : 'bg-[#162032]/80 hover:bg-[#1e293b]/90 border-slate-800 hover:border-slate-700'
+                            isSelected ? 'ring-1 ring-cyan-500 shadow-lg shadow-cyan-950/40' : 'hover:border-cyan-500/50'
                           }`}
+                          style={{
+                            backgroundColor: "var(--bg-card, #1e293b)",
+                            borderColor: isSelected ? "var(--accent-cyan, #06b6d4)" : "var(--border-subtle, #334155)",
+                            color: "var(--text-main, #f8fafc)"
+                          }}
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex items-center space-x-3 truncate">
@@ -671,7 +683,7 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
                               <div className="truncate">
                                 <div className="flex items-center gap-1.5">
                                   {getKindIcon(node.kind)}
-                                  <span className="text-xs font-bold font-mono text-white truncate">{node.name}</span>
+                                  <span className="text-xs font-bold font-mono truncate">{node.name}</span>
                                 </div>
                                 <span className="text-[10px] font-mono text-slate-400 capitalize">{node.kind}</span>
                               </div>
@@ -714,16 +726,16 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
 
         {/* 📋 RIGHT-HAND CONTEXT INSPECTOR DRAWER (32% Canvas Space) */}
         {selectedNode && isInspectorOpen && (
-          <aside className="w-[380px] xl:w-[440px] bg-[#0f172a] border-l border-[#1e293b] flex flex-col justify-between shrink-0 animate-in slide-in-from-right duration-200 shadow-2xl">
+          <aside className="w-[380px] xl:w-[440px] border-l flex flex-col justify-between shrink-0 animate-in slide-in-from-right duration-200 shadow-2xl transition-colors" style={{ backgroundColor: "var(--bg-sidebar, #0f172a)", borderColor: "var(--border-color, #1e293b)", color: "var(--text-main, #f8fafc)" }}>
             {/* Inspector Header */}
-            <div className="p-4 bg-[#162032] border-b border-[#1e293b] flex items-center justify-between shrink-0">
+            <div className="p-4 border-b flex items-center justify-between shrink-0" style={{ backgroundColor: "var(--bg-card-header, #0f172a)", borderColor: "var(--border-color, #1e293b)" }}>
               <div className="flex items-center space-x-2.5 truncate">
-                <div className="w-8 h-8 rounded-lg bg-[#1e293b] flex items-center justify-center border border-slate-700 text-cyan-400 shrink-0">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center border shrink-0" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)", color: "var(--accent-cyan, #06b6d4)" }}>
                   {getKindIcon(selectedNode.kind)}
                 </div>
                 <div className="truncate">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-bold text-white font-mono truncate">{selectedNode.name}</h3>
+                    <h3 className="text-sm font-bold font-mono truncate">{selectedNode.name}</h3>
                     <span className="px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 text-[10px] font-mono capitalize shrink-0">
                       {selectedNode.kind}
                     </span>
@@ -736,7 +748,7 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
 
               <button
                 onClick={() => setIsInspectorOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors ml-2"
+                className="p-1 rounded-lg text-slate-400 hover:opacity-100 opacity-70 transition-colors ml-2"
                 title="Close Inspector"
               >
                 <X size={16} />
@@ -749,40 +761,60 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
               <div className="grid grid-cols-4 gap-2">
                 <button
                   onClick={() => onSelectWorkload(toResourceItem(selectedNode))}
-                  className="p-2 rounded-lg bg-[#1e293b] hover:bg-cyan-950 text-cyan-300 border border-slate-700 hover:border-cyan-500 flex flex-col items-center justify-center gap-1 transition-colors"
+                  className="p-2 rounded-lg border flex flex-col items-center justify-center gap-1 transition-all opacity-85 hover:opacity-100"
+                  style={{
+                    backgroundColor: "var(--bg-input, #0f172a)",
+                    borderColor: "var(--border-subtle, #334155)",
+                    color: "var(--accent-cyan, #06b6d4)",
+                  }}
                   title="Workload Hierarchy & Controllers"
                 >
                   <SlidersHorizontal size={14} />
-                  <span className="text-[10px]">Details</span>
+                  <span className="text-[10px] font-bold">Details</span>
                 </button>
                 <button
                   onClick={() => onOpenWorkloadLogs(toResourceItem(selectedNode))}
-                  className="p-2 rounded-lg bg-[#1e293b] hover:bg-emerald-950 text-emerald-400 border border-slate-700 hover:border-emerald-500 flex flex-col items-center justify-center gap-1 transition-colors"
+                  className="p-2 rounded-lg border flex flex-col items-center justify-center gap-1 transition-all opacity-85 hover:opacity-100"
+                  style={{
+                    backgroundColor: "var(--bg-input, #0f172a)",
+                    borderColor: "var(--border-subtle, #334155)",
+                    color: "var(--accent-green, #10b981)",
+                  }}
                   title="Stream Live Logs"
                 >
                   <ScrollText size={14} />
-                  <span className="text-[10px]">Logs</span>
+                  <span className="text-[10px] font-bold">Logs</span>
                 </button>
                 <button
                   onClick={() => onOpenWorkloadYaml(toResourceItem(selectedNode))}
-                  className="p-2 rounded-lg bg-[#1e293b] hover:bg-purple-950 text-purple-300 border border-slate-700 hover:border-purple-500 flex flex-col items-center justify-center gap-1 transition-colors"
+                  className="p-2 rounded-lg border flex flex-col items-center justify-center gap-1 transition-all opacity-85 hover:opacity-100"
+                  style={{
+                    backgroundColor: "var(--bg-input, #0f172a)",
+                    borderColor: "var(--border-subtle, #334155)",
+                    color: "var(--accent-purple, #a855f7)",
+                  }}
                   title="Edit YAML"
                 >
                   <FileCode2 size={14} />
-                  <span className="text-[10px]">YAML</span>
+                  <span className="text-[10px] font-bold">YAML</span>
                 </button>
                 <button
                   onClick={() => onOpenWorkloadScale(toResourceItem(selectedNode))}
-                  className="p-2 rounded-lg bg-[#1e293b] hover:bg-amber-950 text-amber-300 border border-slate-700 hover:border-amber-500 flex flex-col items-center justify-center gap-1 transition-colors"
+                  className="p-2 rounded-lg border flex flex-col items-center justify-center gap-1 transition-all opacity-85 hover:opacity-100"
+                  style={{
+                    backgroundColor: "var(--bg-input, #0f172a)",
+                    borderColor: "var(--border-subtle, #334155)",
+                    color: "var(--accent-yellow, #f59e0b)",
+                  }}
                   title="Scale Replicas"
                 >
                   <Zap size={14} />
-                  <span className="text-[10px]">Scale</span>
+                  <span className="text-[10px] font-bold">Scale</span>
                 </button>
               </div>
 
               {/* Workload Status Pill */}
-              <div className="p-3 rounded-lg bg-[#162032] border border-slate-800 flex items-center justify-between">
+              <div className="p-3 rounded-lg border flex items-center justify-between" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)" }}>
                 <span className="text-slate-400">Replicas (Ready/Desired):</span>
                 <span className="font-bold text-slate-100 flex items-center gap-2">
                   <span
@@ -803,14 +835,14 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
                 </div>
                 <div className="space-y-1.5 max-h-48 overflow-y-auto">
                   {selectedNode.pods.length === 0 ? (
-                    <div className="p-3 rounded-lg bg-[#162032]/60 border border-slate-800 text-slate-500 text-center text-[11px]">
+                    <div className="p-3 rounded-lg border opacity-60 text-center text-[11px]" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)" }}>
                       No active pods running
                     </div>
                   ) : (
                     selectedNode.pods.map((pod) => (
                       <div
                         key={pod.name}
-                        className="p-2 rounded-lg bg-[#162032] border border-slate-800 flex items-center justify-between gap-2"
+                        className="p-2 rounded-lg border flex items-center justify-between gap-2" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)" }}
                       >
                         <div className="truncate">
                           <div className="text-xs font-bold text-cyan-300 truncate">{pod.name}</div>
@@ -867,7 +899,7 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
                 {selectedNode.routes.map((r) => (
                   <div
                     key={r.name}
-                    className="p-2 rounded-lg bg-[#162032] border border-slate-800 flex items-center justify-between gap-2"
+                    className="p-2 rounded-lg border flex items-center justify-between gap-2" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)" }}
                   >
                     <div className="truncate text-xs font-mono text-cyan-400">{r.host}</div>
                     <button
@@ -889,7 +921,7 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
                 {selectedNode.services.map((s) => {
                   const fqdn = `${s.name}.${selectedNode.namespace}.svc.cluster.local`;
                   return (
-                    <div key={s.name} className="p-2 rounded-lg bg-[#162032] border border-slate-800 space-y-1">
+                    <div key={s.name} className="p-2 rounded-lg border space-y-1" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)" }}>
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-slate-200">{s.name}</span>
                         <span className="text-[10px] text-amber-300">{s.ports}</span>
@@ -915,14 +947,14 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
                   Attached Storage ({selectedNode.pvcs.length})
                 </div>
                 {selectedNode.pvcs.length === 0 ? (
-                  <div className="p-2.5 rounded-lg bg-[#162032]/60 border border-slate-800 text-slate-500 text-[11px]">
+                  <div className="p-2.5 rounded-lg border opacity-60 text-[11px]" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)" }}>
                     Stateless (No persistent volume claims attached)
                   </div>
                 ) : (
                   selectedNode.pvcs.map((pvc) => (
                     <div
                       key={pvc.name}
-                      className="p-2.5 rounded-lg bg-[#162032] border border-slate-800 flex items-center justify-between gap-2"
+                      className="p-2.5 rounded-lg border flex items-center justify-between gap-2" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)" }}
                     >
                       <div>
                         <div className="font-bold text-cyan-300">{pvc.name}</div>
@@ -953,7 +985,7 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
             </div>
 
             {/* Inspector Footer */}
-            <div className="p-3 bg-[#162032] border-t border-[#1e293b] flex items-center justify-between text-[11px] font-mono text-slate-500 shrink-0">
+            <div className="p-3 border-t flex items-center justify-between text-[11px] font-mono opacity-60 shrink-0" style={{ backgroundColor: "var(--bg-card-header, #0f172a)", borderColor: "var(--border-color, #1e293b)" }}>
               <span>Workload: <strong>{selectedNode.name}</strong></span>
               <span>Press <strong>Esc</strong> to close</span>
             </div>

@@ -82,7 +82,7 @@ export class OcClient {
     if (kind === 'networkpolicies') cmdKind = 'netpol';
     if (kind === 'clusteroperators') cmdKind = 'co';
 
-    const cmd = `oc get ${cmdKind} ${nsFlag} -o json || kubectl get ${cmdKind} ${nsFlag} -o json`;
+    const cmd = `oc get ${cmdKind} ${nsFlag} -o json`;
     const { stdout, stderr } = await this.runCommand(cmd);
 
     // Check for authorization or connectivity errors
@@ -618,7 +618,7 @@ export class OcClient {
     if (kind === 'events') cmdKind = 'event';
 
     const nsFlag = namespace && namespace !== 'all-projects' ? `-n "${namespace}"` : '';
-    const cmd = `oc describe ${cmdKind} "${name}" ${nsFlag} || kubectl describe ${cmdKind} "${name}" ${nsFlag}`;
+    const cmd = `oc describe ${cmdKind} "${name}" ${nsFlag}"${name}" ${nsFlag}`;
     const { stdout, stderr } = await this.runCommand(cmd, 15000);
     return stdout || stderr || 'No description available.';
   }
@@ -636,7 +636,7 @@ export class OcClient {
     if (kind === 'events') cmdKind = 'event';
 
     const nsFlag = namespace && namespace !== 'all-projects' ? `-n "${namespace}"` : '';
-    const cmd = `oc get ${cmdKind} "${name}" ${nsFlag} -o yaml || kubectl get ${cmdKind} "${name}" ${nsFlag} -o yaml`;
+    const cmd = `oc get ${cmdKind} "${name}" ${nsFlag} -o yaml"${name}" ${nsFlag} -o yaml`;
     const { stdout, stderr } = await this.runCommand(cmd, 15000);
     return stdout || stderr || 'No YAML available.';
   }
@@ -649,7 +649,7 @@ export class OcClient {
     try {
       fs.writeFileSync(tmpFile, yamlContent, 'utf8');
       const nsFlag = namespace && namespace !== 'all-projects' ? `-n "${namespace}"` : '';
-      const cmd = `oc apply -f "${tmpFile}" ${nsFlag} || kubectl apply -f "${tmpFile}" ${nsFlag}`;
+      const cmd = `oc apply -f "${tmpFile}" ${nsFlag}"${tmpFile}" ${nsFlag}`;
       const { stdout, stderr } = await this.runCommand(cmd);
 
       if (stderr && !stdout) {
@@ -716,7 +716,7 @@ export class OcClient {
     if (kind === 'statefulsets') cmdKind = 'sts';
 
     const nsFlag = namespace && namespace !== 'all-projects' ? `-n "${namespace}"` : '';
-    const cmd = `oc scale ${cmdKind} "${name}" --replicas=${replicas} ${nsFlag} || kubectl scale ${cmdKind} "${name}" --replicas=${replicas} ${nsFlag}`;
+    const cmd = `oc scale ${cmdKind} "${name}" --replicas=${replicas} ${nsFlag}"${name}" --replicas=${replicas} ${nsFlag}`;
     const { stdout, stderr } = await this.runCommand(cmd);
     if (stderr && !stdout) {
       return { success: false, message: stderr };
@@ -732,7 +732,7 @@ export class OcClient {
     if (kind === 'deploymentconfigs') cmdKind = 'dc';
 
     const nsFlag = namespace && namespace !== 'all-projects' ? `-n "${namespace}"` : '';
-    let cmd = `oc rollout restart ${cmdKind}/${name} ${nsFlag} || kubectl rollout restart ${cmdKind}/${name} ${nsFlag}`;
+    let cmd = `oc rollout restart ${cmdKind}/${name} ${nsFlag}`;
     if (cmdKind === 'dc') {
       cmd = `oc rollout latest dc/"${name}" ${nsFlag} || ${cmd}`;
     }
@@ -757,12 +757,44 @@ export class OcClient {
     if (kind === 'events') cmdKind = 'event';
 
     const nsFlag = namespace && namespace !== 'all-projects' ? `-n "${namespace}"` : '';
-    const cmd = `oc delete ${cmdKind} "${name}" ${nsFlag} || kubectl delete ${cmdKind} "${name}" ${nsFlag}`;
+    const cmd = `oc delete ${cmdKind} "${name}" ${nsFlag}"${name}" ${nsFlag}`;
     const { stdout, stderr } = await this.runCommand(cmd);
     if (stderr && !stdout) {
       return { success: false, message: stderr };
     }
     return { success: true, message: stdout.trim() || `Deleted ${kind}/${name}.` };
+  }
+
+  /**
+   * Batch deletes multiple pods by name in a single command.
+   */
+  static async deleteMultiplePods(
+    podNames: string[],
+    namespace: string
+  ): Promise<{ success: boolean; deleted: string[]; failed: string[]; message: string }> {
+    if (!podNames || podNames.length === 0) {
+      return { success: true, deleted: [], failed: [], message: 'No pods selected for deletion.' };
+    }
+
+    try {
+      const nsFlag = namespace && namespace !== 'all-projects' ? `-n "${namespace}"` : '';
+      const quotedNames = podNames.map((n) => `"${n}"`).join(' ');
+      const cmd = `oc delete pod ${quotedNames} ${nsFlag}`;
+      const { stdout, stderr } = await this.runCommand(cmd, 60000);
+
+      if (stderr && !stdout) {
+        return { success: false, deleted: [], failed: podNames, message: stderr };
+      }
+
+      return {
+        success: true,
+        deleted: podNames,
+        failed: [],
+        message: stdout.trim() || `Successfully deleted ${podNames.length} pod(s).`,
+      };
+    } catch (err: any) {
+      return { success: false, deleted: [], failed: podNames, message: err.message || 'Failed to delete pods' };
+    }
   }
 
   /**
@@ -795,20 +827,20 @@ export class OcClient {
       const nsFlag = namespace && namespace !== 'all-projects' ? `-n "${namespace}"` : '';
 
       // 1. Fetch workload manifest JSON
-      const workloadCmd = `oc get ${cmdKind} "${name}" ${nsFlag} -o json || kubectl get ${cmdKind} "${name}" ${nsFlag} -o json`;
+      const workloadCmd = `oc get ${cmdKind} "${name}" ${nsFlag} -o json"${name}" ${nsFlag} -o json`;
       
       // 2. Fetch revisions (RC for dc, RS for deployments, ControllerRevision for statefulset)
       let revisionsCmd = '';
       if (kind === 'deploymentconfigs') {
-        revisionsCmd = `oc get rc ${nsFlag} -o json || kubectl get rc ${nsFlag} -o json`;
+        revisionsCmd = `oc get rc ${nsFlag} -o json`;
       } else if (kind === 'deployments') {
-        revisionsCmd = `oc get rs ${nsFlag} -o json || kubectl get rs ${nsFlag} -o json`;
+        revisionsCmd = `oc get rs ${nsFlag} -o json`;
       } else if (kind === 'statefulsets') {
-        revisionsCmd = `oc get controllerrevision ${nsFlag} -o json || kubectl get controllerrevision ${nsFlag} -o json`;
+        revisionsCmd = `oc get controllerrevision ${nsFlag} -o json`;
       }
 
       // 3. Fetch Pods
-      const podsCmd = `oc get pods ${nsFlag} -o json || kubectl get pods ${nsFlag} -o json`;
+      const podsCmd = `oc get pods ${nsFlag} -o json`;
 
       // Execute in parallel
       const [workloadRes, revisionsRes, podsRes] = await Promise.all([
@@ -1047,13 +1079,13 @@ export class OcClient {
 
       const [dcsRes, deprsRes, stsRes, dsRes, svcsRes, routesRes, pvcsRes, podsRes] = await Promise.all([
         this.runCommand(`oc get dc ${nsFlag} -o json || true`),
-        this.runCommand(`oc get deployments ${nsFlag} -o json || kubectl get deployments ${nsFlag} -o json || true`),
-        this.runCommand(`oc get statefulsets ${nsFlag} -o json || kubectl get statefulsets ${nsFlag} -o json || true`),
-        this.runCommand(`oc get daemonsets ${nsFlag} -o json || kubectl get daemonsets ${nsFlag} -o json || true`),
-        this.runCommand(`oc get services ${nsFlag} -o json || kubectl get services ${nsFlag} -o json || true`),
+        this.runCommand(`oc get deployments ${nsFlag} -o json || true`),
+        this.runCommand(`oc get statefulsets ${nsFlag} -o json || true`),
+        this.runCommand(`oc get daemonsets ${nsFlag} -o json || true`),
+        this.runCommand(`oc get services ${nsFlag} -o json || true`),
         this.runCommand(`oc get routes ${nsFlag} -o json || true`),
-        this.runCommand(`oc get pvc ${nsFlag} -o json || kubectl get pvc ${nsFlag} -o json || true`),
-        this.runCommand(`oc get pods ${nsFlag} -o json || kubectl get pods ${nsFlag} -o json || true`),
+        this.runCommand(`oc get pvc ${nsFlag} -o json || true`),
+        this.runCommand(`oc get pods ${nsFlag} -o json || true`),
       ]);
 
       const parseItems = (stdout: string) => {
@@ -1276,7 +1308,7 @@ export class OcClient {
   ): Promise<{ data?: Record<string, string>; type?: string; error?: string }> {
     try {
       const nsFlag = namespace && namespace !== 'all-projects' ? `-n "${namespace}"` : '';
-      const cmd = `oc get secret "${name}" ${nsFlag} -o json || kubectl get secret "${name}" ${nsFlag} -o json`;
+      const cmd = `oc get secret "${name}" ${nsFlag} -o json"${name}" ${nsFlag} -o json`;
       const { stdout, stderr } = await this.runCommand(cmd);
       if (!stdout.trim()) {
         return { error: stderr || `Secret '${name}' not found` };
@@ -1325,7 +1357,7 @@ export class OcClient {
       };
 
       const jsonStr = JSON.stringify(secretManifest).replace(/'/g, "'\\''");
-      const cmd = `echo '${jsonStr}' | oc apply ${nsFlag} -f - || echo '${jsonStr}' | kubectl apply ${nsFlag} -f -`;
+      const cmd = `echo '${jsonStr}' | oc apply ${nsFlag} -f -`;
       const { stdout, stderr } = await this.runCommand(cmd);
       if (stderr && !stdout) {
         return { success: false, message: stderr };
@@ -1356,7 +1388,7 @@ export class OcClient {
         },
       }).replace(/'/g, "'\\''");
 
-      const cmd = `oc patch pvc "${name}" ${nsFlag} -p '${patch}' || kubectl patch pvc "${name}" ${nsFlag} -p '${patch}'`;
+      const cmd = `oc patch pvc "${name}" ${nsFlag} -p '${patch}'"${name}" ${nsFlag} -p '${patch}'`;
       const { stdout, stderr } = await this.runCommand(cmd);
       if (stderr && !stdout) {
         return { success: false, message: stderr };
@@ -1376,7 +1408,7 @@ export class OcClient {
   ): Promise<{ items: ResourceItem[]; scope?: string; crdKind?: string; group?: string; error?: string }> {
     try {
       // First get the CRD definition to determine scope, group, and kind
-      const crdRes = await this.runCommand(`oc get crd "${crdName}" -o json || kubectl get crd "${crdName}" -o json`);
+      const crdRes = await this.runCommand(`oc get crd "${crdName}" -o json"${crdName}" -o json`);
       let scope = 'Namespaced';
       let crdKind = crdName;
       let group = '';
@@ -1393,7 +1425,7 @@ export class OcClient {
       const isAll = !namespace || namespace === 'all-projects' || namespace === '__all__';
       const nsFlag = isCluster ? '' : (isAll ? '-A' : `-n "${namespace}"`);
 
-      const cmd = `oc get "${crdName}" ${nsFlag} -o json || kubectl get "${crdName}" ${nsFlag} -o json`;
+      const cmd = `oc get "${crdName}" ${nsFlag} -o json"${crdName}" ${nsFlag} -o json`;
       const { stdout, stderr } = await this.runCommand(cmd);
 
       if (!stdout.trim()) {
@@ -1458,7 +1490,7 @@ export class OcClient {
   }> {
     try {
       // 1. Fetch ClusterOperator definition
-      const coRes = await this.runCommand(`oc get co "${operatorName}" -o json || kubectl get co "${operatorName}" -o json`);
+      const coRes = await this.runCommand(`oc get co "${operatorName}" -o json"${operatorName}" -o json`);
       let conditions: any[] = [];
       let relatedObjects: any[] = [];
       let version = '-';
@@ -1488,7 +1520,7 @@ export class OcClient {
       }
 
       // 2. Fetch all events and filter for this operator and its related namespaces
-      const eventsRes = await this.runCommand('oc get events -A -o json || kubectl get events -A -o json');
+      const eventsRes = await this.runCommand('oc get events -A -o json');
       let events: ResourceItem[] = [];
 
       if (eventsRes.stdout.trim()) {

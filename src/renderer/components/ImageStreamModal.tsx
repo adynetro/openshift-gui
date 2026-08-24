@@ -132,15 +132,15 @@ export const ImageStreamModal: React.FC<ImageStreamModalProps> = ({
       }}
       className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150"
     >
-      <div className="bg-[#0f172a] border border-purple-500/40 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+      <div className="rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border transition-colors" style={{ backgroundColor: "var(--bg-card, #1e293b)", borderColor: "var(--border-color, #334155)", color: "var(--text-main, #f8fafc)" }}>
         {/* Header */}
-        <div className="p-4 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between">
+        <div className="p-4 border-b flex items-center justify-between" style={{ backgroundColor: "var(--bg-card-header, #0f172a)", borderColor: "var(--border-color, #334155)" }}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center border border-purple-500/30">
               <Sparkles size={20} />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <h2 className="text-base font-bold flex items-center gap-2">
                 ImageStream & SemVer Tag Manager: <span className="text-purple-400 font-mono">{imageStream.name}</span>
               </h2>
               <p className="text-xs text-slate-400 font-mono">
@@ -174,11 +174,11 @@ export const ImageStreamModal: React.FC<ImageStreamModalProps> = ({
         )}
 
         {/* Cleanup Controls Configuration Card */}
-        <div className="p-4 bg-slate-900/50 border-b border-slate-800/80 space-y-3">
+        <div className="p-4 border-b space-y-3" style={{ backgroundColor: "var(--bg-card-header, #0f172a)", borderColor: "var(--border-color, #334155)" }}>
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-4 flex-wrap">
               {/* Keep N SemVer Count */}
-              <div className="flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)" }}>
                 <span className="text-xs font-medium text-slate-300">Keep Latest SemVer Releases:</span>
                 <div className="flex items-center gap-1">
                   <button
@@ -255,7 +255,7 @@ export const ImageStreamModal: React.FC<ImageStreamModalProps> = ({
         {/* Tags Table */}
         <div className="flex-1 overflow-auto p-4">
           <table className="w-full text-left border-collapse text-xs">
-            <thead className="sticky top-0 bg-[#0f172a] border-b border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+            <thead className="sticky top-0 border-b text-[11px] font-bold uppercase tracking-wider" style={{ backgroundColor: "var(--bg-card-header, #0f172a)", borderColor: "var(--border-color, #334155)", color: "var(--text-muted, #94a3b8)" }}>
               <tr>
                 <th className="py-2.5 px-3">Prune?</th>
                 <th className="py-2.5 px-3">Tag Name</th>
@@ -348,7 +348,7 @@ export const ImageStreamModal: React.FC<ImageStreamModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-3 bg-slate-900 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+        <div className="p-3 border-t flex items-center justify-between text-xs" style={{ backgroundColor: "var(--bg-card-header, #0f172a)", borderColor: "var(--border-color, #334155)", color: "var(--text-muted, #94a3b8)" }}>
           <div className="flex items-center gap-1.5">
             <Info size={13} className="text-slate-400" />
             <span>OpenShift executes tag deletion via <code className="text-slate-300 bg-slate-800 px-1 rounded">oc tag -d</code> command safely.</span>

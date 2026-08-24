@@ -89,9 +89,9 @@ export const ContextModal: React.FC<ContextModalProps> = ({
       }}
       className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150 select-none"
     >
-      <div className="bg-[#0f172a] border border-cyan-500/40 rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+      <div className="rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden border transition-colors" style={{ backgroundColor: "var(--bg-card, #1e293b)", borderColor: "var(--border-color, #334155)", color: "var(--text-main, #f8fafc)" }}>
         {/* Header */}
-        <div className="p-4 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between">
+        <div className="p-4 border-b flex items-center justify-between" style={{ backgroundColor: "var(--bg-card-header, #0f172a)", borderColor: "var(--border-color, #334155)" }}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center border border-cyan-500/30">
               <Icon size={20} />
@@ -115,7 +115,7 @@ export const ContextModal: React.FC<ContextModalProps> = ({
         </div>
 
         {/* Autocomplete Search Input with Keyboard Navigation */}
-        <div className="p-4 bg-slate-900/40 border-b border-slate-800">
+        <div className="p-4 border-b" style={{ backgroundColor: "var(--bg-card-header, #0f172a)", borderColor: "var(--border-color, #334155)" }}>
           <div className="relative">
             <Search size={16} className="absolute inset-y-0 left-3 my-auto text-slate-400 pointer-events-none" />
             <input
@@ -125,7 +125,7 @@ export const ContextModal: React.FC<ContextModalProps> = ({
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={`Search and filter ${mode}s... (use ↑ / ↓ arrows and ↵ Enter)`}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-700 focus:border-cyan-500 rounded-lg text-sm text-slate-100 placeholder-slate-500 shadow-inner focus:outline-none"
+              className="w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm placeholder-slate-500 shadow-inner focus:outline-none" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)", color: "var(--text-main, #f8fafc)" }}
             />
           </div>
         </div>

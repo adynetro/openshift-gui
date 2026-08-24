@@ -69,7 +69,7 @@ export class KubeConfigService {
 
     // 2. CLI fallback (oc config view -o json)
     try {
-      const { stdout } = await execAsync('oc config view -o json || kubectl config view -o json', {
+      const { stdout } = await execAsync('oc config view -o json', {
         env: getExecEnv(),
         maxBuffer: 20 * 1024 * 1024,
       });
@@ -100,7 +100,7 @@ export class KubeConfigService {
    */
   static async switchContext(contextName: string): Promise<boolean> {
     try {
-      await execAsync(`oc config use-context "${contextName}" || kubectl config use-context "${contextName}"`, {
+      await execAsync(`oc config use-context "${contextName}"`, {
         env: getExecEnv(),
       });
       return true;
@@ -156,10 +156,10 @@ export class KubeConfigService {
       } catch (e) {}
     }
 
-    // Strategy 3: kubectl get namespaces -o json
+    // Strategy 3: oc get namespaces -o json
     if (projectList.length === 0) {
       try {
-        const { stdout } = await execAsync('kubectl get namespaces -o json || oc get namespaces -o json', {
+        const { stdout } = await execAsync('oc get namespaces -o json', {
           env: getExecEnv(),
           maxBuffer: 15 * 1024 * 1024,
         });
@@ -215,7 +215,7 @@ export class KubeConfigService {
       return true;
     } catch (e) {
       try {
-        await execAsync(`kubectl config set-context --current --namespace="${projectName}"`, {
+        await execAsync(`oc config set-context --current --namespace="${projectName}"`, {
           env: getExecEnv(),
         });
         return true;

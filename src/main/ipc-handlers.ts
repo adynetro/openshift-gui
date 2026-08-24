@@ -78,6 +78,10 @@ export function registerIpcHandlers(mainWindow: electron.BrowserWindow): void {
     return await OcClient.deleteResource(kind, name, namespace);
   });
 
+  ipcMain.handle('kube:deleteMultiplePods', async (_event, podNames: string[], namespace: string) => {
+    return await OcClient.deleteMultiplePods(podNames, namespace);
+  });
+
   ipcMain.handle('kube:deleteImageStreamTag', async (_event, isName: string, tag: string, namespace: string) => {
     return await OcClient.deleteImageStreamTag(isName, tag, namespace);
   });

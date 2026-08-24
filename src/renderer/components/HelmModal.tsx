@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Anchor, FileText, Code2, History, RotateCcw, Trash2, CheckCircle2, AlertTriangle, RefreshCw, Copy, Check, Save, Edit3 } from 'lucide-react';
 import CodeMirror from '@uiw/react-codemirror';
 import { yaml } from '@codemirror/lang-yaml';
-import { monokai } from '@uiw/codemirror-theme-monokai';
+import { useCurrentTheme } from "../utils/themes.js";
 import { parse as parseYaml } from 'yaml';
 import { ResourceItem } from '../../types/k8s.js';
 
@@ -19,6 +19,7 @@ export const HelmModal: React.FC<HelmModalProps> = ({
   onClose,
   onRefresh,
 }) => {
+  const { theme, cmTheme } = useCurrentTheme();
   const [activeTab, setActiveTab] = useState<'values' | 'edit-values' | 'manifest' | 'history'>('values');
   const [valuesContent, setValuesContent] = useState<string>('');
   const [editedValues, setEditedValues] = useState<string>('');
@@ -143,9 +144,9 @@ export const HelmModal: React.FC<HelmModalProps> = ({
       }}
       className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 z-50 animate-in fade-in duration-150"
     >
-      <div className="bg-[#1e1f1c] border border-[#49483e] rounded-xl shadow-2xl w-[96vw] max-w-[1750px] h-[94vh] flex flex-col overflow-hidden">
+      <div className="rounded-xl shadow-2xl w-[96vw] max-w-[1750px] h-[94vh] flex flex-col overflow-hidden border transition-colors" style={{ backgroundColor: "var(--bg-card, #1e293b)", borderColor: "var(--border-color, #334155)", color: "var(--text-main, #f8fafc)" }}>
         {/* Monokai Header */}
-        <div className="p-4 bg-[#272822] border-b border-[#3e3d32] flex items-center justify-between">
+        <div className="p-4 border-b flex items-center justify-between shrink-0" style={{ backgroundColor: "var(--bg-card-header, #0f172a)", borderColor: "var(--border-color, #334155)" }}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-[#66d9ef]/10 text-[#66d9ef] flex items-center justify-center border border-[#66d9ef]/30">
               <Anchor size={20} />
@@ -180,7 +181,7 @@ export const HelmModal: React.FC<HelmModalProps> = ({
         </div>
 
         {/* Tab Controls */}
-        <div className="flex items-center justify-between px-4 bg-[#272822]/60 border-b border-[#3e3d32]">
+        <div className="flex items-center justify-between px-4 border-b shrink-0" style={{ backgroundColor: "var(--bg-card-header, #0f172a)", borderColor: "var(--border-color, #334155)" }}>
           <div className="flex items-center gap-1">
             <button
               onClick={() => setActiveTab('values')}
@@ -278,7 +279,7 @@ export const HelmModal: React.FC<HelmModalProps> = ({
         )}
 
         {/* Monokai Tab Content */}
-        <div className="flex-1 overflow-hidden flex flex-col p-3 bg-[#1e1f1c]">
+        <div className="flex-1 overflow-hidden flex flex-col p-3" style={{ backgroundColor: "var(--bg-input, #0f172a)" }}>
           {loading ? (
             <div className="flex-1 flex items-center justify-center p-12 text-[#75715e] gap-2">
               <RefreshCw size={18} className="animate-spin text-[#66d9ef]" />
@@ -289,7 +290,7 @@ export const HelmModal: React.FC<HelmModalProps> = ({
               <CodeMirror
                 value={editedValues}
                 height="100%"
-                theme={monokai}
+                theme={cmTheme}
                 extensions={[yaml()]}
                 onChange={handleValuesChange}
                 basicSetup={{
@@ -353,7 +354,7 @@ export const HelmModal: React.FC<HelmModalProps> = ({
               <CodeMirror
                 value={activeTab === 'values' ? valuesContent || '# No values found.' : manifestContent || '# No manifest found.'}
                 height="100%"
-                theme={monokai}
+                theme={cmTheme}
                 extensions={[yaml()]}
                 editable={false}
                 basicSetup={{
@@ -369,7 +370,7 @@ export const HelmModal: React.FC<HelmModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-3 bg-[#272822] border-t border-[#3e3d32] flex justify-between items-center text-xs text-[#75715e]">
+        <div className="p-3 border-t flex justify-between items-center text-xs shrink-0" style={{ backgroundColor: "var(--bg-card-header, #0f172a)", borderColor: "var(--border-color, #334155)", color: "var(--text-muted, #94a3b8)" }}>
           <div>
             {activeTab === 'edit-values' ? (
               <span>Saving values runs <code className="text-[#66d9ef] bg-[#1e1f1c] px-1 rounded">helm upgrade --reuse-values</code></span>

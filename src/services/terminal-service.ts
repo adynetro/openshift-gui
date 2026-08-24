@@ -13,7 +13,7 @@ export class TerminalService {
   private static sessions = new Map<string, TerminalSession>();
 
   /**
-   * Starts an interactive shell session in a pod using oc exec or kubectl exec.
+   * Starts an interactive shell session in a pod using oc exec.
    */
   static startSession(
     targetName: string,
@@ -25,7 +25,7 @@ export class TerminalService {
     const targetWin = window || BrowserWindow.getAllWindows()[0];
 
     // Interactive shell command with colored prompt and fallback
-    const execCmd = `export TERM=xterm-256color; export PS1="[\\u@\\h \\W]\\$ "; if command -v bash >/dev/null 2>&1; then exec bash -i; elif command -v sh >/dev/null 2>&1; then exec sh -i; else exec /bin/sh -i; fi`;
+    const execCmd = `stty onlcr 2>/dev/null || true; export TERM=xterm-256color; export PS1="[\\u@\\h \\W]\\$ "; if command -v bash >/dev/null 2>&1; then exec bash -i; elif command -v sh >/dev/null 2>&1; then exec sh -i; else exec /bin/sh -i; fi`;
 
     const args = ['exec', '-i', targetName];
 

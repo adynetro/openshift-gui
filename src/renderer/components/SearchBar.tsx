@@ -9,10 +9,13 @@ interface SearchBarProps {
   onChangeStatusFilter: (status: string) => void;
   availableStatuses: string[];
   currentKind: ResourceKind;
+  currentProject?: string;
   selectedItem: ResourceItem | null;
   onAction: (actionType: string) => void;
   onClearCompletedFailed?: () => void;
   clearablePodsCount?: number;
+  selectedPodCount?: number;
+  onDeleteSelectedPods?: () => void;
 }
 
 export const SearchBar: React.FC<SearchBarProps> = ({
@@ -22,11 +25,16 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   onChangeStatusFilter,
   availableStatuses,
   currentKind,
+  currentProject,
   selectedItem,
   onAction,
   onClearCompletedFailed,
   clearablePodsCount = 0,
+  selectedPodCount = 0,
+  onDeleteSelectedPods,
 }) => {
+  const isAllProjects = !currentProject || currentProject === 'all-projects' || currentProject === '__all__';
+
   // Contextual action pills based on current resource tab
   const getActionPills = () => {
     // Workloads have all actions in their dedicated popup modal on name click
@@ -118,11 +126,18 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   const actionPills = getActionPills();
 
   return (
-    <div className="p-3 bg-[#0f172a]/70 border-b border-slate-800 space-y-2.5">
+    <div
+      className="p-3 border-b space-y-2.5 transition-colors duration-150"
+      style={{
+        backgroundColor: 'var(--bg-header, #0f172a)',
+        borderColor: 'var(--border-color, #1e293b)',
+        color: 'var(--text-main, #f8fafc)',
+      }}
+    >
       {/* Search Input Box + Status Filter + Clear Completed Pods */}
       <div className="flex items-center gap-2.5 flex-wrap">
         <div className="relative flex-1 min-w-[260px]">
-          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none opacity-50">
             <Search size={15} />
           </div>
 
@@ -131,13 +146,18 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             value={query}
             onChange={(e) => onChangeQuery(e.target.value)}
             placeholder={`Filter ${currentKind === 'events' ? 'events by message, reason, object' : currentKind} by name, IP, node, labels (press '/' to focus)...`}
-            className="w-full pl-9 pr-8 py-1.5 bg-slate-900 border border-slate-700 focus:border-cyan-500 rounded-lg text-xs text-slate-100 placeholder-slate-500 shadow-inner transition-colors font-mono"
+            className="w-full pl-9 pr-8 py-1.5 border rounded-lg text-xs placeholder-slate-500 shadow-inner transition-colors font-mono"
+            style={{
+              backgroundColor: 'var(--bg-input, #0f172a)',
+              borderColor: 'var(--border-subtle, #334155)',
+              color: 'var(--text-main, #f8fafc)',
+            }}
           />
 
           {query && (
             <button
               onClick={() => onChangeQuery('')}
-              className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-200"
+              className="absolute inset-y-0 right-0 pr-2.5 flex items-center opacity-60 hover:opacity-100"
             >
               <X size={14} />
             </button>
@@ -145,13 +165,20 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         </div>
 
         {/* Status Filter Dropdown */}
-        <div className="flex items-center gap-1.5 bg-slate-900 px-2.5 py-1.5 rounded-lg border border-slate-700 text-xs">
-          <Filter size={13} className="text-slate-400" />
-          <span className="text-slate-400 text-[11px] font-semibold">{currentKind === 'events' ? 'Event Type:' : 'Status:'}</span>
+        <div
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs"
+          style={{
+            backgroundColor: 'var(--bg-input, #0f172a)',
+            borderColor: 'var(--border-subtle, #334155)',
+          }}
+        >
+          <Filter size={13} className="opacity-50" />
+          <span className="text-[11px] font-semibold opacity-70">{currentKind === 'events' ? 'Event Type:' : 'Status:'}</span>
           <select
             value={statusFilter}
             onChange={(e) => onChangeStatusFilter(e.target.value)}
-            className="bg-transparent text-xs text-slate-200 font-mono outline-none cursor-pointer"
+            className="bg-transparent text-xs font-mono outline-none cursor-pointer"
+            style={{ color: 'var(--text-main, #f8fafc)' }}
           >
             <option value="ALL" className="bg-slate-900 text-slate-200">
               {currentKind === 'events' ? 'All Events' : 'All Statuses'}
@@ -192,6 +219,18 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           >
             <Eraser size={13} />
             <span>Clear Completed & Failed {clearablePodsCount > 0 ? `(${clearablePodsCount})` : ''}</span>
+          </button>
+        )}
+
+        {/* Batch Delete Selected Pods Button (visible when pods are checked in a specific project) */}
+        {currentKind === 'pods' && !isAllProjects && selectedPodCount > 0 && onDeleteSelectedPods && (
+          <button
+            onClick={onDeleteSelectedPods}
+            className="px-3 py-1.5 rounded-lg bg-rose-950/70 hover:bg-rose-900 text-rose-300 border border-rose-500/60 text-xs font-bold flex items-center gap-1.5 transition-all shadow shadow-rose-950 animate-in fade-in duration-200"
+            title={`Delete ${selectedPodCount} selected pod(s)`}
+          >
+            <Trash2 size={13} />
+            <span>Delete Selected ({selectedPodCount})</span>
           </button>
         )}
 

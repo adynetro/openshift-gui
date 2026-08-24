@@ -42,16 +42,16 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: var(--bg-sidebar, #0f172a);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: var(--border-subtle, #334155);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: var(--accent-cyan, #06b6d4);
 }
 
 /* Draggable macOS titlebar region */
@@ -66,6 +66,23 @@ body {
 /* Terminal & Code styling */
 .terminal-font {
   font-family: var(--font-mono);
+}
+
+/* xterm.js Sharp & Crisp Rendering Fixes */
+.xterm {
+  padding: 4px;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.xterm .xterm-viewport {
+  background-color: transparent !important;
+}
+
+.xterm .xterm-screen canvas {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
 }
 
 /* Pulse animation */
@@ -104,6 +121,8 @@ input, select, textarea, a {
 /* CodeMirror IDE Custom Styling */
 .cm-editor {
   height: 100% !important;
+  min-height: 100% !important;
+  width: 100% !important;
   font-family: 'JetBrains Mono', 'Fira Code', Menlo, Monaco, Consolas, monospace !important;
   font-size: 13px !important;
   line-height: 1.6 !important;
@@ -111,22 +130,108 @@ input, select, textarea, a {
 }
 
 .cm-scroller {
+  height: 100% !important;
+  min-height: 100% !important;
   font-family: inherit !important;
   overflow: auto !important;
 }
 
+.cm-content {
+  min-height: 100% !important;
+  padding: 8px 0 !important;
+}
+
 .cm-gutters {
-  background-color: #0b0f19 !important;
-  border-right: 1px solid #1e293b !important;
-  color: #475569 !important;
+  min-height: 100% !important;
+  position: sticky !important;
+  left: 0 !important;
+  top: 0 !important;
+  z-index: 10 !important;
+  border-right: 1px solid var(--border-color, #1e293b) !important;
+}
+
+.cm-lineNumbers {
+  min-width: 32px !important;
+}
+
+.cm-lineNumbers .cm-gutterElement {
+  padding: 0 8px 0 10px !important;
+  min-width: 24px !important;
+  text-align: right !important;
+  user-select: none !important;
 }
 
 .cm-activeLineGutter {
-  background-color: #1e293b !important;
-  color: #38bdf8 !important;
+  background-color: var(--bg-row-hover, #1e293b) !important;
+  color: var(--accent-cyan, #38bdf8) !important;
   font-weight: bold;
 }
 
 .cm-activeLine {
-  background-color: #1e293b33 !important;
+  background-color: var(--bg-row-hover, #1e293b33) !important;
+}
+
+/* 🌟 Light Theme High-Contrast Text & Component Overrides */
+[data-theme-category="light"] {
+  color: var(--text-main) !important;
+}
+
+[data-theme-category="light"] body {
+  background-color: var(--bg-main) !important;
+  color: var(--text-main) !important;
+}
+
+/* Ensure text on light backgrounds is dark and crisp */
+[data-theme-category="light"] .text-white:not([class*="bg-red"]):not([class*="bg-rose"]):not([class*="bg-cyan"]):not([class*="bg-emerald"]):not([class*="bg-blue"]):not([class*="bg-purple"]):not(.force-white),
+[data-theme-category="light"] .text-slate-100,
+[data-theme-category="light"] .text-slate-200,
+[data-theme-category="light"] .text-slate-300 {
+  color: var(--text-main, #1e2227) !important;
+}
+
+[data-theme-category="light"] .text-slate-400,
+[data-theme-category="light"] .text-slate-500 {
+  color: var(--text-muted, #50545a) !important;
+}
+
+[data-theme-category="light"] ::placeholder {
+  color: var(--text-muted, #50545a) !important;
+  opacity: 0.65;
+}
+
+/* Modal and card surfaces in light themes */
+[data-theme-category="light"] .bg-slate-900,
+[data-theme-category="light"] .bg-slate-950,
+[data-theme-category="light"] .bg-slate-900\/90,
+[data-theme-category="light"] .bg-slate-900\/80,
+[data-theme-category="light"] .bg-slate-900\/70,
+[data-theme-category="light"] .bg-slate-900\/40 {
+  background-color: var(--bg-input, #ffffff) !important;
+}
+
+[data-theme-category="light"] .bg-slate-800,
+[data-theme-category="light"] .bg-slate-800\/80,
+[data-theme-category="light"] .bg-slate-800\/60,
+[data-theme-category="light"] .bg-slate-800\/40 {
+  background-color: var(--bg-card, #ffffff) !important;
+}
+
+[data-theme-category="light"] .border-slate-800,
+[data-theme-category="light"] .border-slate-700,
+[data-theme-category="light"] .border-slate-700\/60,
+[data-theme-category="light"] .border-slate-700\/80 {
+  border-color: var(--border-color, #d0d0d0) !important;
+}
+
+[data-theme-category="light"] .divide-slate-800 > :not([hidden]) ~ :not([hidden]),
+[data-theme-category="light"] .divide-slate-800\/60 > :not([hidden]) ~ :not([hidden]),
+[data-theme-category="light"] .divide-slate-800\/40 > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--border-subtle, #c0c0c0) !important;
+}
+
+/* Light theme CodeMirror Gutters */
+[data-theme-category="light"] .cm-gutters {
+  background-color: var(--bg-card-header, #e5e5e6) !important;
+  border-right: 1px solid var(--border-color, #d0d0d0) !important;
+  color: var(--text-muted, #50545a) !important;
 }

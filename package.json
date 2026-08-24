@@ -1,6 +1,6 @@
 {
   "name": "openshift-gui",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Modern Graphical Desktop GUI & CLI for OpenShift and Kubernetes with Helm & SemVer ImageStream Cleanup",
   "bin": {
     "openshift-gui": "./bin/openshift-gui.js",
@@ -21,6 +21,7 @@
     "pack:app": "node scripts/build-electron.js && electron-builder --mac --dir",
     "pack:dmg": "node scripts/build-electron.js && electron-builder --mac dmg",
     "pack:zip": "node scripts/build-electron.js && electron-builder --mac zip",
+    "pack:win": "node scripts/build-electron.js && electron-builder --win",
     "watch": "tsc --watch",
     "start": "npm run gui",
     "cli": "node bin/openshift-gui.js",

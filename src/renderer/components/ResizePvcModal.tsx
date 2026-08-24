@@ -90,24 +90,24 @@ export const ResizePvcModal: React.FC<ResizePvcModalProps> = ({
       }}
       className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150 select-none"
     >
-      <div className="bg-[#1e1f1c] border border-[#49483e] rounded-xl shadow-2xl w-[92vw] max-w-[650px] overflow-hidden text-[#f8f8f2]">
+      <div className="rounded-xl shadow-2xl w-[92vw] max-w-[650px] overflow-hidden border transition-colors" style={{ backgroundColor: "var(--bg-card, #1e293b)", borderColor: "var(--border-color, #334155)", color: "var(--text-main, #f8fafc)" }}>
         {/* Header */}
-        <div className="p-4 bg-[#272822] border-b border-[#3e3d32] flex items-center justify-between">
+        <div className="p-4 border-b flex items-center justify-between" style={{ backgroundColor: "var(--bg-card-header, #0f172a)", borderColor: "var(--border-color, #334155)" }}>
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-[#3e3d32] flex items-center justify-center border border-[#49483e] text-[#a6e22e]">
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center border" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)", color: "var(--accent-green, #10b981)" }}>
               <Database size={18} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-sm font-bold text-[#f8f8f2] font-mono">
+                <h2 className="text-sm font-bold text-[var(--text-main,#f8fafc)] font-mono">
                   <span>Resize PVC:</span>
-                  <span className="text-[#66d9ef] ml-1">{item.name}</span>
+                  <span className="text-cyan-400 ml-1">{item.name}</span>
                 </h2>
                 <span className="px-2 py-0.2 rounded bg-emerald-950/60 border border-emerald-800 text-[10px] text-emerald-300 font-mono">
                   {item.status}
                 </span>
               </div>
-              <p className="text-[11px] text-[#75715e] font-mono">
+              <p className="text-[11px] text-[var(--text-muted,#94a3b8)] font-mono">
                 Dynamically expand persistent volume storage capacity
               </p>
             </div>
@@ -115,7 +115,7 @@ export const ResizePvcModal: React.FC<ResizePvcModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-[#75715e] hover:text-[#f8f8f2] hover:bg-[#3e3d32] transition-colors"
+            className="p-1.5 rounded-lg text-[var(--text-muted,#94a3b8)] hover:text-[var(--text-main,#f8fafc)] hover:opacity-100 opacity-80 transition-colors"
             title="Close window (Esc)"
           >
             <X size={18} />
@@ -133,46 +133,46 @@ export const ResizePvcModal: React.FC<ResizePvcModalProps> = ({
 
           {/* Current PVC Metadata Cards */}
           <div className="grid grid-cols-3 gap-3">
-            <div className="p-2.5 bg-[#272822] border border-[#3e3d32] rounded-lg">
-              <div className="text-[10px] font-bold text-[#75715e] uppercase">Current Size</div>
-              <div className="text-sm font-bold text-[#a6e22e]">{currentCapacityStr}</div>
+            <div className="p-2.5 bg-[var(--bg-card-header,#0f172a)] border border-[var(--border-subtle,#334155)] rounded-lg">
+              <div className="text-[10px] font-bold text-[var(--text-muted,#94a3b8)] uppercase">Current Size</div>
+              <div className="text-sm font-bold text-emerald-400">{currentCapacityStr}</div>
             </div>
 
-            <div className="p-2.5 bg-[#272822] border border-[#3e3d32] rounded-lg">
-              <div className="text-[10px] font-bold text-[#75715e] uppercase">StorageClass</div>
-              <div className="text-xs font-bold text-[#66d9ef] truncate" title={storageClass}>
+            <div className="p-2.5 bg-[var(--bg-card-header,#0f172a)] border border-[var(--border-subtle,#334155)] rounded-lg">
+              <div className="text-[10px] font-bold text-[var(--text-muted,#94a3b8)] uppercase">StorageClass</div>
+              <div className="text-xs font-bold text-cyan-400 truncate" title={storageClass}>
                 {storageClass}
               </div>
             </div>
 
-            <div className="p-2.5 bg-[#272822] border border-[#3e3d32] rounded-lg">
-              <div className="text-[10px] font-bold text-[#75715e] uppercase">Access Mode</div>
-              <div className="text-xs font-bold text-[#fd971f]">{accessModes}</div>
+            <div className="p-2.5 bg-[var(--bg-card-header,#0f172a)] border border-[var(--border-subtle,#334155)] rounded-lg">
+              <div className="text-[10px] font-bold text-[var(--text-muted,#94a3b8)] uppercase">Access Mode</div>
+              <div className="text-xs font-bold text-amber-400">{accessModes}</div>
             </div>
           </div>
 
           {/* Resize Controls */}
-          <div className="p-4 bg-[#272822] border border-[#3e3d32] rounded-lg space-y-3">
-            <label className="text-xs font-bold text-slate-200 uppercase tracking-wide block">
+          <div className="p-4 bg-[var(--bg-card-header,#0f172a)] border border-[var(--border-subtle,#334155)] rounded-lg space-y-3">
+            <label className="text-xs font-bold uppercase tracking-wide block" style={{ color: "var(--text-main, #f8fafc)" }}>
               Target Storage Capacity
             </label>
 
             <div className="flex items-center gap-3">
-              <div className="flex-1 flex items-center bg-[#1e1f1c] border border-[#49483e] rounded-lg px-3 py-1.5 focus-within:border-[#a6e22e]">
-                <HardDrive size={15} className="text-[#a6e22e] mr-2" />
+              <div className="flex-1 flex items-center rounded-lg px-3 py-1.5 border" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)" }}>
+                <HardDrive size={15} className="text-emerald-400 mr-2" />
                 <input
                   type="number"
                   min={currentNumericSize + 1}
                   value={newSizeNumber}
                   onChange={(e) => setNewSizeNumber(parseInt(e.target.value, 10) || 0)}
-                  className="w-full bg-transparent text-sm font-bold text-white focus:outline-none"
+                  className="w-full bg-transparent text-sm font-bold focus:outline-none" style={{ color: "var(--text-main, #f8fafc)" }}
                 />
               </div>
 
               <select
                 value={unit}
                 onChange={(e) => setUnit(e.target.value)}
-                className="bg-[#1e1f1c] border border-[#49483e] rounded-lg px-3 py-2 text-xs font-bold text-[#66d9ef] focus:outline-none"
+                className="rounded-lg px-3 py-2 text-xs font-bold border focus:outline-none" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)", color: "var(--accent-cyan, #06b6d4)" }}
               >
                 <option value="Gi">Gi (Gibibytes)</option>
                 <option value="Ti">Ti (Tebibytes)</option>
@@ -182,28 +182,28 @@ export const ResizePvcModal: React.FC<ResizePvcModalProps> = ({
 
             {/* Quick Add Pills */}
             <div className="flex items-center gap-2 pt-1">
-              <span className="text-[11px] text-[#75715e]">Quick add:</span>
+              <span className="text-[11px] text-[var(--text-muted,#94a3b8)]">Quick add:</span>
               <button
                 onClick={() => handleQuickAdd(1)}
-                className="px-2 py-1 rounded bg-[#1e1f1c] hover:bg-[#3e3d32] text-xs font-bold text-[#a6e22e] border border-[#3e3d32] transition-colors"
+                className="px-2 py-1 rounded bg-[var(--bg-input,#0f172a)] hover:opacity-100 opacity-80 text-xs font-bold text-emerald-400 border border-[var(--border-subtle,#334155)] transition-colors"
               >
                 +1 {unit}
               </button>
               <button
                 onClick={() => handleQuickAdd(5)}
-                className="px-2 py-1 rounded bg-[#1e1f1c] hover:bg-[#3e3d32] text-xs font-bold text-[#a6e22e] border border-[#3e3d32] transition-colors"
+                className="px-2 py-1 rounded bg-[var(--bg-input,#0f172a)] hover:opacity-100 opacity-80 text-xs font-bold text-emerald-400 border border-[var(--border-subtle,#334155)] transition-colors"
               >
                 +5 {unit}
               </button>
               <button
                 onClick={() => handleQuickAdd(10)}
-                className="px-2 py-1 rounded bg-[#1e1f1c] hover:bg-[#3e3d32] text-xs font-bold text-[#a6e22e] border border-[#3e3d32] transition-colors"
+                className="px-2 py-1 rounded bg-[var(--bg-input,#0f172a)] hover:opacity-100 opacity-80 text-xs font-bold text-emerald-400 border border-[var(--border-subtle,#334155)] transition-colors"
               >
                 +10 {unit}
               </button>
               <button
                 onClick={handleDouble}
-                className="px-2 py-1 rounded bg-[#1e1f1c] hover:bg-[#3e3d32] text-xs font-bold text-[#66d9ef] border border-[#3e3d32] transition-colors"
+                className="px-2 py-1 rounded bg-[var(--bg-input,#0f172a)] hover:opacity-100 opacity-80 text-xs font-bold text-cyan-400 border border-[var(--border-subtle,#334155)] transition-colors"
               >
                 2x Double
               </button>
@@ -211,13 +211,13 @@ export const ResizePvcModal: React.FC<ResizePvcModalProps> = ({
           </div>
 
           {/* Visual Storage Expansion Graph */}
-          <div className="p-3 bg-[#272822] border border-[#3e3d32] rounded-lg space-y-2">
+          <div className="p-3 bg-[var(--bg-card-header,#0f172a)] border border-[var(--border-subtle,#334155)] rounded-lg space-y-2">
             <div className="flex items-center justify-between text-xs font-mono">
-              <span className="text-[#75715e]">Capacity Expansion:</span>
+              <span className="text-[var(--text-muted,#94a3b8)]">Capacity Expansion:</span>
               <span className="flex items-center gap-2 font-bold">
-                <span className="text-[#75715e]">{currentCapacityStr}</span>
-                <ArrowRight size={12} className="text-[#a6e22e]" />
-                <span className="text-[#a6e22e]">
+                <span className="text-[var(--text-muted,#94a3b8)]">{currentCapacityStr}</span>
+                <ArrowRight size={12} className="text-emerald-400" />
+                <span className="text-emerald-400">
                   {newSizeNumber}
                   {unit}
                 </span>
@@ -225,17 +225,17 @@ export const ResizePvcModal: React.FC<ResizePvcModalProps> = ({
             </div>
 
             {/* Capacity Progress Bar */}
-            <div className="w-full bg-[#1e1f1c] h-4 rounded-full overflow-hidden flex border border-[#3e3d32]">
+            <div className="w-full bg-[var(--bg-input,#0f172a)] h-4 rounded-full overflow-hidden flex border border-[var(--border-subtle,#334155)]">
               <div
                 style={{ width: `${percentOld}%` }}
-                className="bg-[#66d9ef] h-full flex items-center justify-center text-[9px] font-bold text-[#272822]"
+                className="bg-cyan-500 h-full flex items-center justify-center text-[9px] font-bold text-[#272822]"
                 title={`Current: ${currentCapacityStr}`}
               >
                 Current ({currentCapacityStr})
               </div>
               <div
                 style={{ width: `${100 - percentOld}%` }}
-                className="bg-[#a6e22e]/40 h-full flex items-center justify-center text-[9px] font-bold text-[#a6e22e]"
+                className="bg-emerald-500/30 h-full flex items-center justify-center text-[9px] font-bold text-emerald-400"
                 title={`New expansion: +${Math.max(0, newSizeNumber - currentNumericSize)}${unit}`}
               >
                 +{Math.max(0, newSizeNumber - currentNumericSize)}
@@ -246,10 +246,10 @@ export const ResizePvcModal: React.FC<ResizePvcModalProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 bg-[#272822] border-t border-[#3e3d32] flex items-center justify-end gap-2 font-mono">
+        <div className="p-4 bg-[var(--bg-card-header,#0f172a)] border-t border-[var(--border-subtle,#334155)] flex items-center justify-end gap-2 font-mono">
           <button
             onClick={onClose}
-            className="px-3.5 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-[#3e3d32] border border-[#49483e] text-xs transition-colors"
+            className="px-3.5 py-1.5 rounded-lg border text-xs font-medium transition-colors" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)", color: "var(--text-main, #f8fafc)" }}
           >
             Cancel
           </button>
@@ -257,7 +257,7 @@ export const ResizePvcModal: React.FC<ResizePvcModalProps> = ({
           <button
             onClick={handleResize}
             disabled={loading || newSizeNumber <= currentNumericSize}
-            className="px-4 py-1.5 rounded-lg bg-[#a6e22e] hover:bg-[#a6e22e]/80 text-[#272822] font-bold text-xs flex items-center gap-1.5 transition-all shadow-md disabled:opacity-50"
+            className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-md disabled:opacity-50"
           >
             <Maximize2 size={13} className={loading ? 'animate-spin' : ''} />
             <span>{loading ? 'Resizing...' : `Expand Storage to ${newSizeNumber}${unit}`}</span>

@@ -98,16 +98,16 @@ export const CrdInstancesModal: React.FC<CrdInstancesModalProps> = ({
       }}
       className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150 select-none"
     >
-      <div className="bg-[#1e1f1c] border border-[#49483e] rounded-xl shadow-2xl w-[92vw] max-w-[1250px] h-[88vh] flex flex-col overflow-hidden text-[#f8f8f2]">
+      <div className="rounded-xl shadow-2xl w-[92vw] max-w-[1250px] h-[88vh] flex flex-col overflow-hidden border transition-colors" style={{ backgroundColor: "var(--bg-card, #1e293b)", borderColor: "var(--border-color, #334155)", color: "var(--text-main, #f8fafc)" }}>
         {/* Monokai Header */}
-        <div className="p-3.5 bg-[#272822] border-b border-[#3e3d32] flex items-center justify-between shrink-0">
+        <div className="p-3.5 bg-[var(--bg-card-header,#0f172a)] border-b border-[var(--border-subtle,#334155)] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-[#3e3d32] flex items-center justify-center border border-[#49483e] text-[#ae81ff]">
               <Boxes size={18} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-sm font-bold text-[#f8f8f2] font-mono flex items-center gap-2">
+                <h2 className="text-sm font-bold text-[var(--text-main,#f8fafc)] font-mono flex items-center gap-2">
                   <span>Custom Resource:</span>
                   <span className="text-[#66d9ef] font-bold">{crdKind}</span>
                 </h2>
@@ -123,7 +123,7 @@ export const CrdInstancesModal: React.FC<CrdInstancesModalProps> = ({
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-[#75715e] font-mono">
+              <p className="text-[11px] text-[var(--text-muted,#94a3b8)] font-mono">
                 Click any instance name to edit its YAML manifest directly • Live auto-refreshing
               </p>
             </div>
@@ -132,19 +132,19 @@ export const CrdInstancesModal: React.FC<CrdInstancesModalProps> = ({
           {/* Search and Close */}
           <div className="flex items-center gap-3">
             <div className="relative w-64">
-              <Search className="absolute left-2.5 top-2 text-[#75715e]" size={14} />
+              <Search className="absolute left-2.5 top-2 text-[var(--text-muted,#94a3b8)]" size={14} />
               <input
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Filter instances..."
-                className="w-full bg-[#1e1f1c] border border-[#49483e] rounded-lg pl-8 pr-3 py-1 text-xs text-[#f8f8f2] placeholder-[#75715e] focus:outline-none focus:border-[#66d9ef] font-mono"
+                className="w-full border rounded-lg pl-8 pr-3 py-1 text-xs focus:outline-none font-mono" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)", color: "var(--text-main, #f8fafc)" }}
               />
             </div>
 
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-[#75715e] hover:text-[#f8f8f2] hover:bg-[#3e3d32] transition-colors"
+              className="p-1.5 rounded-lg text-[var(--text-muted,#94a3b8)] hover:text-[var(--text-main,#f8fafc)] hover:bg-[#3e3d32] transition-colors"
               title="Close window (Esc)"
               aria-label="Close window"
             >
@@ -158,7 +158,7 @@ export const CrdInstancesModal: React.FC<CrdInstancesModalProps> = ({
           {loading && items.length === 0 && (
             <div className="h-64 flex flex-col items-center justify-center space-y-3">
               <RefreshCw className="animate-spin text-[#66d9ef]" size={28} />
-              <p className="text-sm font-mono text-[#75715e]">Loading {crdKind} instances from cluster...</p>
+              <p className="text-sm font-mono text-[var(--text-muted,#94a3b8)]">Loading {crdKind} instances from cluster...</p>
             </div>
           )}
 
@@ -170,10 +170,10 @@ export const CrdInstancesModal: React.FC<CrdInstancesModalProps> = ({
           )}
 
           {!loading && items.length === 0 && !error && (
-            <div className="h-64 flex flex-col items-center justify-center space-y-2 text-center text-[#75715e] font-mono">
+            <div className="h-64 flex flex-col items-center justify-center space-y-2 text-center text-[var(--text-muted,#94a3b8)] font-mono">
               <Boxes size={36} className="text-[#49483e] mb-2" />
               <p className="text-sm font-bold text-slate-300">No {crdKind} instances found</p>
-              <p className="text-xs text-[#75715e]">
+              <p className="text-xs text-[var(--text-muted,#94a3b8)]">
                 No custom resources of kind &apos;{crdKind}&apos; currently exist in{' '}
                 {scope === 'Cluster' ? 'the cluster' : `project '${namespace}'`}.
               </p>
@@ -181,9 +181,9 @@ export const CrdInstancesModal: React.FC<CrdInstancesModalProps> = ({
           )}
 
           {items.length > 0 && (
-            <div className="border border-[#3e3d32] rounded-lg overflow-hidden bg-[#272822]">
+            <div className="border border-[var(--border-subtle,#334155)] rounded-lg overflow-hidden bg-[var(--bg-card-header,#0f172a)]">
               <table className="w-full text-left text-xs font-mono">
-                <thead className="bg-[#1e1f1c] text-[#75715e] uppercase text-[10px] tracking-wider border-b border-[#3e3d32]">
+                <thead className="bg-[var(--bg-input,#0f172a)] text-[var(--text-muted,#94a3b8)] uppercase text-[10px] tracking-wider border-b border-[var(--border-subtle,#334155)]">
                   <tr>
                     <th className="py-2.5 px-4 font-bold">Instance Name</th>
                     {scope !== 'Cluster' && <th className="py-2.5 px-3">Project / Namespace</th>}
@@ -234,7 +234,7 @@ export const CrdInstancesModal: React.FC<CrdInstancesModalProps> = ({
                       </td>
 
                       {/* Age */}
-                      <td className="py-2.5 px-3 text-[#75715e]">{item.age}</td>
+                      <td className="py-2.5 px-3 text-[var(--text-muted,#94a3b8)]">{item.age}</td>
 
                       {/* Action Buttons */}
                       <td className="py-2 px-4 text-right">
@@ -245,7 +245,7 @@ export const CrdInstancesModal: React.FC<CrdInstancesModalProps> = ({
                               e.stopPropagation();
                               onEditInstance(item);
                             }}
-                            className="p-1.5 rounded bg-[#1e1f1c] hover:bg-[#66d9ef]/20 text-[#66d9ef] border border-[#3e3d32] hover:border-[#66d9ef]/50 transition-colors"
+                            className="p-1.5 rounded bg-[var(--bg-input,#0f172a)] hover:bg-[#66d9ef]/20 text-[#66d9ef] border border-[var(--border-subtle,#334155)] hover:border-[#66d9ef]/50 transition-colors"
                             title="Edit Custom Resource YAML"
                             aria-label="Edit YAML"
                           >
@@ -258,7 +258,7 @@ export const CrdInstancesModal: React.FC<CrdInstancesModalProps> = ({
                               e.stopPropagation();
                               onDescribeInstance(item);
                             }}
-                            className="p-1.5 rounded bg-[#1e1f1c] hover:bg-[#3e3d32] text-slate-300 hover:text-white border border-[#3e3d32] transition-colors"
+                            className="p-1.5 rounded bg-[var(--bg-input,#0f172a)] hover:bg-[#3e3d32] text-slate-300 hover:text-white border border-[var(--border-subtle,#334155)] transition-colors"
                             title="Describe Custom Resource"
                             aria-label="Describe"
                           >
@@ -271,7 +271,7 @@ export const CrdInstancesModal: React.FC<CrdInstancesModalProps> = ({
                               e.stopPropagation();
                               onDeleteInstance(item);
                             }}
-                            className="p-1.5 rounded bg-[#1e1f1c] hover:bg-rose-950/60 text-[#75715e] hover:text-rose-300 border border-[#3e3d32] hover:border-rose-800 transition-colors"
+                            className="p-1.5 rounded bg-[var(--bg-input,#0f172a)] hover:bg-rose-950/60 text-[var(--text-muted,#94a3b8)] hover:text-rose-300 border border-[var(--border-subtle,#334155)] hover:border-rose-800 transition-colors"
                             title="Delete Custom Resource"
                             aria-label="Delete"
                           >
@@ -288,7 +288,7 @@ export const CrdInstancesModal: React.FC<CrdInstancesModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-3 bg-[#272822] border-t border-[#3e3d32] flex items-center justify-between text-xs text-[#75715e] font-mono shrink-0">
+        <div className="p-3 border-t flex items-center justify-between text-xs font-mono shrink-0" style={{ backgroundColor: "var(--bg-card-header, #0f172a)", borderColor: "var(--border-color, #334155)", color: "var(--text-muted, #94a3b8)" }}>
           <div>
             <span>Total instances: {items.length}</span>
             {group && (

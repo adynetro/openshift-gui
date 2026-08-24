@@ -101,13 +101,7 @@ export class LogStreamer extends EventEmitter {
     }
 
     const env = getExecEnv();
-
-    try {
-      this.process = spawn('oc', args, { env });
-    } catch (e) {
-      this.process = spawn('kubectl', args, { env });
-    }
-
+    this.process = spawn('oc', args, { env });
     this.isStreaming = true;
 
     let partialLine = '';

@@ -19,6 +19,7 @@ import {
   Shield,
 } from 'lucide-react';
 import { ResourceKind } from '../../types/k8s.js';
+import { ThemeSelector } from './ThemeSelector.js';
 
 interface SidebarProps {
   currentKind: ResourceKind;
@@ -100,12 +101,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenHelp,
 }) => {
   return (
-    <aside className="w-64 bg-[#0f172a] border-r border-[#1e293b] flex flex-col justify-between select-none shrink-0">
+    <aside
+      className="w-64 border-r flex flex-col justify-between select-none shrink-0 transition-colors duration-150"
+      style={{
+        backgroundColor: 'var(--bg-sidebar, #0f172a)',
+        borderColor: 'var(--border-color, #1e293b)',
+        color: 'var(--text-main, #f8fafc)',
+      }}
+    >
       {/* Navigation Groups */}
       <div className="p-3 space-y-3 overflow-y-auto">
         {NAV_GROUPS.map((group) => (
           <div key={group.title} className="space-y-1">
-            <div className="px-3 pt-1.5 pb-0.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono">
+            <div className="px-3 pt-1.5 pb-0.5 text-[10px] font-bold uppercase tracking-wider font-mono opacity-50">
               {group.title}
             </div>
 
@@ -121,13 +129,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium transition-all group ${
                     isActive
                       ? 'bg-gradient-to-r from-red-600 to-rose-700 text-white shadow-lg shadow-red-950/60 font-semibold'
-                      : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/80'
+                      : 'opacity-75 hover:opacity-100 hover:bg-white/5'
                   }`}
                 >
                   <div className="flex items-center space-x-2.5 truncate">
                     <Icon
                       size={15}
-                      className={isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}
+                      className={isActive ? 'text-white' : 'opacity-70 group-hover:opacity-100'}
                     />
                     <span className="truncate">{item.label}</span>
                   </div>
@@ -144,7 +152,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
                           isActive
                             ? 'bg-white/20 text-white font-bold'
-                            : 'bg-slate-800 text-slate-300'
+                            : 'bg-white/10 opacity-80'
                         }`}
                       >
                         {count}
@@ -155,7 +163,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       className={`text-[10px] font-mono px-1 py-0.2 rounded ${
                         isActive
                           ? 'bg-white/20 text-white'
-                          : 'bg-slate-900 text-slate-500 group-hover:text-slate-400'
+                          : 'bg-black/20 opacity-60 group-hover:opacity-90'
                       }`}
                     >
                       {item.hotkey}
@@ -168,24 +176,41 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ))}
       </div>
 
-      {/* Footer Info & Help */}
-      <div className="p-3 border-t border-[#1e293b] space-y-2">
+      {/* Footer Info, Theme Selector & Shortcuts/Help */}
+      <div
+        className="p-3 border-t space-y-2 shrink-0 transition-colors"
+        style={{ borderColor: 'var(--border-color, #1e293b)' }}
+      >
+        {/* Theme Selector placed right above Shortcuts & Help */}
+        <div className="w-full">
+          <ThemeSelector />
+        </div>
+
+        {/* Shortcuts & Help button */}
         <button
           onClick={onOpenHelp}
-          className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors"
+          className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs opacity-75 hover:opacity-100 hover:bg-white/5 transition-all border"
+          style={{ borderColor: 'var(--border-subtle, #334155)' }}
+          title="Open Keyboard Shortcuts & Help (?)"
         >
           <div className="flex items-center space-x-2">
-            <HelpCircle size={14} />
-            <span>Shortcuts & Help</span>
+            <HelpCircle size={14} className="text-cyan-400" />
+            <span className="font-semibold">Shortcuts & Help</span>
           </div>
-          <span className="text-[10px] font-mono bg-slate-900 px-1 py-0.2 rounded text-slate-500">
+          <span
+            className="text-[10px] font-mono px-1.5 py-0.2 rounded border font-bold"
+            style={{
+              backgroundColor: 'var(--bg-input, #0f172a)',
+              borderColor: 'var(--border-color, #334155)',
+            }}
+          >
             ?
           </span>
         </button>
 
-        <div className="px-3 text-[10px] text-slate-400 font-mono flex items-center justify-between">
+        <div className="px-3 text-[10px] opacity-60 font-mono flex items-center justify-between">
           <span>OpenShift GUI</span>
-          <span className="text-emerald-500">v0.1.0</span>
+          <span className="text-emerald-400 font-bold">v0.1.0</span>
         </div>
       </div>
     </aside>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Layers, FolderGit2, Server, User, AlertTriangle, Globe } from 'lucide-react';
+import { ThemeConfig } from '../utils/themes.js';
 
 interface TopNavProps {
   currentContext: string | null;
@@ -10,6 +11,7 @@ interface TopNavProps {
   isUnauthorized?: boolean;
   onOpenContextModal: () => void;
   onOpenProjectModal: () => void;
+  onThemeChange?: (theme: ThemeConfig) => void;
 }
 
 export const TopNav: React.FC<TopNavProps> = ({
@@ -21,11 +23,19 @@ export const TopNav: React.FC<TopNavProps> = ({
   isUnauthorized,
   onOpenContextModal,
   onOpenProjectModal,
+  onThemeChange,
 }) => {
   const isAllProjects = !currentProject || currentProject === 'all-projects' || currentProject === '__all__';
 
   return (
-    <header className="titlebar-drag-region h-16 bg-[#0f172a] border-b border-[#1e293b] flex items-center justify-between px-4 select-none shrink-0">
+    <header
+      className="titlebar-drag-region h-16 border-b flex items-center justify-between px-4 select-none shrink-0 transition-colors duration-150"
+      style={{
+        backgroundColor: 'var(--bg-header, #0f172a)',
+        borderColor: 'var(--border-color, #1e293b)',
+        color: 'var(--text-main, #f8fafc)',
+      }}
+    >
       {/* Left: macOS traffic lights offset + OpenShift Logo */}
       <div className="flex items-center space-x-4 pl-18">
         <div className="flex items-center space-x-2.5">
@@ -90,7 +100,7 @@ export const TopNav: React.FC<TopNavProps> = ({
         </button>
       </div>
 
-      {/* Right: Cluster Status */}
+      {/* Right: User + Cluster Status */}
       <div className="no-drag flex items-center space-x-3">
         {/* User & Server metadata */}
         <div className="hidden lg:flex flex-col items-end text-right">

@@ -29,6 +29,16 @@
     "category": "Development"
   },
   "win": {
-    "icon": "build/icon.png"
+    "icon": "build/icon.png",
+    "target": [
+      {
+        "target": "portable",
+        "arch": ["x64"]
+      },
+      {
+        "target": "zip",
+        "arch": ["x64"]
+      }
+    ]
   }
 }

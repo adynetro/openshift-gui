@@ -171,16 +171,16 @@ export const SecretEditorModal: React.FC<SecretEditorModalProps> = ({
       }}
       className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150 select-none"
     >
-      <div className="bg-[#1e1f1c] border border-[#49483e] rounded-xl shadow-2xl w-[92vw] max-w-[1300px] h-[90vh] flex flex-col overflow-hidden text-[#f8f8f2]">
+      <div className="rounded-xl shadow-2xl w-[92vw] max-w-[1300px] h-[90vh] flex flex-col overflow-hidden border transition-colors" style={{ backgroundColor: "var(--bg-card, #1e293b)", borderColor: "var(--border-color, #334155)", color: "var(--text-main, #f8fafc)" }}>
         {/* Monokai Header */}
-        <div className="p-3.5 bg-[#272822] border-b border-[#3e3d32] flex items-center justify-between shrink-0">
+        <div className="p-3.5 bg-[var(--bg-card-header,#0f172a)] border-b border-[var(--border-subtle,#334155)] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-[#3e3d32] flex items-center justify-center border border-[#49483e] text-[#fd971f]">
               <Key size={18} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-sm font-bold text-[#f8f8f2] flex items-center gap-2 font-mono">
+                <h2 className="text-sm font-bold text-[var(--text-main,#f8fafc)] flex items-center gap-2 font-mono">
                   <span>Secret:</span>
                   <span className="text-[#a6e22e]">{item.name}</span>
                 </h2>
@@ -191,7 +191,7 @@ export const SecretEditorModal: React.FC<SecretEditorModalProps> = ({
                   Project: {namespace}
                 </span>
               </div>
-              <p className="text-[11px] text-[#75715e] font-mono">
+              <p className="text-[11px] text-[var(--text-muted,#94a3b8)] font-mono">
                 Decoded key-value GUI editor • Auto-encodes to base64 on save (⌘S)
               </p>
             </div>
@@ -201,7 +201,7 @@ export const SecretEditorModal: React.FC<SecretEditorModalProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={handleToggleRevealAll}
-              className="px-2.5 py-1.5 rounded-lg bg-[#272822] hover:bg-[#3e3d32] text-slate-300 hover:text-white border border-[#49483e] text-xs font-mono flex items-center gap-1.5 transition-colors"
+              className="px-2.5 py-1.5 rounded-lg bg-[var(--bg-card-header,#0f172a)] hover:bg-[#3e3d32] text-slate-300 hover:text-white border border-[#49483e] text-xs font-mono flex items-center gap-1.5 transition-colors"
               title={revealAll ? 'Mask all secret values' : 'Reveal all secret values'}
             >
               {revealAll ? <EyeOff size={13} className="text-[#fd971f]" /> : <Eye size={13} className="text-[#66d9ef]" />}
@@ -229,7 +229,7 @@ export const SecretEditorModal: React.FC<SecretEditorModalProps> = ({
 
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-[#75715e] hover:text-[#f8f8f2] hover:bg-[#3e3d32] transition-colors ml-1"
+              className="p-1.5 rounded-lg text-[var(--text-muted,#94a3b8)] hover:text-[var(--text-main,#f8fafc)] hover:bg-[#3e3d32] transition-colors ml-1"
               title="Close editor (Esc)"
               aria-label="Close window"
             >
@@ -243,7 +243,7 @@ export const SecretEditorModal: React.FC<SecretEditorModalProps> = ({
           {loading && (
             <div className="h-64 flex flex-col items-center justify-center space-y-3">
               <RefreshCw className="animate-spin text-[#66d9ef]" size={28} />
-              <p className="text-sm text-[#75715e]">Loading and decoding secret keys...</p>
+              <p className="text-sm text-[var(--text-muted,#94a3b8)]">Loading and decoding secret keys...</p>
             </div>
           )}
 
@@ -255,7 +255,7 @@ export const SecretEditorModal: React.FC<SecretEditorModalProps> = ({
           )}
 
           {!loading && entries.length === 0 && (
-            <div className="h-48 flex flex-col items-center justify-center space-y-3 text-center text-[#75715e]">
+            <div className="h-48 flex flex-col items-center justify-center space-y-3 text-center text-[var(--text-muted,#94a3b8)]">
               <Key size={32} className="text-[#49483e]" />
               <p className="text-sm">This secret currently has no key-value data.</p>
               <button
@@ -272,24 +272,24 @@ export const SecretEditorModal: React.FC<SecretEditorModalProps> = ({
             entries.map((entry, idx) => (
               <div
                 key={entry.id}
-                className="bg-[#272822] border border-[#3e3d32] hover:border-[#49483e] rounded-lg p-3.5 space-y-2.5 transition-colors group"
+                className="bg-[var(--bg-card-header,#0f172a)] border border-[var(--border-subtle,#334155)] hover:border-[#49483e] rounded-lg p-3.5 space-y-2.5 transition-colors group"
               >
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 flex-1">
-                    <span className="text-[11px] text-[#75715e] font-bold">#{idx + 1}</span>
+                    <span className="text-[11px] text-[var(--text-muted,#94a3b8)] font-bold">#{idx + 1}</span>
                     <input
                       type="text"
                       value={entry.key}
                       onChange={(e) => handleUpdateEntry(entry.id, 'key', e.target.value)}
                       placeholder="KEY_NAME (e.g. API_KEY, password, tls.key)"
-                      className="flex-1 max-w-[360px] bg-[#1e1f1c] border border-[#49483e] focus:border-[#66d9ef] rounded px-2.5 py-1 text-xs text-[#66d9ef] font-bold focus:outline-none"
+                      className="flex-1 max-w-[360px] bg-[var(--bg-input,#0f172a)] border border-[#49483e] focus:border-[#66d9ef] rounded px-2.5 py-1 text-xs text-[#66d9ef] font-bold focus:outline-none"
                     />
                   </div>
 
                   <div className="flex items-center gap-1.5">
                     <button
                       onClick={() => handleToggleMask(entry.id)}
-                      className="p-1.5 rounded bg-[#1e1f1c] hover:bg-[#3e3d32] text-[#75715e] hover:text-[#f8f8f2] border border-[#3e3d32] transition-colors"
+                      className="p-1.5 rounded bg-[var(--bg-input,#0f172a)] hover:bg-[#3e3d32] text-[var(--text-muted,#94a3b8)] hover:text-[var(--text-main,#f8fafc)] border border-[var(--border-subtle,#334155)] transition-colors"
                       title={entry.isMasked ? 'Reveal value' : 'Mask value'}
                     >
                       {entry.isMasked ? <Eye size={13} /> : <EyeOff size={13} className="text-[#fd971f]" />}
@@ -297,7 +297,7 @@ export const SecretEditorModal: React.FC<SecretEditorModalProps> = ({
 
                     <button
                       onClick={() => handleCopyValue(entry.id, entry.value)}
-                      className="p-1.5 rounded bg-[#1e1f1c] hover:bg-[#3e3d32] text-[#75715e] hover:text-[#a6e22e] border border-[#3e3d32] transition-colors"
+                      className="p-1.5 rounded bg-[var(--bg-input,#0f172a)] hover:bg-[#3e3d32] text-[var(--text-muted,#94a3b8)] hover:text-[#a6e22e] border border-[var(--border-subtle,#334155)] transition-colors"
                       title="Copy plaintext value"
                     >
                       {copiedId === entry.id ? <Check size={13} className="text-[#a6e22e]" /> : <Copy size={13} />}
@@ -305,7 +305,7 @@ export const SecretEditorModal: React.FC<SecretEditorModalProps> = ({
 
                     <button
                       onClick={() => handleDeleteEntry(entry.id)}
-                      className="p-1.5 rounded bg-[#1e1f1c] hover:bg-rose-950/60 text-[#75715e] hover:text-rose-300 border border-[#3e3d32] hover:border-rose-800 transition-colors"
+                      className="p-1.5 rounded bg-[var(--bg-input,#0f172a)] hover:bg-rose-950/60 text-[var(--text-muted,#94a3b8)] hover:text-rose-300 border border-[var(--border-subtle,#334155)] hover:border-rose-800 transition-colors"
                       title="Delete this key"
                     >
                       <Trash2 size={13} />
@@ -327,8 +327,8 @@ export const SecretEditorModal: React.FC<SecretEditorModalProps> = ({
                       if (entry.isMasked) handleToggleMask(entry.id);
                     }}
                     placeholder="Enter secret value..."
-                    className={`w-full bg-[#1e1f1c] border border-[#3e3d32] focus:border-[#a6e22e] rounded p-2.5 text-xs text-[#f8f8f2] focus:outline-none font-mono resize-y ${
-                      entry.isMasked ? 'text-[#75715e] tracking-widest' : ''
+                    className={`w-full bg-[var(--bg-input,#0f172a)] border border-[var(--border-subtle,#334155)] focus:border-[#a6e22e] rounded p-2.5 text-xs text-[var(--text-main,#f8fafc)] focus:outline-none font-mono resize-y ${
+                      entry.isMasked ? 'text-[var(--text-muted,#94a3b8)] tracking-widest' : ''
                     }`}
                   />
                 </div>
@@ -337,7 +337,7 @@ export const SecretEditorModal: React.FC<SecretEditorModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-3 bg-[#272822] border-t border-[#3e3d32] flex items-center justify-between text-xs text-[#75715e] font-mono shrink-0">
+        <div className="p-3 border-t flex items-center justify-between text-xs font-mono shrink-0" style={{ backgroundColor: "var(--bg-card-header, #0f172a)", borderColor: "var(--border-color, #334155)", color: "var(--text-muted, #94a3b8)" }}>
           <div>
             <span>Keys: {entries.length}</span>
             <span className="mx-2">•</span>
