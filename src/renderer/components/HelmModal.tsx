@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Anchor, FileText, Code2, History, RotateCcw, Trash2, CheckCircle2, AlertTriangle, RefreshCw, Copy, Check, Save, Edit3 } from 'lucide-react';
+import CodeMirror from '@uiw/react-codemirror';
+import { yaml } from '@codemirror/lang-yaml';
+import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { parse as parseYaml } from 'yaml';
 import { ResourceItem } from '../../types/k8s.js';
 
@@ -135,7 +138,7 @@ export const HelmModal: React.FC<HelmModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
-      <div className="bg-[#0f172a] border border-blue-500/40 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+      <div className="bg-[#0f172a] border border-blue-500/40 rounded-xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="p-4 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -268,68 +271,93 @@ export const HelmModal: React.FC<HelmModalProps> = ({
         )}
 
         {/* Tab Content */}
-        <div className="flex-1 overflow-auto p-4 flex flex-col">
+        <div className="flex-1 overflow-hidden flex flex-col p-3 bg-[#0b0f19]">
           {loading ? (
-            <div className="flex items-center justify-center p-12 text-slate-400 gap-2">
+            <div className="flex-1 flex items-center justify-center p-12 text-slate-400 gap-2">
               <RefreshCw size={18} className="animate-spin text-blue-400" />
               <span className="text-xs">Loading Helm release details...</span>
             </div>
           ) : activeTab === 'edit-values' ? (
-            <textarea
-              value={editedValues}
-              onChange={(e) => handleValuesChange(e.target.value)}
-              placeholder="# Edit YAML values here..."
-              spellCheck={false}
-              className="flex-1 w-full min-h-[350px] p-4 bg-slate-950 text-slate-100 font-mono text-xs leading-relaxed outline-none rounded-lg border border-slate-800 focus:border-emerald-500 resize-none"
-            />
+            <div className="flex-1 h-full overflow-auto rounded-lg border border-slate-800">
+              <CodeMirror
+                value={editedValues}
+                height="100%"
+                theme={vscodeDark}
+                extensions={[yaml()]}
+                onChange={handleValuesChange}
+                basicSetup={{
+                  lineNumbers: true,
+                  highlightActiveLineGutter: true,
+                  syntaxHighlighting: true,
+                  bracketMatching: true,
+                  foldGutter: true,
+                  autocompletion: true,
+                }}
+              />
+            </div>
           ) : activeTab === 'history' ? (
-            <table className="w-full text-left border-collapse text-xs">
-              <thead className="sticky top-0 bg-[#0f172a] border-b border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                <tr>
-                  <th className="py-2.5 px-3">Revision</th>
-                  <th className="py-2.5 px-3">Updated</th>
-                  <th className="py-2.5 px-3">Status</th>
-                  <th className="py-2.5 px-3">Chart</th>
-                  <th className="py-2.5 px-3">App Version</th>
-                  <th className="py-2.5 px-3">Description</th>
-                  <th className="py-2.5 px-3 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800 font-mono">
-                {history.map((h) => {
-                  const isCurrentRev = String(h.revision) === String(release.extra?.revision);
+            <div className="flex-1 overflow-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead className="sticky top-0 bg-[#0f172a] border-b border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  <tr>
+                    <th className="py-2.5 px-3">Revision</th>
+                    <th className="py-2.5 px-3">Updated</th>
+                    <th className="py-2.5 px-3">Status</th>
+                    <th className="py-2.5 px-3">Chart</th>
+                    <th className="py-2.5 px-3">App Version</th>
+                    <th className="py-2.5 px-3">Description</th>
+                    <th className="py-2.5 px-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800 font-mono">
+                  {history.map((h) => {
+                    const isCurrentRev = String(h.revision) === String(release.extra?.revision);
 
-                  return (
-                    <tr key={h.revision} className="hover:bg-slate-800/40 text-slate-200">
-                      <td className="py-2 px-3 font-bold text-cyan-300">
-                        {h.revision} {isCurrentRev && <span className="text-[10px] text-emerald-400 ml-1 font-sans">[Current]</span>}
-                      </td>
-                      <td className="py-2 px-3 text-slate-400">{h.updated || '-'}</td>
-                      <td className="py-2 px-3 text-emerald-400">{h.status || '-'}</td>
-                      <td className="py-2 px-3 text-blue-300">{h.chart || '-'}</td>
-                      <td className="py-2 px-3 text-amber-300">{h.app_version || '-'}</td>
-                      <td className="py-2 px-3 text-slate-300 text-[11px] truncate max-w-[200px]">{h.description || '-'}</td>
-                      <td className="py-2 px-3 text-right">
-                        {!isCurrentRev && (
-                          <button
-                            onClick={() => handleRollback(h.revision)}
-                            className="px-2 py-1 rounded bg-slate-800 hover:bg-cyan-950 text-cyan-400 border border-slate-700 hover:border-cyan-500 text-xs font-semibold flex items-center gap-1 ml-auto"
-                            title={`Roll back release to revision ${h.revision}`}
-                          >
-                            <RotateCcw size={12} />
-                            <span>Rollback</span>
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                    return (
+                      <tr key={h.revision} className="hover:bg-slate-800/40 text-slate-200">
+                        <td className="py-2 px-3 font-bold text-cyan-300">
+                          {h.revision} {isCurrentRev && <span className="text-[10px] text-emerald-400 ml-1 font-sans">[Current]</span>}
+                        </td>
+                        <td className="py-2 px-3 text-slate-400">{h.updated || '-'}</td>
+                        <td className="py-2 px-3 text-emerald-400">{h.status || '-'}</td>
+                        <td className="py-2 px-3 text-blue-300">{h.chart || '-'}</td>
+                        <td className="py-2 px-3 text-amber-300">{h.app_version || '-'}</td>
+                        <td className="py-2 px-3 text-slate-300 text-[11px] truncate max-w-[200px]">{h.description || '-'}</td>
+                        <td className="py-2 px-3 text-right">
+                          {!isCurrentRev && (
+                            <button
+                              onClick={() => handleRollback(h.revision)}
+                              className="px-2 py-1 rounded bg-slate-800 hover:bg-cyan-950 text-cyan-400 border border-slate-700 hover:border-cyan-500 text-xs font-semibold flex items-center gap-1 ml-auto"
+                              title={`Roll back release to revision ${h.revision}`}
+                            >
+                              <RotateCcw size={12} />
+                              <span>Rollback</span>
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           ) : (
-            <pre className="p-4 bg-slate-950 rounded-lg border border-slate-800 text-xs font-mono text-slate-200 overflow-auto whitespace-pre-wrap leading-relaxed">
-              {activeTab === 'values' ? valuesContent || 'No values found.' : manifestContent || 'No manifest found.'}
-            </pre>
+            <div className="flex-1 h-full overflow-auto rounded-lg border border-slate-800">
+              <CodeMirror
+                value={activeTab === 'values' ? valuesContent || '# No values found.' : manifestContent || '# No manifest found.'}
+                height="100%"
+                theme={vscodeDark}
+                extensions={[yaml()]}
+                editable={false}
+                basicSetup={{
+                  lineNumbers: true,
+                  highlightActiveLineGutter: true,
+                  syntaxHighlighting: true,
+                  bracketMatching: true,
+                  foldGutter: true,
+                }}
+              />
+            </div>
           )}
         </div>
 
@@ -339,7 +367,7 @@ export const HelmModal: React.FC<HelmModalProps> = ({
             {activeTab === 'edit-values' ? (
               <span>Saving values runs <code className="text-slate-300 bg-slate-800 px-1 rounded">helm upgrade --reuse-values</code></span>
             ) : (
-              <span>Helm Release Manager</span>
+              <span>Helm Release Manager • JetBrains Mono Syntax Highlighted</span>
             )}
           </div>
           <button

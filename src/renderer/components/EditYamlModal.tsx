@@ -1,5 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { X, Save, FileCode2, RefreshCw, AlertTriangle, CheckCircle2, Copy, Check, RotateCcw } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { X, Save, FileCode2, RefreshCw, AlertTriangle, CheckCircle2, Copy, Check, RotateCcw, ShieldCheck } from 'lucide-react';
+import CodeMirror from '@uiw/react-codemirror';
+import { yaml } from '@codemirror/lang-yaml';
+import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { parse as parseYaml } from 'yaml';
 import { ResourceItem } from '../../types/k8s.js';
 
@@ -47,18 +50,19 @@ export const EditYamlModal: React.FC<EditYamlModalProps> = ({
     loadData();
   }, [item, namespace]);
 
-  const handleTextChange = (val: string) => {
+  const handleTextChange = useCallback((val: string) => {
     setYamlText(val);
     try {
-      parseYaml(val);
+      if (val.trim()) {
+        parseYaml(val);
+      }
       setValidationError(null);
     } catch (err: any) {
       setValidationError(err.message || 'YAML syntax error');
     }
-  };
+  }, []);
 
   const handleSave = async () => {
-    // Validate first
     try {
       parseYaml(yamlText);
     } catch (err: any) {
@@ -97,6 +101,20 @@ export const EditYamlModal: React.FC<EditYamlModalProps> = ({
     }
   };
 
+  // Keyboard shortcut: Cmd+S / Ctrl+S to save
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        if (!saving && !loading && !validationError) {
+          handleSave();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [saving, loading, validationError, yamlText]);
+
   const isDirty = yamlText !== originalYaml;
 
   return (
@@ -110,18 +128,23 @@ export const EditYamlModal: React.FC<EditYamlModalProps> = ({
             </div>
             <div>
               <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                Edit Resource YAML:{' '}
+                IDE Resource Editor:{' '}
                 <span className="text-cyan-400 font-mono">
                   {item.kind}/{item.name}
                 </span>
                 {isDirty && (
-                  <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px]">
-                    Unsaved Changes
+                  <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-semibold">
+                    • Modified
+                  </span>
+                )}
+                {!validationError && !loading && (
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-semibold flex items-center gap-1">
+                    <ShieldCheck size={10} /> Valid YAML
                   </span>
                 )}
               </h2>
               <p className="text-[11px] text-slate-400 font-mono">
-                Project: {namespace} • Live Edit & Apply
+                Project: {namespace} • JetBrains Mono Syntax Highlighted
               </p>
             </div>
           </div>
@@ -150,9 +173,10 @@ export const EditYamlModal: React.FC<EditYamlModalProps> = ({
               onClick={handleSave}
               disabled={saving || loading || !!validationError}
               className="px-3.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-emerald-950 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              title="Save changes and apply to cluster (Cmd+S)"
             >
               {saving ? <RefreshCw size={13} className="animate-spin" /> : <Save size={13} />}
-              <span>Save & Apply</span>
+              <span>Save & Apply (⌘S)</span>
             </button>
 
             <button
@@ -186,29 +210,57 @@ export const EditYamlModal: React.FC<EditYamlModalProps> = ({
           </div>
         )}
 
-        {/* YAML Code Editor Area */}
-        <div className="flex-1 overflow-hidden flex bg-black">
+        {/* CodeMirror IDE Editor */}
+        <div className="flex-1 overflow-hidden flex flex-col bg-[#0b0f19]">
           {loading ? (
             <div className="flex-1 flex items-center justify-center text-slate-400 gap-2">
               <RefreshCw size={18} className="animate-spin text-cyan-400" />
               <span className="text-xs">Loading resource YAML...</span>
             </div>
           ) : (
-            <textarea
-              value={yamlText}
-              onChange={(e) => handleTextChange(e.target.value)}
-              spellCheck={false}
-              className="flex-1 p-4 bg-[#070b14] text-slate-100 font-mono text-xs leading-relaxed outline-none resize-none selection:bg-cyan-900 border-none overflow-auto"
-            />
+            <div className="flex-1 h-full overflow-auto">
+              <CodeMirror
+                value={yamlText}
+                height="100%"
+                theme={vscodeDark}
+                extensions={[yaml()]}
+                onChange={handleTextChange}
+                basicSetup={{
+                  lineNumbers: true,
+                  highlightActiveLineGutter: true,
+                  highlightSpecialChars: true,
+                  history: true,
+                  foldGutter: true,
+                  drawSelection: true,
+                  dropCursor: true,
+                  allowMultipleSelections: true,
+                  indentOnInput: true,
+                  syntaxHighlighting: true,
+                  bracketMatching: true,
+                  closeBrackets: true,
+                  autocompletion: true,
+                  rectangularSelection: true,
+                  crosshairCursor: true,
+                  highlightActiveLine: true,
+                  highlightSelectionMatches: true,
+                  closeBracketsKeymap: true,
+                  searchKeymap: true,
+                  foldKeymap: true,
+                  completionKeymap: true,
+                  lintKeymap: true,
+                }}
+              />
+            </div>
           )}
         </div>
 
         {/* Footer info */}
         <div className="p-2.5 bg-[#0f172a] border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
-          <span>
-            Press <strong>Save & Apply</strong> to update this workload live in project{' '}
-            <code className="text-cyan-300 bg-slate-800 px-1 rounded">{namespace}</code>.
-          </span>
+          <div className="flex items-center gap-3">
+            <span>
+              Press <kbd className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-[10px]">⌘S</kbd> to Save & Apply directly to <code className="text-cyan-300 bg-slate-800 px-1 rounded">{namespace}</code>.
+            </span>
+          </div>
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}

@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Code2, FileText, Copy, Check, Search, RefreshCw } from 'lucide-react';
+import { X, Code2, FileText, Copy, Check, RefreshCw } from 'lucide-react';
+import CodeMirror from '@uiw/react-codemirror';
+import { yaml } from '@codemirror/lang-yaml';
+import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { ResourceItem } from '../../types/k8s.js';
 
 interface YamlModalProps {
@@ -12,7 +15,6 @@ interface YamlModalProps {
 export const YamlModal: React.FC<YamlModalProps> = ({ mode, item, namespace, onClose }) => {
   const [content, setContent] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
-  const [searchQuery, setSearchQuery] = useState<string>('');
   const [copied, setCopied] = useState<boolean>(false);
 
   useEffect(() => {
@@ -21,8 +23,10 @@ export const YamlModal: React.FC<YamlModalProps> = ({ mode, item, namespace, onC
       try {
         let text = '';
         let cmdKind: string = item.kind;
+        if (cmdKind === 'deploymentconfigs') cmdKind = 'dc';
         if (cmdKind === 'imagestreams') cmdKind = 'is';
         if (cmdKind === 'statefulsets') cmdKind = 'sts';
+        if (cmdKind === 'daemonsets') cmdKind = 'ds';
         if (cmdKind === 'configmaps') cmdKind = 'cm';
 
         if (mode === 'yaml') {
@@ -46,14 +50,9 @@ export const YamlModal: React.FC<YamlModalProps> = ({ mode, item, namespace, onC
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const lines = content.split('\n');
-  const filteredLines = searchQuery
-    ? lines.filter((l) => l.toLowerCase().includes(searchQuery.toLowerCase()))
-    : lines;
-
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
-      <div className="bg-[#0b0f19] border border-cyan-500/40 rounded-xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+      <div className="bg-[#0b0f19] border border-cyan-500/40 rounded-xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="p-3 bg-[#0f172a] border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -88,32 +87,30 @@ export const YamlModal: React.FC<YamlModalProps> = ({ mode, item, namespace, onC
           </div>
         </div>
 
-        {/* Search within document */}
-        <div className="px-4 py-2 bg-[#0f172a]/80 border-b border-slate-800 flex items-center gap-2">
-          <Search size={14} className="text-slate-500" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search within YAML / describe output..."
-            className="w-full bg-transparent text-xs text-slate-200 placeholder-slate-500 outline-none"
-          />
-          {searchQuery && (
-            <span className="text-[10px] text-slate-400 font-mono shrink-0">
-              Matching lines: {filteredLines.length} / {lines.length}
-            </span>
-          )}
-        </div>
-
-        {/* Content Box */}
-        <div className="flex-1 overflow-auto p-4 font-mono text-xs text-slate-200 leading-relaxed bg-black/90">
+        {/* IDE Syntax Highlighted Content Box */}
+        <div className="flex-1 overflow-hidden flex flex-col bg-[#0b0f19]">
           {loading ? (
-            <div className="flex items-center justify-center p-12 text-slate-400 gap-2">
+            <div className="flex-1 flex items-center justify-center text-slate-400 gap-2">
               <RefreshCw size={18} className="animate-spin text-cyan-400" />
-              <span>Loading details...</span>
+              <span className="text-xs">Loading details...</span>
             </div>
           ) : (
-            <pre className="whitespace-pre-wrap">{filteredLines.join('\n')}</pre>
+            <div className="flex-1 h-full overflow-auto">
+              <CodeMirror
+                value={content}
+                height="100%"
+                theme={vscodeDark}
+                extensions={mode === 'yaml' ? [yaml()] : []}
+                editable={false}
+                basicSetup={{
+                  lineNumbers: true,
+                  highlightActiveLineGutter: true,
+                  syntaxHighlighting: true,
+                  bracketMatching: true,
+                  foldGutter: true,
+                }}
+              />
+            </div>
           )}
         </div>
       </div>
