@@ -78,15 +78,33 @@ export const PodTerminalModal: React.FC<PodTerminalModalProps> = ({
     xtermInstance.current = term;
     fitAddonRef.current = fitAddon;
 
-    term.writeln('\x1b[36m⚡ Opening interactive pod terminal for ' + item.name + '...\x1b[0m\r\n');
+    term.writeln('\x1b[36m⚡ Connecting to pod ' + item.name + '...\x1b[0m\r\n');
 
-    let currentSessionId = '';
+    const sessionIdRef = { current: '' };
     const api = (window as any).electronAPI;
+
+    // Stream input from xterm to electron
+    const onDataDispose = term.onData((data) => {
+      if (sessionIdRef.current && api?.writeTerminal) {
+        api.writeTerminal(sessionIdRef.current, data);
+      }
+    });
+
+    // Receive data from electron to xterm
+    const removeListener = api?.onTerminalData ? api.onTerminalData((data: { sessionId: string; data: string }) => {
+      if (!sessionIdRef.current || data.sessionId === sessionIdRef.current) {
+        term.write(data.data);
+      }
+    }) : () => {};
 
     const initSession = async () => {
       try {
-        currentSessionId = await api.startTerminal(item.name, namespace, container);
-        setSessionId(currentSessionId);
+        if (!api?.startTerminal) {
+          throw new Error('Terminal IPC API not available');
+        }
+        const newSessionId = await api.startTerminal(item.name, namespace, container);
+        sessionIdRef.current = newSessionId;
+        setSessionId(newSessionId);
         setStatus('connected');
         term.focus();
       } catch (err: any) {
@@ -96,20 +114,6 @@ export const PodTerminalModal: React.FC<PodTerminalModalProps> = ({
     };
 
     initSession();
-
-    // Stream input from xterm to electron
-    const onDataDispose = term.onData((data) => {
-      if (currentSessionId && api.writeTerminal) {
-        api.writeTerminal(currentSessionId, data);
-      }
-    });
-
-    // Receive data from electron to xterm
-    const removeListener = api.onTerminalData((data: { sessionId: string; data: string }) => {
-      if (data.sessionId === currentSessionId) {
-        term.write(data.data);
-      }
-    });
 
     // Window resize handler
     const handleResize = () => {
@@ -123,8 +127,8 @@ export const PodTerminalModal: React.FC<PodTerminalModalProps> = ({
       onDataDispose.dispose();
       removeListener();
       window.removeEventListener('resize', handleResize);
-      if (currentSessionId && api.stopTerminal) {
-        api.stopTerminal(currentSessionId);
+      if (sessionIdRef.current && api?.stopTerminal) {
+        api.stopTerminal(sessionIdRef.current);
       }
       term.dispose();
     };

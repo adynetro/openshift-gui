@@ -22,17 +22,12 @@ export class TerminalService {
     window?: BrowserWindow
   ): string {
     const sessionId = `term-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
-    const nsFlag = namespace && namespace !== 'all-projects' ? `-n "${namespace}"` : '';
-    const containerFlag = container ? `-c "${container}"` : '';
+    const targetWin = window || BrowserWindow.getAllWindows()[0];
 
-    // Shell command trying bash first, falling back to sh with proper environment
-    const execCmd = `export TERM=xterm-256color; if command -v bash >/dev/null 2>&1; then exec bash; elif command -v sh >/dev/null 2>&1; then exec sh; else exec /bin/sh; fi`;
+    // Interactive shell command with colored prompt and fallback
+    const execCmd = `export TERM=xterm-256color; export PS1="[\\u@\\h \\W]\\$ "; if command -v bash >/dev/null 2>&1; then exec bash -i; elif command -v sh >/dev/null 2>&1; then exec sh -i; else exec /bin/sh -i; fi`;
 
-    const args = [
-      'exec',
-      '-i',
-      targetName,
-    ];
+    const args = ['exec', '-i', targetName];
 
     if (namespace && namespace !== 'all-projects') {
       args.push('-n', namespace);
@@ -44,7 +39,6 @@ export class TerminalService {
 
     args.push('--', 'sh', '-c', execCmd);
 
-    // Try oc first, or fallback to kubectl
     const child = spawn('oc', args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: {
@@ -53,41 +47,31 @@ export class TerminalService {
       },
     });
 
-    child.stdout.on('data', (chunk) => {
-      if (window && !window.isDestroyed()) {
-        window.webContents.send('terminal:data', {
+    const sendData = (text: string) => {
+      const win = targetWin || BrowserWindow.getAllWindows()[0];
+      if (win && !win.isDestroyed()) {
+        win.webContents.send('terminal:data', {
           sessionId,
-          data: chunk.toString('utf-8'),
+          data: text,
         });
       }
+    };
+
+    child.stdout.on('data', (chunk) => {
+      sendData(chunk.toString('utf-8'));
     });
 
     child.stderr.on('data', (chunk) => {
-      if (window && !window.isDestroyed()) {
-        window.webContents.send('terminal:data', {
-          sessionId,
-          data: chunk.toString('utf-8'),
-        });
-      }
+      sendData(chunk.toString('utf-8'));
     });
 
     child.on('close', (code) => {
-      if (window && !window.isDestroyed()) {
-        window.webContents.send('terminal:data', {
-          sessionId,
-          data: `\r\n\x1b[33m[Process exited with code ${code ?? 0}]\x1b[0m\r\n`,
-        });
-      }
+      sendData(`\r\n\x1b[33m[Session terminated (code ${code ?? 0})]\x1b[0m\r\n`);
       this.sessions.delete(sessionId);
     });
 
     child.on('error', (err) => {
-      if (window && !window.isDestroyed()) {
-        window.webContents.send('terminal:data', {
-          sessionId,
-          data: `\r\n\x1b[31m[Failed to launch terminal: ${err.message}]\x1b[0m\r\n`,
-        });
-      }
+      sendData(`\r\n\x1b[31m[Failed to connect: ${err.message}]\x1b[0m\r\n`);
       this.sessions.delete(sessionId);
     });
 
@@ -108,7 +92,9 @@ export class TerminalService {
   static writeData(sessionId: string, data: string): void {
     const session = this.sessions.get(sessionId);
     if (session && session.process.stdin && !session.process.stdin.destroyed) {
-      session.process.stdin.write(data);
+      // In xterm.js, Enter emits \r. Translate \r to \n for standard shell pipe
+      const input = data.replace(/\r/g, '\n');
+      session.process.stdin.write(input);
     }
   }
 

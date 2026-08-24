@@ -31,6 +31,7 @@ import {
   ChevronRight,
   Grid3X3,
   Workflow,
+  CircleDot,
   X,
 } from 'lucide-react';
 import { TopologyData, TopologyNode, ResourceItem, ResourceKind } from '../../types/k8s.js';
@@ -64,7 +65,7 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedNode, setSelectedNode] = useState<TopologyNode | null>(null);
   const [isInspectorOpen, setIsInspectorOpen] = useState(true);
-  const [viewMode, setViewMode] = useState<'pipeline' | 'grid'>('pipeline');
+  const [viewMode, setViewMode] = useState<'pipeline' | 'circular' | 'grid'>('circular');
   const [copiedFqdn, setCopiedFqdn] = useState<string | null>(null);
 
   const fetchTopology = useCallback(
@@ -229,6 +230,16 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
 
           {/* Layout Toggle */}
           <div className="flex items-center bg-[#1e293b] p-0.5 rounded-lg border border-slate-700 text-xs font-mono">
+            <button
+              onClick={() => setViewMode('circular')}
+              className={`px-2.5 py-1 rounded flex items-center gap-1.5 transition-colors ${
+                viewMode === 'circular' ? 'bg-cyan-950 text-cyan-300 font-bold border border-cyan-800' : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="OpenShift Radial Circular Graph View"
+            >
+              <CircleDot size={13} />
+              <span>Graph</span>
+            </button>
             <button
               onClick={() => setViewMode('pipeline')}
               className={`px-2.5 py-1 rounded flex items-center gap-1.5 transition-colors ${
@@ -490,8 +501,127 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
                       );
                     })}
                   </div>
+                ) : viewMode === 'circular' ? (
+                  /* 🌟 VIEW MODE 2: Authentic OpenShift Radial Circular Graph */
+                  <div className="flex flex-wrap gap-8 items-center justify-center p-6 bg-[#0b0f19]/70 rounded-xl border border-slate-800/80">
+                    {workloads.map((node) => {
+                      const ringColor = getPodDonutColor(node.readyReplicas, node.desiredReplicas);
+                      const isSelected = selectedNode?.id === node.id;
+
+                      return (
+                        <div
+                          key={node.id}
+                          onClick={() => {
+                            setSelectedNode(node);
+                            setIsInspectorOpen(true);
+                          }}
+                          className="relative flex flex-col items-center group cursor-pointer"
+                        >
+                          {/* Top-Right Floating Route Badge */}
+                          {node.routes[0] && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenExternal(node.routes[0].url);
+                              }}
+                              className="absolute -top-3 -right-2 z-20 px-2 py-0.5 rounded-full bg-[#1e293b] hover:bg-cyan-950 text-cyan-400 border border-slate-700 hover:border-cyan-500 text-[10px] font-mono font-bold flex items-center gap-1 shadow-lg transition-all"
+                              title={`Open ${node.routes[0].host} in browser`}
+                            >
+                              <ExternalLink size={10} />
+                              <span className="max-w-[90px] truncate">{node.routes[0].name || 'Route'}</span>
+                            </button>
+                          )}
+
+                          {/* Central Round Circular Node with Outer Status Donut */}
+                          <div
+                            className={`relative w-28 h-28 rounded-full flex items-center justify-center transition-all duration-200 ${
+                              isSelected
+                                ? 'scale-105 ring-4 ring-cyan-500/80 shadow-2xl shadow-cyan-500/30'
+                                : 'hover:scale-105 shadow-xl hover:shadow-cyan-950/40'
+                            }`}
+                          >
+                            {/* Outer SVG Donut Halo */}
+                            <svg className="absolute inset-0 w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                              {/* Background Ring */}
+                              <circle
+                                cx="18"
+                                cy="18"
+                                r="15.5"
+                                className="text-slate-800"
+                                strokeWidth="3"
+                                stroke="currentColor"
+                                fill="none"
+                              />
+                              {/* Progress Ring */}
+                              <circle
+                                cx="18"
+                                cy="18"
+                                r="15.5"
+                                strokeDasharray={`${
+                                  node.desiredReplicas > 0 ? (node.readyReplicas / node.desiredReplicas) * 97.4 : 0
+                                }, 100`}
+                                strokeWidth="3.5"
+                                strokeLinecap="round"
+                                stroke={ringColor}
+                                fill="none"
+                                className="transition-all duration-500"
+                              />
+                            </svg>
+
+                            {/* Inner Circle Disc */}
+                            <div className="w-[84px] h-[84px] rounded-full bg-[#162032] border border-slate-700/80 flex flex-col items-center justify-center p-1 text-center shadow-inner group-hover:bg-[#1e293b] transition-colors">
+                              <div className="mb-0.5">{getKindIcon(node.kind)}</div>
+                              <span className="text-xs font-bold font-mono text-white">
+                                {node.readyReplicas}/{node.desiredReplicas}
+                              </span>
+                              <span className="text-[9px] font-mono text-slate-400 capitalize truncate max-w-[70px]">
+                                {node.kind === 'deploymentconfigs'
+                                  ? 'DC'
+                                  : node.kind === 'deployments'
+                                  ? 'Deploy'
+                                  : node.kind === 'statefulsets'
+                                  ? 'Stateful'
+                                  : 'Daemon'}
+                              </span>
+                            </div>
+
+                            {/* Bottom-Right Attached Storage Badge */}
+                            {node.pvcs.length > 0 && (
+                              <div
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onOpenPvcResize({
+                                    id: node.pvcs[0].name,
+                                    name: node.pvcs[0].name,
+                                    namespace: node.namespace,
+                                    kind: 'pvc',
+                                    status: node.pvcs[0].status,
+                                    age: '',
+                                  });
+                                }}
+                                className="absolute -bottom-1 -right-1 z-20 w-6 h-6 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-700 flex items-center justify-center shadow-md hover:bg-cyan-900 transition-colors"
+                                title={`Attached Storage: ${node.pvcs[0].name} (${node.pvcs[0].capacity})`}
+                              >
+                                <Database size={11} />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Node Label Pill */}
+                          <div className="mt-2.5 px-2.5 py-1 rounded-lg bg-[#162032] border border-slate-800 text-center max-w-[150px] group-hover:border-slate-600 transition-colors">
+                            <div className="text-xs font-bold font-mono text-slate-100 truncate" title={node.name}>
+                              {node.name}
+                            </div>
+                            <div className="text-[9px] font-mono text-slate-400 truncate">
+                              {node.services[0]?.name || 'Internal Only'}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 ) : (
-                  /* 🌟 VIEW MODE 2: Compact Card Grid */
+                  /* 🌟 VIEW MODE 3: Compact Card Grid */
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {workloads.map((node) => {
                       const ringColor = getPodDonutColor(node.readyReplicas, node.desiredReplicas);
