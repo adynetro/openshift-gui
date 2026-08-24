@@ -31,7 +31,6 @@ export const App: React.FC = () => {
   const [query, setQuery] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
-  const [demoMode, setDemoMode] = useState<boolean>(false);
   const [statusNotification, setStatusNotification] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   // Modal State
@@ -46,28 +45,17 @@ export const App: React.FC = () => {
     }, 4000);
   };
 
-  // Toggle Demo Mode
-  const handleToggleDemoMode = async () => {
-    const api = (window as any).electronAPI;
-    const next = !demoMode;
-    setDemoMode(next);
-    if (api) {
-      await api.setDemoMode(next);
-    }
-    showToast(next ? 'Enabled Demo Data Mode' : 'Connected to Live Cluster', 'success');
-    await loadKubeInfo();
-    fetchResources(false);
-  };
-
   // Load Kubeconfig contexts and active project
   const loadKubeInfo = useCallback(async () => {
     try {
       const api = (window as any).electronAPI;
       if (!api) return;
 
-      const { contexts: ctxList, currentContext: currCtx } = await api.getContexts();
-      setContexts(ctxList || []);
-      setCurrentContext(currCtx || null);
+      const res = await api.getContexts();
+      const ctxList = res?.contexts || [];
+      const currCtx = res?.currentContext || null;
+      setContexts(ctxList);
+      setCurrentContext(currCtx);
 
       const ns = await api.getCurrentNamespace();
       setCurrentProject(ns || 'default');
@@ -124,12 +112,12 @@ export const App: React.FC = () => {
 
   // Auto-polling interval
   useEffect(() => {
-    if (!autoRefresh || demoMode) return;
+    if (!autoRefresh) return;
     const interval = setInterval(() => {
       fetchResources(true);
     }, 4000);
     return () => clearInterval(interval);
-  }, [autoRefresh, demoMode, fetchResources]);
+  }, [autoRefresh, fetchResources]);
 
   // Filter items by search query
   const filteredItems = useMemo(() => {
@@ -213,9 +201,11 @@ export const App: React.FC = () => {
 
       if (e.key === 'c') {
         e.preventDefault();
+        loadKubeInfo();
         setModalMode('context');
       } else if (e.key === 'p') {
         e.preventDefault();
+        loadKubeInfo();
         setModalMode('project');
       } else if (e.key === '/') {
         e.preventDefault();
@@ -236,7 +226,7 @@ export const App: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [modalMode]);
+  }, [modalMode, loadKubeInfo]);
 
   return (
     <div className="h-screen w-screen flex flex-col bg-[#0b0f19] text-slate-100 overflow-hidden font-sans select-none">
@@ -250,12 +240,16 @@ export const App: React.FC = () => {
         isUnauthorized={isUnauthorized}
         loading={loading}
         autoRefresh={autoRefresh}
-        demoMode={demoMode}
-        onToggleDemoMode={handleToggleDemoMode}
         onToggleAutoRefresh={() => setAutoRefresh((prev) => !prev)}
         onRefresh={() => fetchResources(false)}
-        onOpenContextModal={() => setModalMode('context')}
-        onOpenProjectModal={() => setModalMode('project')}
+        onOpenContextModal={() => {
+          loadKubeInfo();
+          setModalMode('context');
+        }}
+        onOpenProjectModal={() => {
+          loadKubeInfo();
+          setModalMode('project');
+        }}
       />
 
       {/* Main Layout (Sidebar + Content) */}
@@ -305,8 +299,10 @@ export const App: React.FC = () => {
             error={fetchError}
             isUnauthorized={isUnauthorized}
             onRowAction={(action, item) => handleAction(action, item)}
-            onOpenContextModal={() => setModalMode('context')}
-            onEnableDemoMode={handleToggleDemoMode}
+            onOpenContextModal={() => {
+              loadKubeInfo();
+              setModalMode('context');
+            }}
             onRetry={() => fetchResources(false)}
           />
         </main>

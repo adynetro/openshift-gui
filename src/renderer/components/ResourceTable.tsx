@@ -13,7 +13,6 @@ import {
   XCircle,
   Clock,
   Layers,
-  FlaskConical,
   KeyRound,
 } from 'lucide-react';
 import { ResourceKind, ResourceItem, ImageStreamResource } from '../../types/k8s.js';
@@ -28,7 +27,6 @@ interface ResourceTableProps {
   isUnauthorized?: boolean;
   onRowAction: (actionType: string, item: ResourceItem) => void;
   onOpenContextModal?: () => void;
-  onEnableDemoMode?: () => void;
   onRetry?: () => void;
 }
 
@@ -42,7 +40,6 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
   isUnauthorized,
   onRowAction,
   onOpenContextModal,
-  onEnableDemoMode,
   onRetry,
 }) => {
   const getStatusBadge = (status: string, color?: string) => {
@@ -86,7 +83,7 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
           </p>
         </div>
 
-        {/* Action Buttons to resolve immediately */}
+        {/* Action Buttons */}
         <div className="flex items-center gap-3 pt-2">
           {onOpenContextModal && (
             <button
@@ -95,16 +92,6 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
             >
               <Layers size={14} />
               <span>Switch Context</span>
-            </button>
-          )}
-
-          {onEnableDemoMode && (
-            <button
-              onClick={onEnableDemoMode}
-              className="px-3.5 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-purple-950 transition-all"
-            >
-              <FlaskConical size={14} />
-              <span>Load Demo Data Mode</span>
             </button>
           )}
 
@@ -136,17 +123,8 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
       <div className="flex-1 flex flex-col items-center justify-center p-12 text-slate-500 space-y-3 text-center">
         <p className="text-base font-semibold text-slate-300">No {kind} found in this project</p>
         <p className="text-xs text-slate-500 max-w-sm">
-          Try switching to another project / namespace or load demo data to test UI actions.
+          Try switching to another project / namespace or filter query.
         </p>
-        {onEnableDemoMode && (
-          <button
-            onClick={onEnableDemoMode}
-            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-800/60 text-xs font-semibold flex items-center gap-1.5 transition-colors"
-          >
-            <FlaskConical size={13} />
-            <span>Enable Demo Data</span>
-          </button>
-        )}
       </div>
     );
   }

@@ -8,18 +8,6 @@ import { ResourceKind } from '../types/k8s.js';
 const activeStreamers = new Map<string, LogStreamer>();
 
 export function registerIpcHandlers(mainWindow: BrowserWindow): void {
-  // Demo Mode
-  ipcMain.handle('kube:setDemoMode', async (_event, enabled: boolean) => {
-    OcClient.isDemoMode = enabled;
-    KubeConfigService.isDemoMode = enabled;
-    HelmService.isDemoMode = enabled;
-    return enabled;
-  });
-
-  ipcMain.handle('kube:getDemoMode', async () => {
-    return OcClient.isDemoMode;
-  });
-
   // Kubeconfig / Cluster Handlers
   ipcMain.handle('kube:getContexts', async () => {
     return await KubeConfigService.getContexts();

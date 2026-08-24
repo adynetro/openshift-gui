@@ -1,8 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 export interface IpcApi {
-  setDemoMode: (enabled: boolean) => Promise<boolean>;
-  getDemoMode: () => Promise<boolean>;
   getContexts: () => Promise<{ contexts: any[]; currentContext: string | null }>;
   switchContext: (contextName: string) => Promise<boolean>;
   getProjects: () => Promise<any[]>;
@@ -27,8 +25,6 @@ export interface IpcApi {
 }
 
 const api: IpcApi = {
-  setDemoMode: (enabled) => ipcRenderer.invoke('kube:setDemoMode', enabled),
-  getDemoMode: () => ipcRenderer.invoke('kube:getDemoMode'),
   getContexts: () => ipcRenderer.invoke('kube:getContexts'),
   switchContext: (ctx) => ipcRenderer.invoke('kube:switchContext', ctx),
   getProjects: () => ipcRenderer.invoke('kube:getProjects'),

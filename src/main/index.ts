@@ -1,21 +1,45 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'node:path';
+import os from 'node:os';
 import { registerIpcHandlers } from './ipc-handlers.js';
+
+// Ensure macOS GUI subprocess PATH and HOME are properly initialized
+const home = process.env['HOME'] || os.homedir();
+const defaultPaths = [
+  '/opt/homebrew/bin',
+  '/opt/homebrew/sbin',
+  '/usr/local/bin',
+  '/usr/local/sbin',
+  '/usr/bin',
+  '/bin',
+  '/usr/sbin',
+  '/sbin',
+  path.join(home, 'bin'),
+  path.join(home, '.local', 'bin'),
+];
+
+process.env['PATH'] = Array.from(
+  new Set([...defaultPaths, ...(process.env['PATH'] || '').split(':')])
+).join(':');
+
+if (!process.env['KUBECONFIG']) {
+  process.env['KUBECONFIG'] = path.join(home, '.kube', 'config');
+}
 
 let mainWindow: BrowserWindow | null = null;
 
-function createWindow() {
+async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 840,
-    minWidth: 1000,
-    minHeight: 650,
-    title: 'OpenShift GUI',
+    minWidth: 960,
+    minHeight: 600,
     titleBarStyle: 'hiddenInset',
-    backgroundColor: '#0f172a', // Slate 900
-    trafficLightPosition: { x: 16, y: 16 },
+    backgroundColor: '#0b0f19',
+    vibrancy: 'under-window',
+    visualEffectState: 'active',
     webPreferences: {
-      preload: path.join(app.getAppPath(), 'dist', 'main', 'preload.js'),
+      preload: path.join(import.meta.dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
@@ -24,14 +48,12 @@ function createWindow() {
 
   registerIpcHandlers(mainWindow);
 
-  const isDev = process.env['NODE_ENV'] === 'development' || !app.isPackaged;
-  const devUrl = process.env['VITE_DEV_SERVER_URL'] || 'http://localhost:5173';
-
-  if (isDev && process.env['VITE_DEV_SERVER_URL']) {
-    mainWindow.loadURL(devUrl);
-    mainWindow.webContents.openDevTools();
+  const isDev = process.env.NODE_ENV === 'development' || process.argv.includes('--dev');
+  if (isDev) {
+    mainWindow.loadURL('http://localhost:5173');
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
-    mainWindow.loadFile(path.join(app.getAppPath(), 'dist', 'renderer', 'index.html'));
+    mainWindow.loadFile(path.join(import.meta.dirname, '../renderer/index.html'));
   }
 
   mainWindow.on('closed', () => {
@@ -39,18 +61,16 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(() => {
-  createWindow();
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
-  });
-});
+app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
+  }
+});
+
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
   }
 });
