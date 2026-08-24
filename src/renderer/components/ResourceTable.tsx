@@ -1,8 +1,6 @@
 import React from 'react';
 import {
-  Box,
   Terminal,
-  SlidersHorizontal,
   RefreshCw,
   Sparkles,
   FileText,
@@ -13,8 +11,8 @@ import {
   AlertTriangle,
   XCircle,
   Clock,
-  Layers,
   KeyRound,
+  Layers,
   ExternalLink,
 } from 'lucide-react';
 import { ResourceKind, ResourceItem, ImageStreamResource } from '../../types/k8s.js';
@@ -47,6 +45,7 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
   onRetry,
 }) => {
   const isAllProjects = !currentProject || currentProject === 'all-projects' || currentProject === '__all__';
+  const isWorkload = kind === 'deployments' || kind === 'deploymentconfigs' || kind === 'statefulsets' || kind === 'daemonsets';
 
   const handleOpenExternal = (url: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -231,7 +230,7 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
               </>
             )}
             <th className="py-3 px-3">Age</th>
-            {kind !== 'events' && <th className="py-3 px-4 text-right">Actions</th>}
+            {kind !== 'events' && !isWorkload && <th className="py-3 px-4 text-right">Actions</th>}
           </tr>
         </thead>
 
@@ -470,33 +469,11 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                 <td className="py-2.5 px-3 font-mono text-slate-400">{item.age}</td>
 
                 {/* Clean Pictogram Quick Action Buttons with Hover Tooltips */}
-                {kind !== 'events' && (
+                {kind !== 'events' && !isWorkload && (
                   <td className="py-2 px-4 text-right">
                     <div className="flex items-center justify-end gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
-                      {/* Workload Details Drilldown */}
-                      {(kind === 'deployments' ||
-                        kind === 'deploymentconfigs' ||
-                        kind === 'statefulsets' ||
-                        kind === 'daemonsets') && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onRowAction('workload-details', item);
-                          }}
-                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-cyan-950 text-cyan-300 border border-slate-700 hover:border-cyan-500 transition-colors"
-                          title="View Replicasets / Replication Controllers & Pods"
-                          aria-label="Workload Details"
-                        >
-                          <Layers size={14} />
-                        </button>
-                      )}
-
-                      {/* Live Logs: Pods, Deployments, DeploymentConfigs, StatefulSets, DaemonSets */}
-                      {(kind === 'pods' ||
-                        kind === 'deployments' ||
-                        kind === 'deploymentconfigs' ||
-                        kind === 'statefulsets' ||
-                        kind === 'daemonsets') && (
+                      {/* Live Logs for Pods */}
+                      {kind === 'pods' && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -507,21 +484,6 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                           aria-label="Live Logs"
                         >
                           <Terminal size={14} />
-                        </button>
-                      )}
-
-                      {/* Scale Replicas */}
-                      {(kind === 'deployments' || kind === 'deploymentconfigs' || kind === 'statefulsets') && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onRowAction('scale', item);
-                          }}
-                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-cyan-950 text-cyan-400 border border-slate-700 hover:border-cyan-500 transition-colors"
-                          title="Scale Replicas"
-                          aria-label="Scale"
-                        >
-                          <SlidersHorizontal size={14} />
                         </button>
                       )}
 

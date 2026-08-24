@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layers, FolderGit2, RefreshCw, Server, User, AlertTriangle, Globe } from 'lucide-react';
+import { Layers, FolderGit2, Server, User, AlertTriangle, Globe } from 'lucide-react';
 
 interface TopNavProps {
   currentContext: string | null;
@@ -8,10 +8,6 @@ interface TopNavProps {
   clusterUser: string;
   isConnected: boolean;
   isUnauthorized?: boolean;
-  loading: boolean;
-  autoRefresh: boolean;
-  onToggleAutoRefresh: () => void;
-  onRefresh: () => void;
   onOpenContextModal: () => void;
   onOpenProjectModal: () => void;
 }
@@ -23,10 +19,6 @@ export const TopNav: React.FC<TopNavProps> = ({
   clusterUser,
   isConnected,
   isUnauthorized,
-  loading,
-  autoRefresh,
-  onToggleAutoRefresh,
-  onRefresh,
   onOpenContextModal,
   onOpenProjectModal,
 }) => {
@@ -98,7 +90,7 @@ export const TopNav: React.FC<TopNavProps> = ({
         </button>
       </div>
 
-      {/* Right: Cluster Status, Refresh & Controls */}
+      {/* Right: Cluster Status */}
       <div className="no-drag flex items-center space-x-3">
         {/* User & Server metadata */}
         <div className="hidden lg:flex flex-col items-end text-right">
@@ -132,25 +124,6 @@ export const TopNav: React.FC<TopNavProps> = ({
             </>
           )}
         </div>
-
-        {/* Live Auto-Sync Status Badge (Active by Default) */}
-        <div
-          className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-emerald-950/40 border border-emerald-800/70 text-emerald-300 text-xs font-mono"
-          title="Cluster state is automatically synced every 3.5 seconds"
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 pulse-dot shadow-sm shadow-emerald-400" />
-          <span>Auto-Sync Active</span>
-        </div>
-
-        {/* Manual Refresh Button */}
-        <button
-          onClick={onRefresh}
-          disabled={loading}
-          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-all disabled:opacity-50"
-          title="Refresh resources immediately"
-        >
-          <RefreshCw size={15} className={loading ? 'animate-spin text-cyan-400' : ''} />
-        </button>
       </div>
     </header>
   );

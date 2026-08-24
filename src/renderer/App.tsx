@@ -324,10 +324,6 @@ export const App: React.FC = () => {
         clusterUser={clusterInfo?.user || ''}
         isConnected={clusterInfo?.connected ?? true}
         isUnauthorized={isUnauthorized}
-        loading={loading}
-        autoRefresh={autoRefresh}
-        onToggleAutoRefresh={() => setAutoRefresh((prev) => !prev)}
-        onRefresh={() => fetchResources(false)}
         onOpenContextModal={() => {
           loadKubeInfo();
           setModalMode('context');

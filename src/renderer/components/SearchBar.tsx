@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, X, Zap, Terminal, Sparkles, RefreshCw, SlidersHorizontal, FileText, Code2, Trash2, Filter, Eraser, Anchor, Layers } from 'lucide-react';
+import { Search, X, Zap, Terminal, Sparkles, RefreshCw, FileText, Code2, Trash2, Filter, Eraser, Anchor } from 'lucide-react';
 import { ResourceKind, ResourceItem } from '../../types/k8s.js';
 
 interface SearchBarProps {
@@ -29,59 +29,26 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 }) => {
   // Contextual action pills based on current resource tab
   const getActionPills = () => {
-    if (currentKind === 'events') return [];
+    // Workloads have all actions in their dedicated popup modal on name click
+    if (
+      currentKind === 'events' ||
+      currentKind === 'deployments' ||
+      currentKind === 'deploymentconfigs' ||
+      currentKind === 'statefulsets' ||
+      currentKind === 'daemonsets'
+    ) {
+      return [];
+    }
     const pills: { id: string; label: string; tooltip: string; icon: any; color: string; disabled?: boolean }[] = [];
 
-    // Details action pill for workloads
-    if (
-      currentKind === 'deployments' ||
-      currentKind === 'deploymentconfigs' ||
-      currentKind === 'statefulsets' ||
-      currentKind === 'daemonsets'
-    ) {
-      pills.push({
-        id: 'workload-details',
-        label: 'Details',
-        tooltip: 'View Replicasets / Replication Controllers & Live Pods',
-        icon: Layers,
-        color: 'hover:border-cyan-500 hover:text-cyan-300 hover:bg-cyan-950/40 text-cyan-400 border-cyan-900/50 bg-cyan-950/20 font-semibold',
-        disabled: !selectedItem,
-      });
-    }
-
-    // Live logs for pods, deployments, deploymentconfigs, statefulsets, daemonsets
-    if (
-      currentKind === 'pods' ||
-      currentKind === 'deployments' ||
-      currentKind === 'deploymentconfigs' ||
-      currentKind === 'statefulsets' ||
-      currentKind === 'daemonsets'
-    ) {
+    // Live logs for pods
+    if (currentKind === 'pods') {
       pills.push({
         id: 'logs',
         label: 'Logs',
-        tooltip: 'Stream Live Aggregated Logs',
+        tooltip: 'Stream Live Pod Logs',
         icon: Terminal,
         color: 'hover:border-emerald-500 hover:text-emerald-300 hover:bg-emerald-950/40 text-emerald-400 border-emerald-900/50 bg-emerald-950/20',
-        disabled: !selectedItem,
-      });
-    }
-
-    if (currentKind === 'deployments' || currentKind === 'deploymentconfigs' || currentKind === 'statefulsets') {
-      pills.push({
-        id: 'scale',
-        label: 'Scale',
-        tooltip: 'Scale Replicas',
-        icon: SlidersHorizontal,
-        color: 'hover:border-cyan-500 hover:text-cyan-300 hover:bg-cyan-950/40 text-cyan-400 border-cyan-900/50 bg-cyan-950/20',
-        disabled: !selectedItem,
-      });
-      pills.push({
-        id: 'restart',
-        label: 'Restart',
-        tooltip: 'Trigger Rollout Restart',
-        icon: RefreshCw,
-        color: 'hover:border-amber-500 hover:text-amber-300 hover:bg-amber-950/40 text-amber-400 border-amber-900/50 bg-amber-950/20',
         disabled: !selectedItem,
       });
     }
