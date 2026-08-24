@@ -1,7 +1,9 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import electron from 'electron';
 import path from 'node:path';
 import os from 'node:os';
 import { registerIpcHandlers } from './ipc-handlers.js';
+
+const { app, BrowserWindow } = electron;
 
 // Ensure macOS GUI subprocess PATH and HOME are properly initialized
 const home = process.env['HOME'] || os.homedir();
@@ -26,7 +28,7 @@ if (!process.env['KUBECONFIG']) {
   process.env['KUBECONFIG'] = path.join(home, '.kube', 'config');
 }
 
-let mainWindow: BrowserWindow | null = null;
+let mainWindow: electron.BrowserWindow | null = null;
 
 async function createWindow() {
   mainWindow = new BrowserWindow({
@@ -39,7 +41,7 @@ async function createWindow() {
     vibrancy: 'under-window',
     visualEffectState: 'active',
     webPreferences: {
-      preload: path.join(import.meta.dirname, 'preload.js'),
+      preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
@@ -53,7 +55,7 @@ async function createWindow() {
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
-    mainWindow.loadFile(path.join(import.meta.dirname, '../renderer/index.html'));
+    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
   }
 
   mainWindow.on('closed', () => {

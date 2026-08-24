@@ -18,37 +18,34 @@ console.log('🎨 Step 1: Building React Desktop GUI with Vite...');
 execSync('npx vite build', { cwd: ROOT_DIR, stdio: 'inherit' });
 console.log('✅ React Desktop UI built in dist/renderer\n');
 
-// 3. Bundle Electron Main Process
-console.log('⚡ Step 2: Bundling Electron Main Process...');
+// 3. Bundle Electron Main Process as CJS
+console.log('⚡ Step 2: Bundling Electron Main Process (CJS)...');
 await esbuild.build({
   entryPoints: [path.join(ROOT_DIR, 'src', 'main', 'index.ts')],
   bundle: true,
   platform: 'node',
   target: 'node20',
-  format: 'esm',
-  outfile: path.join(DIST_MAIN, 'index.js'),
-  external: ['electron', 'node:*'],
-  banner: {
-    js: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);\n',
-  },
+  format: 'cjs',
+  outfile: path.join(DIST_MAIN, 'index.cjs'),
+  external: ['electron'],
   minify: false,
   sourcemap: true,
 });
-console.log('✅ Main process built in dist/main/index.js\n');
+console.log('✅ Main process built in dist/main/index.cjs\n');
 
-// 4. Bundle Electron Preload Script
-console.log('🔗 Step 3: Bundling Electron Preload Script...');
+// 4. Bundle Electron Preload Script as CJS
+console.log('🔗 Step 3: Bundling Electron Preload Script (CJS)...');
 await esbuild.build({
   entryPoints: [path.join(ROOT_DIR, 'src', 'main', 'preload.ts')],
   bundle: true,
   platform: 'node',
   target: 'node20',
   format: 'cjs',
-  outfile: path.join(DIST_MAIN, 'preload.js'),
+  outfile: path.join(DIST_MAIN, 'preload.cjs'),
   external: ['electron'],
   minify: false,
   sourcemap: false,
 });
-console.log('✅ Preload script built in dist/main/preload.js\n');
+console.log('✅ Preload script built in dist/main/preload.cjs\n');
 
 console.log('\x1b[32m🎉 OpenShift Desktop GUI build complete!\x1b[0m\n');

@@ -6,7 +6,7 @@
     "openshift-gui": "./bin/openshift-gui.js",
     "oc-gui": "./bin/openshift-gui.js"
   },
-  "main": "dist/main/index.js",
+  "main": "dist/main/index.cjs",
   "type": "module",
   "files": [
     "bin",

@@ -49,7 +49,10 @@ export const App: React.FC = () => {
   const loadKubeInfo = useCallback(async () => {
     try {
       const api = (window as any).electronAPI;
-      if (!api) return;
+      if (!api) {
+        console.error('electronAPI is not available on window');
+        return;
+      }
 
       const res = await api.getContexts();
       const ctxList = res?.contexts || [];
@@ -66,7 +69,7 @@ export const App: React.FC = () => {
       const projList = await api.getProjects();
       setProjects(projList || []);
     } catch (e) {
-      console.error('Error loading kube info:', e);
+      console.error('Error in loadKubeInfo:', e);
     }
   }, []);
 

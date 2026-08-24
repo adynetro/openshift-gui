@@ -1,13 +1,14 @@
-import { ipcMain, BrowserWindow } from 'electron';
+import electron from 'electron';
 import { KubeConfigService } from '../services/kubeconfig.js';
 import { OcClient } from '../services/oc-client.js';
 import { HelmService } from '../services/helm.js';
 import { LogStreamer, LogEntry } from '../services/log-streamer.js';
 import { ResourceKind } from '../types/k8s.js';
 
+const { ipcMain } = electron;
 const activeStreamers = new Map<string, LogStreamer>();
 
-export function registerIpcHandlers(mainWindow: BrowserWindow): void {
+export function registerIpcHandlers(mainWindow: electron.BrowserWindow): void {
   // Kubeconfig / Cluster Handlers
   ipcMain.handle('kube:getContexts', async () => {
     return await KubeConfigService.getContexts();
