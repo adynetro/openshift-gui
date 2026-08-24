@@ -454,6 +454,8 @@ export const App: React.FC = () => {
               onOpenWorkloadYaml={(item) => openModal('edit-yaml', item)}
               onOpenWorkloadScale={(item) => openModal('scale', item)}
               onOpenPvcResize={(item) => openModal('resize-pvc', item)}
+              onOpenPodTerminal={(item) => openModal('terminal', item)}
+              onOpenPodLogs={(item) => openModal('logs', item)}
               onOpenExternal={async (url) => {
                 const api = (window as any).electronAPI;
                 if (api && api.openExternal) await api.openExternal(url);
