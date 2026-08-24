@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { X, Save, FileCode2, RefreshCw, AlertTriangle, CheckCircle2, Copy, Check, RotateCcw, ShieldCheck } from 'lucide-react';
 import CodeMirror from '@uiw/react-codemirror';
 import { yaml } from '@codemirror/lang-yaml';
-import { vscodeDark } from '@uiw/codemirror-theme-vscode';
+import { monokai } from '@uiw/codemirror-theme-monokai';
 import { parse as parseYaml } from 'yaml';
 import { ResourceItem } from '../../types/k8s.js';
 
@@ -119,32 +119,32 @@ export const EditYamlModal: React.FC<EditYamlModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
-      <div className="bg-[#0b0f19] border border-cyan-500/40 rounded-xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="p-3 bg-[#0f172a] border-b border-slate-800 flex items-center justify-between">
+      <div className="bg-[#1e1f1c] border border-[#49483e] rounded-xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden">
+        {/* Monokai Header */}
+        <div className="p-3 bg-[#272822] border-b border-[#3e3d32] flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center border border-cyan-500/30">
+            <div className="w-8 h-8 rounded-lg bg-[#a6e22e]/10 text-[#a6e22e] flex items-center justify-center border border-[#a6e22e]/30">
               <FileCode2 size={16} />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-white flex items-center gap-2">
+              <h2 className="text-sm font-bold text-[#f8f8f2] flex items-center gap-2">
                 IDE Resource Editor:{' '}
-                <span className="text-cyan-400 font-mono">
+                <span className="text-[#66d9ef] font-mono">
                   {item.kind}/{item.name}
                 </span>
                 {isDirty && (
-                  <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-semibold">
+                  <span className="px-2 py-0.5 rounded-full bg-[#fd971f]/20 text-[#fd971f] border border-[#fd971f]/40 text-[10px] font-semibold">
                     • Modified
                   </span>
                 )}
                 {!validationError && !loading && (
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-semibold flex items-center gap-1">
+                  <span className="px-2 py-0.5 rounded-full bg-[#a6e22e]/20 text-[#a6e22e] border border-[#a6e22e]/40 text-[10px] font-semibold flex items-center gap-1">
                     <ShieldCheck size={10} /> Valid YAML
                   </span>
                 )}
               </h2>
-              <p className="text-[11px] text-slate-400 font-mono">
-                Project: {namespace} • JetBrains Mono Syntax Highlighted
+              <p className="text-[11px] text-[#75715e] font-mono">
+                Project: {namespace} • Monokai Theme & JetBrains Mono
               </p>
             </div>
           </div>
@@ -153,7 +153,7 @@ export const EditYamlModal: React.FC<EditYamlModalProps> = ({
             {isDirty && (
               <button
                 onClick={handleReset}
-                className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium flex items-center gap-1 border border-slate-700 transition-colors"
+                className="px-2.5 py-1 rounded bg-[#272822] hover:bg-[#3e3d32] text-[#f8f8f2] text-xs font-medium flex items-center gap-1 border border-[#49483e] transition-colors"
                 title="Reset to original"
               >
                 <RotateCcw size={12} />
@@ -163,16 +163,16 @@ export const EditYamlModal: React.FC<EditYamlModalProps> = ({
 
             <button
               onClick={handleCopy}
-              className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium flex items-center gap-1 border border-slate-700 transition-colors"
+              className="px-2.5 py-1 rounded bg-[#272822] hover:bg-[#3e3d32] text-[#f8f8f2] text-xs font-medium flex items-center gap-1 border border-[#49483e] transition-colors"
             >
-              {copied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+              {copied ? <Check size={13} className="text-[#a6e22e]" /> : <Copy size={13} />}
               <span>{copied ? 'Copied' : 'Copy'}</span>
             </button>
 
             <button
               onClick={handleSave}
               disabled={saving || loading || !!validationError}
-              className="px-3.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-emerald-950 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              className="px-3.5 py-1 rounded-lg bg-[#a6e22e] hover:bg-[#a6e22e]/80 text-[#272822] text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-black/40 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
               title="Save changes and apply to cluster (Cmd+S)"
             >
               {saving ? <RefreshCw size={13} className="animate-spin" /> : <Save size={13} />}
@@ -181,7 +181,7 @@ export const EditYamlModal: React.FC<EditYamlModalProps> = ({
 
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              className="p-1.5 rounded-lg text-[#75715e] hover:text-[#f8f8f2] hover:bg-[#3e3d32] transition-colors"
             >
               <X size={18} />
             </button>
@@ -190,8 +190,8 @@ export const EditYamlModal: React.FC<EditYamlModalProps> = ({
 
         {/* Validation Error Alert */}
         {validationError && (
-          <div className="px-4 py-2 bg-rose-950/80 text-rose-300 border-b border-rose-800 text-xs flex items-center gap-2 font-mono">
-            <AlertTriangle size={14} className="shrink-0 text-rose-400" />
+          <div className="px-4 py-2 bg-[#f92672]/20 text-[#f92672] border-b border-[#f92672]/40 text-xs flex items-center gap-2 font-mono">
+            <AlertTriangle size={14} className="shrink-0 text-[#f92672]" />
             <span className="truncate">{validationError}</span>
           </div>
         )}
@@ -201,8 +201,8 @@ export const EditYamlModal: React.FC<EditYamlModalProps> = ({
           <div
             className={`px-4 py-2 text-xs flex items-center gap-2 border-b font-mono ${
               statusMessage.type === 'error'
-                ? 'bg-rose-950/90 text-rose-200 border-rose-800'
-                : 'bg-emerald-950/90 text-emerald-200 border-emerald-800'
+                ? 'bg-[#f92672]/20 text-[#f92672] border-[#f92672]/40'
+                : 'bg-[#a6e22e]/20 text-[#a6e22e] border-[#a6e22e]/40'
             }`}
           >
             {statusMessage.type === 'error' ? <AlertTriangle size={14} /> : <CheckCircle2 size={14} />}
@@ -211,10 +211,10 @@ export const EditYamlModal: React.FC<EditYamlModalProps> = ({
         )}
 
         {/* CodeMirror IDE Editor */}
-        <div className="flex-1 overflow-hidden flex flex-col bg-[#0b0f19]">
+        <div className="flex-1 overflow-hidden flex flex-col bg-[#272822]">
           {loading ? (
-            <div className="flex-1 flex items-center justify-center text-slate-400 gap-2">
-              <RefreshCw size={18} className="animate-spin text-cyan-400" />
+            <div className="flex-1 flex items-center justify-center text-[#75715e] gap-2">
+              <RefreshCw size={18} className="animate-spin text-[#66d9ef]" />
               <span className="text-xs">Loading resource YAML...</span>
             </div>
           ) : (
@@ -222,7 +222,7 @@ export const EditYamlModal: React.FC<EditYamlModalProps> = ({
               <CodeMirror
                 value={yamlText}
                 height="100%"
-                theme={vscodeDark}
+                theme={monokai}
                 extensions={[yaml()]}
                 onChange={handleTextChange}
                 basicSetup={{
@@ -254,24 +254,24 @@ export const EditYamlModal: React.FC<EditYamlModalProps> = ({
           )}
         </div>
 
-        {/* Footer info */}
-        <div className="p-2.5 bg-[#0f172a] border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+        {/* Monokai Footer info */}
+        <div className="p-2.5 bg-[#1e1f1c] border-t border-[#3e3d32] flex items-center justify-between text-[11px] text-[#75715e]">
           <div className="flex items-center gap-3">
             <span>
-              Press <kbd className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-[10px]">⌘S</kbd> to Save & Apply directly to <code className="text-cyan-300 bg-slate-800 px-1 rounded">{namespace}</code>.
+              Press <kbd className="px-1.5 py-0.5 rounded bg-[#272822] text-[#f8f8f2] font-mono text-[10px]">⌘S</kbd> to Save & Apply directly to <code className="text-[#66d9ef] bg-[#272822] px-1 rounded">{namespace}</code>.
             </span>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
-              className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700"
+              className="px-3 py-1 rounded bg-[#272822] hover:bg-[#3e3d32] text-[#f8f8f2] text-xs font-medium border border-[#49483e]"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
               disabled={saving || loading || !!validationError}
-              className="px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1 disabled:opacity-40"
+              className="px-3 py-1 rounded bg-[#a6e22e] hover:bg-[#a6e22e]/80 text-[#272822] text-xs font-bold flex items-center gap-1 disabled:opacity-40"
             >
               <Save size={12} />
               <span>Save & Apply</span>

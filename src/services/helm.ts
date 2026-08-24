@@ -75,13 +75,38 @@ export class HelmService {
   }
 
   /**
-   * Gets values for a Helm release.
+   * Gets values for a Helm release without headers like COMPUTED VALUES.
    */
   static async getValues(releaseName: string, namespace: string): Promise<string> {
     const nsFlag = namespace ? `-n "${namespace}"` : '';
-    const cmd = `helm get values "${releaseName}" ${nsFlag} -a`;
-    const { stdout, stderr } = await this.runHelm(cmd);
-    return stdout || stderr || 'No user-supplied values found.';
+
+    // First try user-supplied values
+    let cmd = `helm get values "${releaseName}" ${nsFlag}`;
+    let { stdout, stderr } = await this.runHelm(cmd);
+
+    // If user-supplied is empty, fallback to all computed values
+    if (!stdout.trim() || stdout.trim() === 'null' || stdout.trim() === '{}') {
+      const allCmd = `helm get values "${releaseName}" ${nsFlag} -a`;
+      const res = await this.runHelm(allCmd);
+      if (res.stdout.trim()) {
+        stdout = res.stdout;
+      }
+    }
+
+    let cleaned = (stdout || stderr || '').trim();
+
+    // Strip COMPUTED VALUES / USER-SUPPLIED VALUES header banners
+    cleaned = cleaned
+      .replace(/^#?\s*COMPUTED VALUES:\s*\n?/im, '')
+      .replace(/^#?\s*USER-SUPPLIED VALUES:\s*\n?/im, '')
+      .replace(/^---\s*\n?/m, '')
+      .trim();
+
+    if (cleaned === 'null' || !cleaned) {
+      return '# No custom values set for this release';
+    }
+
+    return cleaned;
   }
 
   /**
@@ -94,7 +119,13 @@ export class HelmService {
   ): Promise<{ success: boolean; message: string }> {
     const tmpFile = path.join(os.tmpdir(), `helm-vals-${Date.now()}.yaml`);
     try {
-      fs.writeFileSync(tmpFile, valuesYaml, 'utf8');
+      // Strip any accidental headers if present
+      const cleanYaml = valuesYaml
+        .replace(/^#?\s*COMPUTED VALUES:\s*\n?/im, '')
+        .replace(/^#?\s*USER-SUPPLIED VALUES:\s*\n?/im, '')
+        .trim();
+
+      fs.writeFileSync(tmpFile, cleanYaml, 'utf8');
 
       // Look up release chart name
       const { items } = await this.getReleases(namespace);
