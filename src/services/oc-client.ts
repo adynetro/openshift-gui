@@ -1441,4 +1441,126 @@ export class OcClient {
       return { items: [], error: err.message || 'Failed to fetch CRD instances' };
     }
   }
+
+  /**
+   * Fetches events, conditions, and related objects for a given ClusterOperator.
+   */
+  static async getClusterOperatorEvents(
+    operatorName: string
+  ): Promise<{
+    operatorName: string;
+    version?: string;
+    status?: string;
+    conditions: any[];
+    events: ResourceItem[];
+    relatedObjects?: any[];
+    error?: string;
+  }> {
+    try {
+      // 1. Fetch ClusterOperator definition
+      const coRes = await this.runCommand(`oc get co "${operatorName}" -o json || kubectl get co "${operatorName}" -o json`);
+      let conditions: any[] = [];
+      let relatedObjects: any[] = [];
+      let version = '-';
+      let status = 'Available';
+
+      const relatedNamespaces = new Set<string>();
+      relatedNamespaces.add(`openshift-${operatorName}`);
+
+      if (coRes.stdout.trim()) {
+        try {
+          const coJson = JSON.parse(coRes.stdout);
+          conditions = coJson.status?.conditions || [];
+          relatedObjects = coJson.status?.relatedObjects || [];
+          version = coJson.status?.versions?.[0]?.version || '-';
+
+          const deg = conditions.find((c: any) => c.type === 'Degraded')?.status === 'True';
+          const prog = conditions.find((c: any) => c.type === 'Progressing')?.status === 'True';
+          const avail = conditions.find((c: any) => c.type === 'Available')?.status === 'True';
+          if (deg) status = 'Degraded';
+          else if (prog) status = 'Progressing';
+          else if (!avail) status = 'Unavailable';
+
+          for (const obj of relatedObjects) {
+            if (obj.namespace) relatedNamespaces.add(obj.namespace);
+          }
+        } catch {}
+      }
+
+      // 2. Fetch all events and filter for this operator and its related namespaces
+      const eventsRes = await this.runCommand('oc get events -A -o json || kubectl get events -A -o json');
+      let events: ResourceItem[] = [];
+
+      if (eventsRes.stdout.trim()) {
+        try {
+          const json = JSON.parse(eventsRes.stdout);
+          const rawItems = json.items || [];
+
+          const opLower = operatorName.toLowerCase();
+          const filtered = rawItems.filter((ev: any) => {
+            const evNs = (ev.metadata?.namespace || '').toLowerCase();
+            const objName = (ev.involvedObject?.name || '').toLowerCase();
+            const msg = (ev.message || '').toLowerCase();
+
+            if (relatedNamespaces.has(ev.metadata?.namespace)) return true;
+            if (objName.includes(opLower)) return true;
+            if (msg.includes(opLower)) return true;
+            return false;
+          });
+
+          events = filtered.map((raw: any) => {
+            const eventType = raw.type || 'Normal';
+            const reason = raw.reason || 'Event';
+            const message = raw.message || '';
+            const count = raw.count || 1;
+            const objectKind = raw.involvedObject?.kind || 'Object';
+            const objectName = raw.involvedObject?.name || '';
+            const ns = raw.metadata?.namespace || 'default';
+            const timestamp = raw.lastTimestamp || raw.eventTime || raw.metadata?.creationTimestamp;
+
+            return {
+              id: `${ns}/${raw.metadata?.name || objectName}`,
+              name: `${objectKind}/${objectName}`,
+              namespace: ns,
+              kind: 'events' as const,
+              status: reason,
+              statusColor: (eventType === 'Warning' ? 'red' : 'green') as 'red' | 'green',
+              age: formatAge(timestamp),
+              extra: {
+                eventType,
+                reason,
+                message,
+                count,
+                objectKind,
+                objectName,
+                lastSeen: timestamp,
+                rawTimestamp: timestamp ? new Date(timestamp).getTime() : 0,
+              },
+              labels: raw.metadata?.labels || {},
+              raw,
+            };
+          });
+
+          // Sort newest first
+          events.sort((a, b) => (b.extra?.rawTimestamp || 0) - (a.extra?.rawTimestamp || 0));
+        } catch {}
+      }
+
+      return {
+        operatorName,
+        version,
+        status,
+        conditions,
+        events,
+        relatedObjects,
+      };
+    } catch (err: any) {
+      return {
+        operatorName,
+        conditions: [],
+        events: [],
+        error: err.message || 'Failed to fetch operator events',
+      };
+    }
+  }
 }

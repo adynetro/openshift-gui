@@ -16,6 +16,7 @@ import { SecretEditorModal } from './components/SecretEditorModal.js';
 import { ResizePvcModal } from './components/ResizePvcModal.js';
 import { CrdInstancesModal } from './components/CrdInstancesModal.js';
 import { PodTerminalModal } from './components/PodTerminalModal.js';
+import { ClusterOperatorEventsModal } from './components/ClusterOperatorEventsModal.js';
 import { ResourceKind, ResourceItem, KubeContext, ProjectInfo, ImageStreamResource } from '../types/k8s.js';
 import { FuzzyMatcher } from '../utils/fuzzy.js';
 import { CheckCircle2, AlertTriangle } from 'lucide-react';
@@ -27,6 +28,7 @@ type ModalMode =
   | 'workload-details'
   | 'logs'
   | 'terminal'
+  | 'operator-events'
   | 'yaml'
   | 'edit-yaml'
   | 'edit-secret'
@@ -305,6 +307,9 @@ export const App: React.FC = () => {
         break;
       case 'terminal':
         openModal('terminal', item);
+        break;
+      case 'operator-events':
+        openModal('operator-events', item);
         break;
       case 'scale':
         openModal('scale', item);
@@ -653,6 +658,14 @@ export const App: React.FC = () => {
           onEditInstance={(inst) => openModal('edit-yaml', inst)}
           onDescribeInstance={(inst) => openModal('describe', inst)}
           onDeleteInstance={(inst) => openModal('delete', inst)}
+        />
+      )}
+
+      {/* Cluster Operator Live Events & Condition Transition Modal */}
+      {modalMode === 'operator-events' && selectedItem && (
+        <ClusterOperatorEventsModal
+          operatorItem={selectedItem}
+          onClose={closeModal}
         />
       )}
 

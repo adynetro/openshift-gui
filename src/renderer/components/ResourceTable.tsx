@@ -23,6 +23,7 @@ import {
   Copy,
   HardDrive,
   Network,
+  ShieldCheck,
 } from 'lucide-react';
 import { ResourceKind, ResourceItem, ImageStreamResource } from '../../types/k8s.js';
 
@@ -287,7 +288,9 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
               </>
             )}
             <th className="py-3 px-3">Age</th>
-            {kind !== 'events' && !isWorkload && <th className="py-3 px-4 text-right">Actions</th>}
+            {kind !== 'events' && kind !== 'clusteroperators' && !isWorkload && (
+              <th className="py-3 px-4 text-right">Actions</th>
+            )}
           </tr>
         </thead>
 
@@ -364,6 +367,19 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                       title={`Click to view and edit Custom Resource instances for ${item.name}`}
                     >
                       <Boxes size={12} className="text-[#ae81ff] shrink-0" />
+                      <span className="truncate">{item.name}</span>
+                    </button>
+                  ) : kind === 'clusteroperators' ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectItem(item);
+                        onRowAction('operator-events', item);
+                      }}
+                      className="text-left font-bold text-slate-100 hover:text-cyan-300 hover:underline truncate max-w-[280px] transition-colors cursor-pointer flex items-center gap-1.5"
+                      title={`Click to view live events and condition history for ${item.name}`}
+                    >
+                      <ShieldCheck size={12} className="text-cyan-400 shrink-0" />
                       <span className="truncate">{item.name}</span>
                     </button>
                   ) : (
@@ -726,7 +742,7 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                 <td className="py-2.5 px-3 font-mono text-slate-400">{item.age}</td>
 
                 {/* Clean Pictogram Quick Action Buttons with Hover Tooltips */}
-                {kind !== 'events' && !isWorkload && (
+                {kind !== 'events' && kind !== 'clusteroperators' && !isWorkload && (
                   <td className="py-2 px-4 text-right">
                     <div className="flex items-center justify-end gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
                       {/* Live Logs and Interactive Terminal for Pods */}

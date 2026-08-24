@@ -106,6 +106,11 @@ export function registerIpcHandlers(mainWindow: electron.BrowserWindow): void {
     return await OcClient.getCrdInstances(crdName, namespace);
   });
 
+  // Cluster Operator Events Handler
+  ipcMain.handle('operator:getEvents', async (_event, operatorName: string) => {
+    return await OcClient.getClusterOperatorEvents(operatorName);
+  });
+
   // Helm Handlers
   ipcMain.handle('helm:getValues', async (_event, releaseName: string, namespace: string) => {
     return await HelmService.getValues(releaseName, namespace);
