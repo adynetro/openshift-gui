@@ -14,6 +14,7 @@ import {
   Clock,
   Layers,
   KeyRound,
+  Edit3,
 } from 'lucide-react';
 import { ResourceKind, ResourceItem, ImageStreamResource } from '../../types/k8s.js';
 
@@ -47,7 +48,7 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
     let bg = 'bg-slate-800 text-slate-300 border-slate-700';
     let Icon = Clock;
 
-    if (s === 'running' || s === 'active' || s === 'ready' || s === 'deployed' || s === 'admitted' || s === 'completed') {
+    if (s === 'running' || s === 'active' || s === 'ready' || s === 'deployed' || s === 'admitted' || s === 'completed' || s === 'succeeded') {
       bg = 'bg-emerald-950/60 text-emerald-300 border-emerald-800/80';
       Icon = CheckCircle2;
     } else if (s.includes('crash') || s.includes('error') || s.includes('failed') || s.includes('unhealthy') || s.includes('notready')) {
@@ -123,7 +124,7 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
       <div className="flex-1 flex flex-col items-center justify-center p-12 text-slate-500 space-y-3 text-center">
         <p className="text-base font-semibold text-slate-300">No {kind} found in this project</p>
         <p className="text-xs text-slate-500 max-w-sm">
-          Try switching to another project / namespace or filter query.
+          Try switching to another project / namespace or clearing status filters.
         </p>
       </div>
     );
@@ -144,7 +145,16 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                 <th className="py-3 px-3">Node</th>
               </>
             )}
-            {(kind === 'deployments' || kind === 'statefulsets') && (
+            {kind === 'deploymentconfigs' && (
+              <>
+                <th className="py-3 px-3">Ready</th>
+                <th className="py-3 px-3">Revision</th>
+                <th className="py-3 px-3">Triggers</th>
+                <th className="py-3 px-3">Strategy</th>
+                <th className="py-3 px-3">Status</th>
+              </>
+            )}
+            {(kind === 'deployments' || kind === 'statefulsets' || kind === 'daemonsets') && (
               <>
                 <th className="py-3 px-3">Ready</th>
                 <th className="py-3 px-3">Up-To-Date</th>
@@ -235,8 +245,21 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                   </>
                 )}
 
+                {/* DeploymentConfig Columns */}
+                {kind === 'deploymentconfigs' && (
+                  <>
+                    <td className="py-2.5 px-3 font-mono font-bold text-slate-200">{item.ready || '-'}</td>
+                    <td className="py-2.5 px-3 font-mono text-cyan-300">rev {item.extra?.revision || '1'}</td>
+                    <td className="py-2.5 px-3 font-mono text-slate-400 text-[11px] truncate max-w-[160px]" title={item.extra?.triggers}>
+                      {item.extra?.triggers || 'Config'}
+                    </td>
+                    <td className="py-2.5 px-3 font-mono text-slate-300 text-[11px]">{item.extra?.strategy || 'Rolling'}</td>
+                    <td className="py-2.5 px-3">{getStatusBadge(item.status, item.statusColor)}</td>
+                  </>
+                )}
+
                 {/* Workload Columns */}
-                {(kind === 'deployments' || kind === 'statefulsets') && (
+                {(kind === 'deployments' || kind === 'statefulsets' || kind === 'daemonsets') && (
                   <>
                     <td className="py-2.5 px-3 font-mono font-bold text-slate-200">{item.ready || '-'}</td>
                     <td className="py-2.5 px-3 font-mono text-slate-400">{item.extra?.upToDate ?? '-'}</td>
@@ -331,7 +354,20 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                 {/* Clickable Quick Action Buttons for this row */}
                 <td className="py-2.5 px-4 text-right">
                   <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-                    {(kind === 'pods' || kind === 'deployments') && (
+                    {/* Direct Edit YAML Button for Workloads */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRowAction(kind === 'helm' ? 'helm-manage' : 'edit-yaml', item);
+                      }}
+                      className="px-2 py-1 rounded bg-slate-800 hover:bg-emerald-950 text-emerald-400 border border-slate-700 hover:border-emerald-500 transition-colors flex items-center gap-1 font-semibold"
+                      title="Edit Resource"
+                    >
+                      <Edit3 size={12} />
+                      <span>Edit</span>
+                    </button>
+
+                    {(kind === 'pods' || kind === 'deployments' || kind === 'deploymentconfigs') && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -345,7 +381,7 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                       </button>
                     )}
 
-                    {(kind === 'deployments' || kind === 'statefulsets') && (
+                    {(kind === 'deployments' || kind === 'deploymentconfigs' || kind === 'statefulsets') && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();

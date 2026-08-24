@@ -6,6 +6,7 @@ import { ResourceTable } from './components/ResourceTable.js';
 import { ContextModal } from './components/ContextModal.js';
 import { LogViewer } from './components/LogViewer.js';
 import { YamlModal } from './components/YamlModal.js';
+import { EditYamlModal } from './components/EditYamlModal.js';
 import { ImageStreamModal } from './components/ImageStreamModal.js';
 import { HelmModal } from './components/HelmModal.js';
 import { ActionDialog } from './components/ActionDialog.js';
@@ -29,13 +30,14 @@ export const App: React.FC = () => {
   const [counts, setCounts] = useState<Partial<Record<ResourceKind, number>>>({});
   const [selectedItem, setSelectedItem] = useState<ResourceItem | null>(null);
   const [query, setQuery] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [loading, setLoading] = useState<boolean>(true);
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
   const [statusNotification, setStatusNotification] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   // Modal State
   const [modalMode, setModalMode] = useState<
-    'none' | 'context' | 'project' | 'logs' | 'yaml' | 'describe' | 'scale' | 'restart' | 'delete' | 'clean-is' | 'helm' | 'help'
+    'none' | 'context' | 'project' | 'logs' | 'yaml' | 'edit-yaml' | 'describe' | 'scale' | 'restart' | 'delete' | 'clean-is' | 'helm' | 'help'
   >('none');
 
   const showToast = (text: string, type: 'success' | 'error' = 'success') => {
@@ -110,6 +112,7 @@ export const App: React.FC = () => {
   // Fetch when kind or project changes
   useEffect(() => {
     setSelectedItem(null);
+    setStatusFilter('ALL');
     fetchResources(false);
   }, [fetchResources]);
 
@@ -122,12 +125,68 @@ export const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [autoRefresh, fetchResources]);
 
-  // Filter items by search query
+  // Available statuses in current resource list
+  const availableStatuses = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of resources) {
+      if (r.status) set.add(r.status);
+    }
+    return Array.from(set).sort();
+  }, [resources]);
+
+  // Clearable pods count (Completed, Failed, Error, CrashLoopBackOff)
+  const clearablePodsCount = useMemo(() => {
+    if (currentKind !== 'pods') return 0;
+    return resources.filter((p) => {
+      const st = (p.status || '').toLowerCase();
+      return st.includes('completed') || st.includes('failed') || st.includes('error') || st.includes('crashloop') || st.includes('evicted');
+    }).length;
+  }, [currentKind, resources]);
+
+  // Filter items by status and search query
   const filteredItems = useMemo(() => {
-    if (!query.trim()) return resources;
-    const matcher = new FuzzyMatcher(resources, ['name', 'status', 'namespace', 'age']);
-    return matcher.search(query);
-  }, [resources, query]);
+    let items = resources;
+
+    // Filter by status if selected
+    if (statusFilter !== 'ALL') {
+      items = items.filter((item) => item.status === statusFilter);
+    }
+
+    // Filter by search query
+    if (query.trim()) {
+      const matcher = new FuzzyMatcher(items, ['name', 'status', 'namespace', 'ip', 'node', 'age']);
+      items = matcher.search(query);
+    }
+
+    return items;
+  }, [resources, statusFilter, query]);
+
+  // Handle Clear Completed & Failed Pods
+  const handleClearCompletedFailedPods = async () => {
+    if (clearablePodsCount === 0) {
+      alert('No completed, error, or failed pods found in this project.');
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to permanently delete all ${clearablePodsCount} completed and failed pods in project '${currentProject}'?`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const res = await (window as any).electronAPI.prunePods(currentProject);
+      if (res.success) {
+        showToast(res.message, 'success');
+        fetchResources(false);
+      } else {
+        showToast(res.message, 'error');
+      }
+    } catch (e: any) {
+      showToast(e.message || 'Failed to prune pods', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Handle Switch Context
   const handleSwitchContext = async (contextName: string) => {
@@ -165,6 +224,9 @@ export const App: React.FC = () => {
     if (item) setSelectedItem(item);
 
     switch (actionType) {
+      case 'edit-yaml':
+        setModalMode('edit-yaml');
+        break;
       case 'logs':
         setModalMode('logs');
         break;
@@ -216,14 +278,16 @@ export const App: React.FC = () => {
         if (searchInput) searchInput.focus();
       } else if (e.key === '1') setCurrentKind('pods');
       else if (e.key === '2') setCurrentKind('deployments');
-      else if (e.key === '3') setCurrentKind('statefulsets');
-      else if (e.key === '4') setCurrentKind('routes');
-      else if (e.key === '5') setCurrentKind('services');
-      else if (e.key === '6') setCurrentKind('imagestreams');
-      else if (e.key === '7') setCurrentKind('helm');
-      else if (e.key === '8') setCurrentKind('configmaps');
-      else if (e.key === '9') setCurrentKind('secrets');
-      else if (e.key === '0') setCurrentKind('nodes');
+      else if (e.key === '3') setCurrentKind('deploymentconfigs');
+      else if (e.key === '4') setCurrentKind('statefulsets');
+      else if (e.key === '5') setCurrentKind('daemonsets');
+      else if (e.key === '6') setCurrentKind('routes');
+      else if (e.key === '7') setCurrentKind('services');
+      else if (e.key === '8') setCurrentKind('imagestreams');
+      else if (e.key === '9') setCurrentKind('helm');
+      else if (e.key === '0') setCurrentKind('configmaps');
+      else if (e.key === '-') setCurrentKind('secrets');
+      else if (e.key === 'n') setCurrentKind('nodes');
       else if (e.key === '?' || e.key === 'h') setModalMode('help');
     };
 
@@ -283,13 +347,18 @@ export const App: React.FC = () => {
             </div>
           )}
 
-          {/* Autocomplete Search & Action Bar */}
+          {/* Autocomplete Search & Action Bar with Status Filter & Clear Pods */}
           <SearchBar
             query={query}
             onChangeQuery={setQuery}
+            statusFilter={statusFilter}
+            onChangeStatusFilter={setStatusFilter}
+            availableStatuses={availableStatuses}
             currentKind={currentKind}
             selectedItem={selectedItem}
             onAction={handleAction}
+            onClearCompletedFailed={handleClearCompletedFailedPods}
+            clearablePodsCount={clearablePodsCount}
           />
 
           {/* Resource Table */}
@@ -350,13 +419,26 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* YAML / Describe Modal */}
+      {/* Read-Only YAML / Describe Modal */}
       {(modalMode === 'yaml' || modalMode === 'describe') && selectedItem && (
         <YamlModal
           mode={modalMode}
           item={selectedItem}
           namespace={currentProject}
           onClose={() => setModalMode('none')}
+        />
+      )}
+
+      {/* Interactive Edit YAML Modal */}
+      {modalMode === 'edit-yaml' && selectedItem && (
+        <EditYamlModal
+          item={selectedItem}
+          namespace={currentProject}
+          onClose={() => setModalMode('none')}
+          onSuccess={(msg) => {
+            showToast(msg, 'success');
+            fetchResources(false);
+          }}
         />
       )}
 
@@ -370,7 +452,7 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Helm Release Manager Modal */}
+      {/* Helm Release Manager Modal (Values Edit & Upgrade) */}
       {modalMode === 'helm' && selectedItem && (
         <HelmModal
           release={selectedItem}

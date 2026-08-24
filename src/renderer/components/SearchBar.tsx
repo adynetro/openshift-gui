@@ -1,27 +1,46 @@
 import React from 'react';
-import { Search, X, Zap, Terminal, Sparkles, RefreshCw, SlidersHorizontal, FileText, Code2, Trash2 } from 'lucide-react';
+import { Search, X, Zap, Terminal, Sparkles, RefreshCw, SlidersHorizontal, FileText, Code2, Trash2, Edit3, Filter, Eraser } from 'lucide-react';
 import { ResourceKind, ResourceItem } from '../../types/k8s.js';
 
 interface SearchBarProps {
   query: string;
   onChangeQuery: (val: string) => void;
+  statusFilter: string;
+  onChangeStatusFilter: (status: string) => void;
+  availableStatuses: string[];
   currentKind: ResourceKind;
   selectedItem: ResourceItem | null;
   onAction: (actionType: string) => void;
+  onClearCompletedFailed?: () => void;
+  clearablePodsCount?: number;
 }
 
 export const SearchBar: React.FC<SearchBarProps> = ({
   query,
   onChangeQuery,
+  statusFilter,
+  onChangeStatusFilter,
+  availableStatuses,
   currentKind,
   selectedItem,
   onAction,
+  onClearCompletedFailed,
+  clearablePodsCount = 0,
 }) => {
   // Contextual action pills based on current resource tab
   const getActionPills = () => {
     const pills: { id: string; label: string; icon: any; color: string; disabled?: boolean }[] = [];
 
-    if (currentKind === 'pods' || currentKind === 'deployments') {
+    // Edit YAML action available for all resources
+    pills.push({
+      id: 'edit-yaml',
+      label: 'Edit YAML',
+      icon: Edit3,
+      color: 'hover:border-emerald-500 hover:text-emerald-300 hover:bg-emerald-950/40 text-emerald-400 border-emerald-900/50 bg-emerald-950/20 font-semibold',
+      disabled: !selectedItem,
+    });
+
+    if (currentKind === 'pods' || currentKind === 'deployments' || currentKind === 'deploymentconfigs') {
       pills.push({
         id: 'logs',
         label: 'Live Logs',
@@ -31,7 +50,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       });
     }
 
-    if (currentKind === 'deployments' || currentKind === 'statefulsets') {
+    if (currentKind === 'deployments' || currentKind === 'deploymentconfigs' || currentKind === 'statefulsets') {
       pills.push({
         id: 'scale',
         label: 'Scale Replicas',
@@ -60,8 +79,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
     if (currentKind === 'helm') {
       pills.push({
-        id: 'helm-values',
-        label: 'Helm Values',
+        id: 'helm-manage',
+        label: 'Edit Values & Manage',
         icon: FileText,
         color: 'hover:border-blue-500 hover:text-blue-300 hover:bg-blue-950/40 text-blue-400 border-blue-900/50 bg-blue-950/20',
         disabled: !selectedItem,
@@ -85,7 +104,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
     pills.push({
       id: 'yaml',
-      label: 'YAML',
+      label: 'View YAML',
       icon: Code2,
       color: 'hover:border-slate-500 hover:text-slate-200 hover:bg-slate-800 text-slate-300 border-slate-700 bg-slate-800/40',
       disabled: !selectedItem,
@@ -105,49 +124,90 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   const actionPills = getActionPills();
 
   return (
-    <div className="p-4 bg-[#0f172a]/60 border-b border-slate-800 space-y-2.5">
-      {/* Search Input Box */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1">
+    <div className="p-3 bg-[#0f172a]/70 border-b border-slate-800 space-y-2.5">
+      {/* Search Input Box + Status Filter + Clear Completed Pods */}
+      <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="relative flex-1 min-w-[260px]">
           <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-            <Search size={16} />
+            <Search size={15} />
           </div>
 
           <input
             type="text"
             value={query}
             onChange={(e) => onChangeQuery(e.target.value)}
-            placeholder={`Filter ${currentKind} by name, status, IP, or labels (press '/' to focus)...`}
-            className="w-full pl-10 pr-10 py-2 bg-slate-900/90 border border-slate-700/80 focus:border-red-500/80 rounded-lg text-sm text-slate-100 placeholder-slate-500 shadow-inner transition-colors"
+            placeholder={`Filter ${currentKind} by name, IP, node, labels (press '/' to focus)...`}
+            className="w-full pl-9 pr-8 py-1.5 bg-slate-900 border border-slate-700 focus:border-cyan-500 rounded-lg text-xs text-slate-100 placeholder-slate-500 shadow-inner transition-colors"
           />
 
           {query && (
             <button
               onClick={() => onChangeQuery('')}
-              className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-200"
+              className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-200"
             >
-              <X size={15} />
+              <X size={14} />
             </button>
           )}
         </div>
 
+        {/* Status Filter Dropdown */}
+        <div className="flex items-center gap-1.5 bg-slate-900 px-2.5 py-1.5 rounded-lg border border-slate-700 text-xs">
+          <Filter size={13} className="text-slate-400" />
+          <span className="text-slate-400 text-[11px] font-semibold">Status:</span>
+          <select
+            value={statusFilter}
+            onChange={(e) => onChangeStatusFilter(e.target.value)}
+            className="bg-transparent text-xs text-slate-200 font-mono outline-none cursor-pointer"
+          >
+            <option value="ALL" className="bg-slate-900 text-slate-200">
+              All Statuses
+            </option>
+            {availableStatuses.map((st) => (
+              <option key={st} value={st} className="bg-slate-900 text-slate-200">
+                {st}
+              </option>
+            ))}
+          </select>
+          {statusFilter !== 'ALL' && (
+            <button
+              onClick={() => onChangeStatusFilter('ALL')}
+              className="text-slate-400 hover:text-white"
+              title="Reset status filter"
+            >
+              <X size={12} />
+            </button>
+          )}
+        </div>
+
+        {/* Clear Completed & Failed Pods Button (on Pods tab) */}
+        {currentKind === 'pods' && onClearCompletedFailed && (
+          <button
+            onClick={onClearCompletedFailed}
+            className="px-3 py-1.5 rounded-lg bg-amber-950/70 hover:bg-amber-900 text-amber-300 border border-amber-800/80 text-xs font-bold flex items-center gap-1.5 transition-all shadow shadow-amber-950"
+            title="Clean all completed, error, and failed pods in this project"
+          >
+            <Eraser size={13} />
+            <span>Clear Completed & Failed {clearablePodsCount > 0 ? `(${clearablePodsCount})` : ''}</span>
+          </button>
+        )}
+
         {/* Selected resource indicator */}
         {selectedItem ? (
-          <div className="px-3 py-2 rounded-lg bg-slate-900 border border-cyan-500/30 text-xs font-mono text-cyan-300 flex items-center gap-2">
+          <div className="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-cyan-500/40 text-xs font-mono text-cyan-300 flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-            <span className="truncate max-w-[200px]">Selected: {selectedItem.name}</span>
+            <span className="truncate max-w-[180px]">{selectedItem.name}</span>
           </div>
         ) : (
-          <div className="px-3 py-2 rounded-lg bg-slate-900/40 border border-slate-800 text-xs font-mono text-slate-400">
+          <div className="px-2.5 py-1.5 rounded-lg bg-slate-900/40 border border-slate-800 text-[11px] font-mono text-slate-500">
             Click a row to select
           </div>
         )}
       </div>
 
       {/* Autocomplete Action Buttons / Suggestion Pills */}
-      <div className="flex items-center gap-2 flex-wrap text-xs">
-        <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1 uppercase tracking-wider">
-          <Zap size={12} className="text-amber-400" /> Actions:
+      <div className="flex items-center gap-1.5 flex-wrap text-xs">
+        <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1 uppercase tracking-wider">
+          <Zap size={11} className="text-amber-400" /> Actions:
         </span>
 
         {actionPills.map((pill) => {
@@ -159,7 +219,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               disabled={pill.disabled}
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-all disabled:opacity-30 disabled:cursor-not-allowed ${pill.color}`}
             >
-              <Icon size={13} />
+              <Icon size={12} />
               <span>{pill.label}</span>
             </button>
           );

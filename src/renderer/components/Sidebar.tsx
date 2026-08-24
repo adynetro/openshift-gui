@@ -2,15 +2,16 @@ import React from 'react';
 import {
   Box,
   Layers,
+  Layers2,
   Server,
-  Globe,
   Network,
-  Image as ImageIcon,
+  Image,
+  FileText,
+  Key,
   Anchor,
-  FileCode,
-  Lock,
-  Cpu,
+  HardDrive,
   HelpCircle,
+  Cpu,
 } from 'lucide-react';
 import { ResourceKind } from '../../types/k8s.js';
 
@@ -30,17 +31,19 @@ interface NavItem {
   badgeText?: string;
 }
 
-export const SIDEBAR_ITEMS: NavItem[] = [
+const NAV_ITEMS: NavItem[] = [
   { kind: 'pods', label: 'Pods', icon: Box, hotkey: '1' },
   { kind: 'deployments', label: 'Deployments', icon: Layers, hotkey: '2' },
-  { kind: 'statefulsets', label: 'StatefulSets', icon: Server, hotkey: '3' },
-  { kind: 'routes', label: 'Routes', icon: Globe, hotkey: '4', badgeText: 'OpenShift', badgeColor: 'bg-red-950 text-red-400 border-red-800' },
-  { kind: 'services', label: 'Services', icon: Network, hotkey: '5' },
-  { kind: 'imagestreams', label: 'ImageStreams', icon: ImageIcon, hotkey: '6', badgeText: 'SemVer', badgeColor: 'bg-emerald-950 text-emerald-400 border-emerald-800' },
-  { kind: 'helm', label: 'Helm Releases', icon: Anchor, hotkey: '7', badgeText: 'Helm 3', badgeColor: 'bg-blue-950 text-blue-400 border-blue-800' },
-  { kind: 'configmaps', label: 'ConfigMaps', icon: FileCode, hotkey: '8' },
-  { kind: 'secrets', label: 'Secrets', icon: Lock, hotkey: '9' },
-  { kind: 'nodes', label: 'Cluster Nodes', icon: Cpu, hotkey: '0' },
+  { kind: 'deploymentconfigs', label: 'DeploymentConfigs', icon: Layers2, hotkey: '3', badgeText: 'OpenShift', badgeColor: 'bg-red-950 text-red-300 border-red-800' },
+  { kind: 'statefulsets', label: 'StatefulSets', icon: Server, hotkey: '4' },
+  { kind: 'daemonsets', label: 'DaemonSets', icon: Cpu, hotkey: '5' },
+  { kind: 'routes', label: 'Routes', icon: Network, hotkey: '6', badgeText: 'OpenShift', badgeColor: 'bg-red-950 text-red-300 border-red-800' },
+  { kind: 'services', label: 'Services', icon: Network, hotkey: '7' },
+  { kind: 'imagestreams', label: 'ImageStreams', icon: Image, hotkey: '8', badgeText: 'SemVer', badgeColor: 'bg-purple-950 text-purple-300 border-purple-800' },
+  { kind: 'helm', label: 'Helm Releases', icon: Anchor, hotkey: '9', badgeText: 'v3', badgeColor: 'bg-blue-950 text-blue-300 border-blue-800' },
+  { kind: 'configmaps', label: 'ConfigMaps', icon: FileText, hotkey: '0' },
+  { kind: 'secrets', label: 'Secrets', icon: Key, hotkey: '-' },
+  { kind: 'nodes', label: 'Cluster Nodes', icon: HardDrive, hotkey: 'n' },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -50,78 +53,84 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenHelp,
 }) => {
   return (
-    <aside className="w-60 bg-[#0f172a] border-r border-[#1e293b] flex flex-col justify-between p-3 select-none shrink-0">
+    <aside className="w-64 bg-[#0f172a] border-r border-[#1e293b] flex flex-col justify-between select-none shrink-0">
       {/* Navigation List */}
-      <div className="space-y-1">
-        <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-          Workloads & Resources
+      <div className="p-3 space-y-1 overflow-y-auto">
+        <div className="px-3 py-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+          Resources
         </div>
-        <nav className="space-y-1">
-          {SIDEBAR_ITEMS.map((item) => {
-            const Icon = item.icon;
-            const isActive = currentKind === item.kind;
-            const count = counts[item.kind];
 
-            return (
-              <button
-                key={item.kind}
-                onClick={() => onSelectKind(item.kind)}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all group ${
-                  isActive
-                    ? 'bg-gradient-to-r from-red-600/20 to-red-600/5 text-white border border-red-500/40 shadow-sm shadow-red-950/50'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60 border border-transparent'
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <Icon
-                    size={16}
-                    className={
+        {NAV_ITEMS.map((item) => {
+          const Icon = item.icon;
+          const isActive = currentKind === item.kind;
+          const count = counts[item.kind];
+
+          return (
+            <button
+              key={item.kind}
+              onClick={() => onSelectKind(item.kind)}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all group ${
+                isActive
+                  ? 'bg-gradient-to-r from-red-600 to-rose-700 text-white shadow-lg shadow-red-950/60 font-semibold'
+                  : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/80'
+              }`}
+            >
+              <div className="flex items-center space-x-2.5 truncate">
+                <Icon
+                  size={15}
+                  className={isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}
+                />
+                <span className="truncate">{item.label}</span>
+              </div>
+
+              <div className="flex items-center space-x-1.5 shrink-0">
+                {item.badgeText && !isActive && (
+                  <span className={`px-1.5 py-0.2 rounded text-[9px] border font-mono ${item.badgeColor}`}>
+                    {item.badgeText}
+                  </span>
+                )}
+
+                {count !== undefined && count > 0 && (
+                  <span
+                    className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
                       isActive
-                        ? 'text-[#ee0000]'
-                        : 'text-slate-400 group-hover:text-slate-200 transition-colors'
-                    }
-                  />
-                  <span>{item.label}</span>
-                </div>
+                        ? 'bg-white/20 text-white font-bold'
+                        : 'bg-slate-800 text-slate-300'
+                    }`}
+                  >
+                    {count}
+                  </span>
+                )}
 
-                <div className="flex items-center gap-1.5">
-                  {item.badgeText && !isActive && (
-                    <span className={`text-[9px] px-1 py-0.2 rounded border font-mono ${item.badgeColor}`}>
-                      {item.badgeText}
-                    </span>
-                  )}
-                  {count !== undefined && count > 0 && (
-                    <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
-                        isActive
-                          ? 'bg-red-500 text-white'
-                          : 'bg-slate-800 text-slate-400 group-hover:bg-slate-700 group-hover:text-slate-200'
-                      }`}
-                    >
-                      {count}
-                    </span>
-                  )}
-                  <span className="text-[10px] text-slate-500 font-mono">[{item.hotkey}]</span>
-                </div>
-              </button>
-            );
-          })}
-        </nav>
+                <span
+                  className={`text-[10px] font-mono px-1 py-0.2 rounded ${
+                    isActive ? 'bg-black/20 text-white' : 'text-slate-500 bg-slate-900'
+                  }`}
+                >
+                  {item.hotkey}
+                </span>
+              </div>
+            </button>
+          );
+        })}
       </div>
 
-      {/* Bottom Footer Shortcuts & Help */}
-      <div className="pt-3 border-t border-slate-800 space-y-2">
+      {/* Footer Info & Shortcuts */}
+      <div className="p-3 border-t border-slate-800/80 bg-slate-900/40 space-y-2">
         <button
           onClick={onOpenHelp}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 transition-colors"
+          className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors"
         >
-          <HelpCircle size={15} />
-          <span>Keyboard Shortcuts & Help</span>
+          <div className="flex items-center space-x-2">
+            <HelpCircle size={14} className="text-slate-400" />
+            <span>Shortcuts & Help</span>
+          </div>
+          <kbd className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] font-mono text-slate-400">?</kbd>
         </button>
 
-        <div className="px-3 py-1 bg-slate-900/60 rounded-md border border-slate-800 text-[10px] text-slate-400 font-mono flex justify-between items-center">
+        <div className="px-3 py-1 text-[10px] text-slate-500 flex items-center justify-between font-mono">
           <span>OpenShift GUI</span>
-          <span className="text-emerald-400 font-bold">v0.1.0</span>
+          <span>v0.1.0</span>
         </div>
       </div>
     </aside>

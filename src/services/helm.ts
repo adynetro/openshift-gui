@@ -1,5 +1,8 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
 import { ResourceItem, HelmReleaseItem } from '../types/k8s.js';
 import { formatAge, getStatusColor } from '../utils/formatters.js';
 import { getExecEnv } from './oc-client.js';
@@ -10,9 +13,9 @@ export class HelmService {
   /**
    * Run a helm command safely.
    */
-  static async runHelm(command: string, timeout = 12000): Promise<{ stdout: string; stderr: string }> {
+  static async runHelm(command: string, timeout = 15000): Promise<{ stdout: string; stderr: string }> {
     try {
-      const result = await execAsync(command, { timeout, env: getExecEnv(), maxBuffer: 15 * 1024 * 1024 });
+      const result = await execAsync(command, { timeout, env: getExecEnv(), maxBuffer: 20 * 1024 * 1024 });
       return result;
     } catch (error: any) {
       return {
@@ -79,6 +82,47 @@ export class HelmService {
     const cmd = `helm get values "${releaseName}" ${nsFlag} -a`;
     const { stdout, stderr } = await this.runHelm(cmd);
     return stdout || stderr || 'No user-supplied values found.';
+  }
+
+  /**
+   * Updates / upgrades a Helm release with new YAML values.
+   */
+  static async upgradeValues(
+    releaseName: string,
+    valuesYaml: string,
+    namespace: string
+  ): Promise<{ success: boolean; message: string }> {
+    const tmpFile = path.join(os.tmpdir(), `helm-vals-${Date.now()}.yaml`);
+    try {
+      fs.writeFileSync(tmpFile, valuesYaml, 'utf8');
+
+      // Look up release chart name
+      const { items } = await this.getReleases(namespace);
+      const rel = items.find((r) => r.name === releaseName);
+      const chart = rel?.extra?.chart || releaseName;
+
+      const nsFlag = namespace ? `-n "${namespace}"` : '';
+      const cmd = `helm upgrade "${releaseName}" "${chart}" -f "${tmpFile}" --reuse-values ${nsFlag}`;
+      const { stdout, stderr } = await this.runHelm(cmd, 30000);
+
+      if (stderr && !stdout) {
+        // Retry without --reuse-values in case chart needs fresh values
+        const fallbackCmd = `helm upgrade "${releaseName}" "${chart}" -f "${tmpFile}" ${nsFlag}`;
+        const res = await this.runHelm(fallbackCmd, 30000);
+        if (res.stderr && !res.stdout) {
+          return { success: false, message: res.stderr };
+        }
+        return { success: true, message: res.stdout || `Helm release ${releaseName} upgraded successfully!` };
+      }
+
+      return { success: true, message: stdout || `Helm release ${releaseName} upgraded successfully!` };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Helm upgrade failed' };
+    } finally {
+      if (fs.existsSync(tmpFile)) {
+        fs.unlinkSync(tmpFile);
+      }
+    }
   }
 
   /**

@@ -1,7 +1,9 @@
 export type ResourceKind =
   | 'pods'
   | 'deployments'
+  | 'deploymentconfigs'
   | 'statefulsets'
+  | 'daemonsets'
   | 'services'
   | 'routes'
   | 'imagestreams'
@@ -65,8 +67,8 @@ export interface KubeContext {
 
 export interface ProjectInfo {
   name: string;
-  displayName?: string;
-  status?: string;
+  displayName: string;
+  status: string;
   isCurrent: boolean;
 }
 
@@ -76,5 +78,4 @@ export interface ClusterInfo {
   context: string;
   namespace: string;
   connected: boolean;
-  version?: string;
 }

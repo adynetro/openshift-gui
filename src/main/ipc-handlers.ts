@@ -50,6 +50,14 @@ export function registerIpcHandlers(mainWindow: electron.BrowserWindow): void {
     return await OcClient.getYaml(kind, name, namespace);
   });
 
+  ipcMain.handle('kube:applyYaml', async (_event, yamlContent: string, namespace: string) => {
+    return await OcClient.applyYaml(yamlContent, namespace);
+  });
+
+  ipcMain.handle('kube:prunePods', async (_event, namespace: string, targetStatuses?: string[]) => {
+    return await OcClient.prunePods(namespace, targetStatuses);
+  });
+
   ipcMain.handle('kube:scaleResource', async (_event, kind: string, name: string, namespace: string, replicas: number) => {
     return await OcClient.scale(kind, name, namespace, replicas);
   });
@@ -69,6 +77,10 @@ export function registerIpcHandlers(mainWindow: electron.BrowserWindow): void {
   // Helm Handlers
   ipcMain.handle('helm:getValues', async (_event, releaseName: string, namespace: string) => {
     return await HelmService.getValues(releaseName, namespace);
+  });
+
+  ipcMain.handle('helm:upgradeValues', async (_event, releaseName: string, valuesYaml: string, namespace: string) => {
+    return await HelmService.upgradeValues(releaseName, valuesYaml, namespace);
   });
 
   ipcMain.handle('helm:getManifest', async (_event, releaseName: string, namespace: string) => {

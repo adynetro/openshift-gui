@@ -1,7 +1,8 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
-import os from 'node:os';
+import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { ResourceKind, ResourceItem, ImageStreamResource } from '../types/k8s.js';
 import { formatAge, getStatusColor } from '../utils/formatters.js';
 import { SemverSorter } from './semver-sorter.js';
@@ -41,7 +42,7 @@ export class OcClient {
       const result = await execAsync(command, {
         timeout,
         env: getExecEnv(),
-        maxBuffer: 20 * 1024 * 1024,
+        maxBuffer: 25 * 1024 * 1024,
       });
       return { stdout: result.stdout || '', stderr: result.stderr || '', exitCode: 0 };
     } catch (error: any) {
@@ -66,8 +67,10 @@ export class OcClient {
 
     const nsFlag = namespace ? `-n "${namespace}"` : '';
     let cmdKind = kind as string;
+    if (kind === 'deploymentconfigs') cmdKind = 'dc';
     if (kind === 'imagestreams') cmdKind = 'is';
     if (kind === 'statefulsets') cmdKind = 'sts';
+    if (kind === 'daemonsets') cmdKind = 'ds';
     if (kind === 'configmaps') cmdKind = 'cm';
 
     const cmd = `oc get ${cmdKind} ${nsFlag} -o json || kubectl get ${cmdKind} ${nsFlag} -o json`;
@@ -159,13 +162,61 @@ export class OcClient {
           };
         }
 
-        case 'deployments':
-        case 'statefulsets': {
+        case 'deploymentconfigs': {
           const replicas = raw.status?.replicas || 0;
           const readyReplicas = raw.status?.readyReplicas || 0;
           const updatedReplicas = raw.status?.updatedReplicas || 0;
           const availableReplicas = raw.status?.availableReplicas || 0;
           const desired = raw.spec?.replicas ?? 1;
+          const ready = `${readyReplicas}/${desired}`;
+          const revision = raw.status?.latestVersion || '1';
+
+          const triggers = (raw.spec?.triggers || [])
+            .map((t: any) => t.type)
+            .join(', ') || 'Config';
+
+          const strategy = raw.spec?.strategy?.type || 'Rolling';
+
+          let status = 'Active';
+          if (readyReplicas === desired && desired > 0) {
+            status = 'Running';
+          } else if (desired === 0) {
+            status = 'Scaled to 0';
+          } else if (readyReplicas < desired) {
+            status = 'Degraded';
+          }
+
+          return {
+            id: `${ns}/${name}`,
+            name,
+            namespace: ns,
+            kind,
+            status,
+            statusColor: getStatusColor(status),
+            age,
+            ready,
+            extra: {
+              desired,
+              current: replicas,
+              upToDate: updatedReplicas,
+              available: availableReplicas,
+              revision,
+              triggers,
+              strategy,
+            },
+            labels: raw.metadata?.labels || {},
+            raw,
+          };
+        }
+
+        case 'deployments':
+        case 'statefulsets':
+        case 'daemonsets': {
+          const replicas = raw.status?.replicas || raw.status?.currentNumberScheduled || 0;
+          const readyReplicas = raw.status?.readyReplicas || raw.status?.numberReady || 0;
+          const updatedReplicas = raw.status?.updatedReplicas || raw.status?.updatedNumberScheduled || 0;
+          const availableReplicas = raw.status?.availableReplicas || raw.status?.numberAvailable || 0;
+          const desired = raw.spec?.replicas ?? (raw.status?.desiredNumberScheduled ?? 1);
           const ready = `${readyReplicas}/${desired}`;
 
           let status = 'Active';
@@ -345,8 +396,15 @@ export class OcClient {
    * Describes a resource.
    */
   static async describe(kind: string, name: string, namespace: string): Promise<string> {
+    let cmdKind = kind;
+    if (kind === 'deploymentconfigs') cmdKind = 'dc';
+    if (kind === 'imagestreams') cmdKind = 'is';
+    if (kind === 'statefulsets') cmdKind = 'sts';
+    if (kind === 'daemonsets') cmdKind = 'ds';
+    if (kind === 'configmaps') cmdKind = 'cm';
+
     const nsFlag = namespace ? `-n "${namespace}"` : '';
-    const cmd = `oc describe ${kind} "${name}" ${nsFlag} || kubectl describe ${kind} "${name}" ${nsFlag}`;
+    const cmd = `oc describe ${cmdKind} "${name}" ${nsFlag} || kubectl describe ${cmdKind} "${name}" ${nsFlag}`;
     const { stdout, stderr } = await this.runCommand(cmd, 15000);
     return stdout || stderr || 'No description available.';
   }
@@ -355,18 +413,95 @@ export class OcClient {
    * Gets the YAML definition of a resource.
    */
   static async getYaml(kind: string, name: string, namespace: string): Promise<string> {
+    let cmdKind = kind;
+    if (kind === 'deploymentconfigs') cmdKind = 'dc';
+    if (kind === 'imagestreams') cmdKind = 'is';
+    if (kind === 'statefulsets') cmdKind = 'sts';
+    if (kind === 'daemonsets') cmdKind = 'ds';
+    if (kind === 'configmaps') cmdKind = 'cm';
+
     const nsFlag = namespace ? `-n "${namespace}"` : '';
-    const cmd = `oc get ${kind} "${name}" ${nsFlag} -o yaml || kubectl get ${kind} "${name}" ${nsFlag} -o yaml`;
+    const cmd = `oc get ${cmdKind} "${name}" ${nsFlag} -o yaml || kubectl get ${cmdKind} "${name}" ${nsFlag} -o yaml`;
     const { stdout, stderr } = await this.runCommand(cmd, 15000);
     return stdout || stderr || 'No YAML available.';
   }
 
   /**
-   * Scales a deployment or statefulset.
+   * Applies / updates a resource via YAML content (oc apply -f -).
+   */
+  static async applyYaml(yamlContent: string, namespace: string): Promise<{ success: boolean; message: string }> {
+    const tmpFile = path.join(os.tmpdir(), `oc-edit-${Date.now()}.yaml`);
+    try {
+      fs.writeFileSync(tmpFile, yamlContent, 'utf8');
+      const nsFlag = namespace ? `-n "${namespace}"` : '';
+      const cmd = `oc apply -f "${tmpFile}" ${nsFlag} || kubectl apply -f "${tmpFile}" ${nsFlag}`;
+      const { stdout, stderr } = await this.runCommand(cmd);
+
+      if (stderr && !stdout) {
+        return { success: false, message: stderr };
+      }
+      return { success: true, message: stdout.trim() || 'Resource updated successfully!' };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Failed to apply YAML' };
+    } finally {
+      if (fs.existsSync(tmpFile)) {
+        fs.unlinkSync(tmpFile);
+      }
+    }
+  }
+
+  /**
+   * Batch deletes Completed, Failed, and Error pods in a project.
+   */
+  static async prunePods(
+    namespace: string,
+    targetStatuses: string[] = ['Completed', 'Error', 'CrashLoopBackOff', 'Failed', 'Succeeded', 'Evicted']
+  ): Promise<{ success: boolean; count: number; deleted: string[]; message: string }> {
+    try {
+      const res = await this.getResources('pods', namespace);
+      if (res.error) {
+        return { success: false, count: 0, deleted: [], message: res.error };
+      }
+
+      const matchingPods = res.items.filter((p) => {
+        const status = (p.status || '').toLowerCase();
+        return targetStatuses.some((ts) => status.includes(ts.toLowerCase()));
+      });
+
+      if (matchingPods.length === 0) {
+        return { success: true, count: 0, deleted: [], message: 'No completed or failed pods found to clean.' };
+      }
+
+      const podNames = matchingPods.map((p) => p.name);
+      const nsFlag = namespace ? `-n "${namespace}"` : '';
+      const cmd = `oc delete pod ${podNames.map((n) => `"${n}"`).join(' ')} ${nsFlag}`;
+      const { stdout, stderr } = await this.runCommand(cmd, 30000);
+
+      if (stderr && !stdout) {
+        return { success: false, count: 0, deleted: [], message: stderr };
+      }
+
+      return {
+        success: true,
+        count: podNames.length,
+        deleted: podNames,
+        message: `Successfully cleared ${podNames.length} completed/failed pods: ${podNames.join(', ')}`,
+      };
+    } catch (err: any) {
+      return { success: false, count: 0, deleted: [], message: err.message || 'Failed to prune pods' };
+    }
+  }
+
+  /**
+   * Scales a deployment, deploymentconfig, or statefulset.
    */
   static async scale(kind: string, name: string, namespace: string, replicas: number): Promise<{ success: boolean; message: string }> {
+    let cmdKind = kind;
+    if (kind === 'deploymentconfigs') cmdKind = 'dc';
+    if (kind === 'statefulsets') cmdKind = 'sts';
+
     const nsFlag = namespace ? `-n "${namespace}"` : '';
-    const cmd = `oc scale ${kind} "${name}" --replicas=${replicas} ${nsFlag} || kubectl scale ${kind} "${name}" --replicas=${replicas} ${nsFlag}`;
+    const cmd = `oc scale ${cmdKind} "${name}" --replicas=${replicas} ${nsFlag} || kubectl scale ${cmdKind} "${name}" --replicas=${replicas} ${nsFlag}`;
     const { stdout, stderr } = await this.runCommand(cmd);
     if (stderr && !stdout) {
       return { success: false, message: stderr };
@@ -375,24 +510,38 @@ export class OcClient {
   }
 
   /**
-   * Triggers a rollout restart for a workload.
+   * Triggers a rollout restart or latest for a workload.
    */
   static async rolloutRestart(kind: string, name: string, namespace: string): Promise<{ success: boolean; message: string }> {
+    let cmdKind = kind;
+    if (kind === 'deploymentconfigs') cmdKind = 'dc';
+
     const nsFlag = namespace ? `-n "${namespace}"` : '';
-    const cmd = `oc rollout restart ${kind}/${name} ${nsFlag} || kubectl rollout restart ${kind}/${name} ${nsFlag}`;
+    let cmd = `oc rollout restart ${cmdKind}/${name} ${nsFlag} || kubectl rollout restart ${cmdKind}/${name} ${nsFlag}`;
+    if (cmdKind === 'dc') {
+      cmd = `oc rollout latest dc/"${name}" ${nsFlag} || ${cmd}`;
+    }
+
     const { stdout, stderr } = await this.runCommand(cmd);
     if (stderr && !stdout) {
       return { success: false, message: stderr };
     }
-    return { success: true, message: stdout.trim() || `Restart initiated for ${kind}/${name}.` };
+    return { success: true, message: stdout.trim() || `Rollout restart initiated for ${cmdKind}/${name}.` };
   }
 
   /**
    * Deletes a resource.
    */
   static async deleteResource(kind: string, name: string, namespace: string): Promise<{ success: boolean; message: string }> {
+    let cmdKind = kind;
+    if (kind === 'deploymentconfigs') cmdKind = 'dc';
+    if (kind === 'imagestreams') cmdKind = 'is';
+    if (kind === 'statefulsets') cmdKind = 'sts';
+    if (kind === 'daemonsets') cmdKind = 'ds';
+    if (kind === 'configmaps') cmdKind = 'cm';
+
     const nsFlag = namespace ? `-n "${namespace}"` : '';
-    const cmd = `oc delete ${kind} "${name}" ${nsFlag} || kubectl delete ${kind} "${name}" ${nsFlag}`;
+    const cmd = `oc delete ${cmdKind} "${name}" ${nsFlag} || kubectl delete ${cmdKind} "${name}" ${nsFlag}`;
     const { stdout, stderr } = await this.runCommand(cmd);
     if (stderr && !stdout) {
       return { success: false, message: stderr };
