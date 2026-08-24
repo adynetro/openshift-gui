@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, X, Zap, Terminal, Sparkles, RefreshCw, SlidersHorizontal, FileText, Code2, Trash2, Edit3, Filter, Eraser, Activity } from 'lucide-react';
+import { Search, X, Zap, Terminal, Sparkles, RefreshCw, SlidersHorizontal, FileText, Code2, Trash2, Filter, Eraser, Anchor } from 'lucide-react';
 import { ResourceKind, ResourceItem } from '../../types/k8s.js';
 
 interface SearchBarProps {
@@ -29,18 +29,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 }) => {
   // Contextual action pills based on current resource tab
   const getActionPills = () => {
-    const pills: { id: string; label: string; icon: any; color: string; disabled?: boolean }[] = [];
-
-    // Edit YAML action available for all workloads
-    if (currentKind !== 'events' && currentKind !== 'nodes') {
-      pills.push({
-        id: 'edit-yaml',
-        label: 'Edit YAML',
-        icon: Edit3,
-        color: 'hover:border-emerald-500 hover:text-emerald-300 hover:bg-emerald-950/40 text-emerald-400 border-emerald-900/50 bg-emerald-950/20 font-semibold',
-        disabled: !selectedItem,
-      });
-    }
+    const pills: { id: string; label: string; tooltip: string; icon: any; color: string; disabled?: boolean }[] = [];
 
     // Live logs for pods, deployments, deploymentconfigs, statefulsets, daemonsets
     if (
@@ -52,7 +41,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     ) {
       pills.push({
         id: 'logs',
-        label: 'Live Logs',
+        label: 'Logs',
+        tooltip: 'Stream Live Aggregated Logs',
         icon: Terminal,
         color: 'hover:border-emerald-500 hover:text-emerald-300 hover:bg-emerald-950/40 text-emerald-400 border-emerald-900/50 bg-emerald-950/20',
         disabled: !selectedItem,
@@ -62,14 +52,16 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     if (currentKind === 'deployments' || currentKind === 'deploymentconfigs' || currentKind === 'statefulsets') {
       pills.push({
         id: 'scale',
-        label: 'Scale Replicas',
+        label: 'Scale',
+        tooltip: 'Scale Replicas',
         icon: SlidersHorizontal,
         color: 'hover:border-cyan-500 hover:text-cyan-300 hover:bg-cyan-950/40 text-cyan-400 border-cyan-900/50 bg-cyan-950/20',
         disabled: !selectedItem,
       });
       pills.push({
         id: 'restart',
-        label: 'Rollout Restart',
+        label: 'Restart',
+        tooltip: 'Trigger Rollout Restart',
         icon: RefreshCw,
         color: 'hover:border-amber-500 hover:text-amber-300 hover:bg-amber-950/40 text-amber-400 border-amber-900/50 bg-amber-950/20',
         disabled: !selectedItem,
@@ -79,7 +71,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     if (currentKind === 'imagestreams') {
       pills.push({
         id: 'clean-is',
-        label: 'SemVer Tag Cleanup Wizard',
+        label: 'SemVer Clean',
+        tooltip: 'Open SemVer Tag Cleanup Wizard',
         icon: Sparkles,
         color: 'hover:border-purple-500 hover:text-purple-300 hover:bg-purple-950/40 text-purple-400 border-purple-900/50 bg-purple-950/20',
         disabled: !selectedItem,
@@ -89,14 +82,16 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     if (currentKind === 'helm') {
       pills.push({
         id: 'helm-manage',
-        label: 'Edit Values & Manage',
-        icon: FileText,
+        label: 'Values',
+        tooltip: 'Edit Values & Upgrade Release',
+        icon: Anchor,
         color: 'hover:border-blue-500 hover:text-blue-300 hover:bg-blue-950/40 text-blue-400 border-blue-900/50 bg-blue-950/20',
         disabled: !selectedItem,
       });
       pills.push({
         id: 'helm-history',
-        label: 'History & Rollback',
+        label: 'History',
+        tooltip: 'View History & Rollback',
         icon: RefreshCw,
         color: 'hover:border-cyan-500 hover:text-cyan-300 hover:bg-cyan-950/40 text-cyan-400 border-cyan-900/50 bg-cyan-950/20',
         disabled: !selectedItem,
@@ -105,7 +100,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
     pills.push({
       id: 'describe',
-      label: 'Describe Details',
+      label: 'Describe',
+      tooltip: 'Describe Resource Details',
       icon: FileText,
       color: 'hover:border-slate-500 hover:text-slate-200 hover:bg-slate-800 text-slate-300 border-slate-700 bg-slate-800/40',
       disabled: !selectedItem,
@@ -113,9 +109,10 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
     pills.push({
       id: 'yaml',
-      label: 'View YAML',
+      label: 'YAML',
+      tooltip: 'View & Edit YAML Definition',
       icon: Code2,
-      color: 'hover:border-slate-500 hover:text-slate-200 hover:bg-slate-800 text-slate-300 border-slate-700 bg-slate-800/40',
+      color: 'hover:border-emerald-500 hover:text-emerald-300 hover:bg-slate-800 text-slate-300 border-slate-700 bg-slate-800/40',
       disabled: !selectedItem,
     });
 
@@ -123,6 +120,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       pills.push({
         id: 'delete',
         label: 'Delete',
+        tooltip: 'Delete Selected Resource',
         icon: Trash2,
         color: 'hover:border-red-500 hover:text-red-300 hover:bg-red-950/40 text-red-400 border-red-900/50 bg-red-950/20',
         disabled: !selectedItem,
@@ -148,7 +146,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             value={query}
             onChange={(e) => onChangeQuery(e.target.value)}
             placeholder={`Filter ${currentKind === 'events' ? 'events by message, reason, object' : currentKind} by name, IP, node, labels (press '/' to focus)...`}
-            className="w-full pl-9 pr-8 py-1.5 bg-slate-900 border border-slate-700 focus:border-cyan-500 rounded-lg text-xs text-slate-100 placeholder-slate-500 shadow-inner transition-colors"
+            className="w-full pl-9 pr-8 py-1.5 bg-slate-900 border border-slate-700 focus:border-cyan-500 rounded-lg text-xs text-slate-100 placeholder-slate-500 shadow-inner transition-colors font-mono"
           />
 
           {query && (
@@ -225,7 +223,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         )}
       </div>
 
-      {/* Autocomplete Action Buttons / Suggestion Pills */}
+      {/* Clean Compact Action Buttons */}
       <div className="flex items-center gap-1.5 flex-wrap text-xs">
         <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1 uppercase tracking-wider">
           <Zap size={11} className="text-amber-400" /> Actions:
@@ -238,9 +236,10 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               key={pill.id}
               onClick={() => onAction(pill.id)}
               disabled={pill.disabled}
+              title={pill.tooltip}
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-all disabled:opacity-30 disabled:cursor-not-allowed ${pill.color}`}
             >
-              <Icon size={12} />
+              <Icon size={13} />
               <span>{pill.label}</span>
             </button>
           );
