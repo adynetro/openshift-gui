@@ -749,7 +749,7 @@ export class OcClient {
         return b.name.localeCompare(a.name);
       });
 
-      // Parse Pods
+      // Parse Pods with exact workload ownership matching
       const pods: WorkloadPodItem[] = [];
       if (podsRes.stdout.trim()) {
         try {
@@ -759,30 +759,47 @@ export class OcClient {
             const podSpec = pod.spec || {};
             const podStatus = pod.status || {};
             const labels = meta.labels || {};
+            const owners = meta.ownerReferences || [];
+            const annotations = meta.annotations || {};
+
+            // Exclude OpenShift deployer / build hook pods (e.g. gremlins-18-deploy)
+            if (meta.name?.endsWith('-deploy') || annotations['openshift.io/deployer-pod-for']) {
+              continue;
+            }
 
             let isMatch = false;
             if (kind === 'deploymentconfigs') {
-              if (labels['deploymentconfig'] === name || 
-                  labels['deployment']?.startsWith(`${name}-`) ||
-                  meta.name?.startsWith(`${name}-`)) {
+              // 1. Exact label match: deploymentconfig=<name>
+              if (labels['deploymentconfig'] === name || labels['openshift.io/deployment-config.name'] === name) {
+                isMatch = true;
+              }
+              // 2. Owner reference or deployment label matching one of this DC's replication controllers
+              else if (
+                owners.some((o: any) => o.kind === 'ReplicationController' && revisions.some((r) => r.name === o.name)) ||
+                (labels['deployment'] && revisions.some((r) => r.name === labels['deployment']))
+              ) {
                 isMatch = true;
               }
             } else if (kind === 'deployments') {
-              const owners = meta.ownerReferences || [];
-              const matchOwner = owners.some((o: any) => revisions.some(r => r.name === o.name) || o.name === name);
-              const matchLabel = Object.entries(selectors).every(([k, v]) => labels[k] === v);
-              if (matchOwner || (matchLabel && Object.keys(selectors).length > 0) || meta.name?.startsWith(`${name}-`)) {
+              // In Kubernetes, pods belong to a ReplicaSet of this deployment
+              if (owners.some((o: any) => o.kind === 'ReplicaSet' && revisions.some((r) => r.name === o.name))) {
                 isMatch = true;
+              } else if (revisions.length === 0) {
+                // If revisions list is empty, match exact selector matchLabels
+                const matchLabel = Object.entries(selectors).every(([k, v]) => labels[k] === v);
+                if (matchLabel && Object.keys(selectors).length > 0) {
+                  isMatch = true;
+                }
               }
             } else if (kind === 'statefulsets') {
-              if (labels['app'] === name || 
-                  labels['statefulset.kubernetes.io/pod-name']?.startsWith(name) ||
-                  meta.name?.startsWith(`${name}-`)) {
+              if (
+                owners.some((o: any) => o.kind === 'StatefulSet' && o.name === name) ||
+                (labels['statefulset.kubernetes.io/pod-name'] && new RegExp(`^${name}-\\d+$`).test(meta.name))
+              ) {
                 isMatch = true;
               }
             } else if (kind === 'daemonsets') {
-              const matchLabel = Object.entries(selectors).every(([k, v]) => labels[k] === v);
-              if ((matchLabel && Object.keys(selectors).length > 0) || meta.name?.startsWith(`${name}-`)) {
+              if (owners.some((o: any) => o.kind === 'DaemonSet' && o.name === name)) {
                 isMatch = true;
               }
             }

@@ -133,26 +133,21 @@ export const TopNav: React.FC<TopNavProps> = ({
           )}
         </div>
 
-        {/* Auto Refresh Toggle */}
-        <button
-          onClick={onToggleAutoRefresh}
-          className={`px-2.5 py-1 rounded-lg text-xs font-mono font-medium border transition-colors flex items-center gap-1.5 ${
-            autoRefresh
-              ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300'
-              : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
-          }`}
-          title="Toggle 4s Auto-Polling Refresh"
+        {/* Live Auto-Sync Status Badge (Active by Default) */}
+        <div
+          className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-emerald-950/40 border border-emerald-800/70 text-emerald-300 text-xs font-mono"
+          title="Cluster state is automatically synced every 3.5 seconds"
         >
-          <span className={`w-1.5 h-1.5 rounded-full ${autoRefresh ? 'bg-emerald-400' : 'bg-slate-500'}`} />
-          <span>Auto {autoRefresh ? 'ON' : 'OFF'}</span>
-        </button>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 pulse-dot shadow-sm shadow-emerald-400" />
+          <span>Auto-Sync Active</span>
+        </div>
 
         {/* Manual Refresh Button */}
         <button
           onClick={onRefresh}
           disabled={loading}
           className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-all disabled:opacity-50"
-          title="Refresh resources now"
+          title="Refresh resources immediately"
         >
           <RefreshCw size={15} className={loading ? 'animate-spin text-cyan-400' : ''} />
         </button>

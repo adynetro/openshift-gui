@@ -48,9 +48,9 @@ export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [copiedImage, setCopiedImage] = useState<string | null>(null);
 
-  const fetchDetails = useCallback(async () => {
+  const fetchDetails = useCallback(async (isBackground = false) => {
     try {
-      setLoading(true);
+      if (!isBackground) setLoading(true);
       setError(null);
       const res = await (window as any).electronAPI.getWorkloadDetails(item.kind, item.name, namespace);
       if (res.error) {
@@ -59,14 +59,18 @@ export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
         setDetails(res.details);
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to fetch workload details');
+      if (!isBackground) setError(err.message || 'Failed to fetch workload details');
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   }, [item.kind, item.name, namespace]);
 
   useEffect(() => {
-    fetchDetails();
+    fetchDetails(false);
+    const interval = setInterval(() => {
+      fetchDetails(true);
+    }, 3500);
+    return () => clearInterval(interval);
   }, [fetchDetails]);
 
   // Keyboard shortcut Esc to close
@@ -214,7 +218,7 @@ export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
             </button>
 
             <button
-              onClick={fetchDetails}
+              onClick={() => fetchDetails(false)}
               disabled={loading}
               className="p-1.5 rounded-lg bg-[#272822] hover:bg-[#3e3d32] text-[#75715e] hover:text-[#f8f8f2] border border-[#49483e] transition-colors disabled:opacity-50"
               title="Refresh workload details"
