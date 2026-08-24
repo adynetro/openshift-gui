@@ -15,6 +15,8 @@ import {
   Layers,
   KeyRound,
   Edit3,
+  ExternalLink,
+  Activity,
 } from 'lucide-react';
 import { ResourceKind, ResourceItem, ImageStreamResource } from '../../types/k8s.js';
 
@@ -47,15 +49,29 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
 }) => {
   const isAllProjects = !currentProject || currentProject === 'all-projects' || currentProject === '__all__';
 
+  const handleOpenExternal = (url: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const api = (window as any).electronAPI;
+      if (api && api.openExternal) {
+        api.openExternal(url);
+      } else {
+        window.open(url, '_blank');
+      }
+    } catch (err) {
+      console.error('Failed to open URL:', err);
+    }
+  };
+
   const getStatusBadge = (status: string, color?: string) => {
     const s = (status || '').toLowerCase();
     let bg = 'bg-slate-800 text-slate-300 border-slate-700';
     let Icon = Clock;
 
-    if (s === 'running' || s === 'active' || s === 'ready' || s === 'deployed' || s === 'admitted' || s === 'completed' || s === 'succeeded') {
+    if (s === 'running' || s === 'active' || s === 'ready' || s === 'deployed' || s === 'admitted' || s === 'completed' || s === 'succeeded' || s === 'normal') {
       bg = 'bg-emerald-950/60 text-emerald-300 border-emerald-800/80';
       Icon = CheckCircle2;
-    } else if (s.includes('crash') || s.includes('error') || s.includes('failed') || s.includes('unhealthy') || s.includes('notready')) {
+    } else if (s.includes('crash') || s.includes('error') || s.includes('failed') || s.includes('unhealthy') || s.includes('notready') || s === 'warning') {
       bg = 'bg-rose-950/60 text-rose-300 border-rose-800/80';
       Icon = XCircle;
     } else if (s.includes('pending') || s.includes('init') || s.includes('terminating') || s.includes('warning') || s.includes('degraded') || s.includes('superseded')) {
@@ -139,9 +155,18 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
       <table className="w-full text-left border-collapse text-xs">
         <thead className="sticky top-0 bg-[#0f172a] border-b border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider z-10 select-none shadow-sm">
           <tr>
-            <th className="py-3 px-4">Name</th>
+            <th className="py-3 px-4">{kind === 'events' ? 'Involved Object' : 'Name'}</th>
             {isAllProjects && kind !== 'nodes' && (
               <th className="py-3 px-3">Project</th>
+            )}
+            {kind === 'events' && (
+              <>
+                <th className="py-3 px-3">Type</th>
+                <th className="py-3 px-3">Reason</th>
+                <th className="py-3 px-4">Message</th>
+                <th className="py-3 px-3">Count</th>
+                <th className="py-3 px-3">Source</th>
+              </>
             )}
             {kind === 'pods' && (
               <>
@@ -178,7 +203,7 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
             )}
             {kind === 'routes' && (
               <>
-                <th className="py-3 px-3">Host</th>
+                <th className="py-3 px-3">Host & Route URL</th>
                 <th className="py-3 px-3">Path</th>
                 <th className="py-3 px-3">Service</th>
                 <th className="py-3 px-3">TLS</th>
@@ -225,7 +250,7 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                     : 'hover:bg-slate-800/40 text-slate-200'
                 }`}
               >
-                {/* Name */}
+                {/* Name / Involved Object */}
                 <td className="py-2.5 px-4 font-mono font-semibold text-slate-100 flex items-center gap-2">
                   <span
                     className={`w-2 h-2 rounded-full ${
@@ -244,6 +269,30 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                       {item.namespace || 'default'}
                     </span>
                   </td>
+                )}
+
+                {/* Event Columns */}
+                {kind === 'events' && (
+                  <>
+                    <td className="py-2.5 px-3">
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
+                          item.extra?.eventType === 'Warning'
+                            ? 'bg-rose-950/80 text-rose-300 border-rose-800'
+                            : 'bg-emerald-950/80 text-emerald-300 border-emerald-800'
+                        }`}
+                      >
+                        {item.extra?.eventType === 'Warning' ? <AlertTriangle size={11} /> : <CheckCircle2 size={11} />}
+                        <span>{item.extra?.eventType || 'Normal'}</span>
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 font-mono font-bold text-cyan-300">{item.status}</td>
+                    <td className="py-2.5 px-4 text-slate-300 font-mono text-[11px] max-w-[360px] truncate" title={item.extra?.message}>
+                      {item.extra?.message || '-'}
+                    </td>
+                    <td className="py-2.5 px-3 font-mono text-amber-300">{item.extra?.count ? `${item.extra.count}x` : '1x'}</td>
+                    <td className="py-2.5 px-3 font-mono text-slate-400 truncate max-w-[120px]">{item.extra?.source || '-'}</td>
+                  </>
                 )}
 
                 {/* Pod Columns */}
@@ -299,11 +348,26 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                   </>
                 )}
 
-                {/* Route Columns */}
+                {/* Route Columns with Clickable Direct External Links */}
                 {kind === 'routes' && (
                   <>
-                    <td className="py-2.5 px-3 font-mono text-cyan-300 truncate max-w-[220px]" title={item.extra?.host}>
-                      {item.extra?.host || '-'}
+                    <td className="py-2.5 px-3 font-mono text-cyan-300 truncate max-w-[260px]">
+                      {item.extra?.host && item.extra.host !== '-' ? (
+                        <button
+                          onClick={(e) => {
+                            const protocol = item.extra?.tls && item.extra.tls !== 'None' ? 'https' : 'http';
+                            const fullUrl = `${protocol}://${item.extra?.host || ''}${item.extra?.path || '/'}`;
+                            handleOpenExternal(fullUrl, e);
+                          }}
+                          className="hover:underline text-cyan-400 hover:text-cyan-300 flex items-center gap-1.5 font-bold group/link"
+                          title={`Open ${item.extra.host} in browser`}
+                        >
+                          <span className="truncate">{item.extra.host}</span>
+                          <ExternalLink size={12} className="opacity-70 group-hover/link:opacity-100 shrink-0" />
+                        </button>
+                      ) : (
+                        <span>-</span>
+                      )}
                     </td>
                     <td className="py-2.5 px-3 font-mono text-slate-400">{item.extra?.path || '/'}</td>
                     <td className="py-2.5 px-3 font-mono text-slate-300">{item.extra?.targetService || '-'}</td>
@@ -371,25 +435,32 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                 <td className="py-2.5 px-4 text-right">
                   <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
                     {/* Direct Edit YAML Button for Workloads */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onRowAction(kind === 'helm' ? 'helm-manage' : 'edit-yaml', item);
-                      }}
-                      className="px-2 py-1 rounded bg-slate-800 hover:bg-emerald-950 text-emerald-400 border border-slate-700 hover:border-emerald-500 transition-colors flex items-center gap-1 font-semibold"
-                      title="Edit Resource"
-                    >
-                      <Edit3 size={12} />
-                      <span>Edit</span>
-                    </button>
+                    {kind !== 'events' && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRowAction(kind === 'helm' ? 'helm-manage' : 'edit-yaml', item);
+                        }}
+                        className="px-2 py-1 rounded bg-slate-800 hover:bg-emerald-950 text-emerald-400 border border-slate-700 hover:border-emerald-500 transition-colors flex items-center gap-1 font-semibold"
+                        title="Edit Resource"
+                      >
+                        <Edit3 size={12} />
+                        <span>Edit</span>
+                      </button>
+                    )}
 
-                    {(kind === 'pods' || kind === 'deployments' || kind === 'deploymentconfigs') && (
+                    {/* Live Logs for Pods, Deployments, DeploymentConfigs, StatefulSets, DaemonSets */}
+                    {(kind === 'pods' ||
+                      kind === 'deployments' ||
+                      kind === 'deploymentconfigs' ||
+                      kind === 'statefulsets' ||
+                      kind === 'daemonsets') && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           onRowAction('logs', item);
                         }}
-                        className="px-2 py-1 rounded bg-slate-800 hover:bg-emerald-900/70 text-emerald-400 border border-slate-700 hover:border-emerald-500 transition-colors flex items-center gap-1"
+                        className="px-2 py-1 rounded bg-slate-800 hover:bg-emerald-900/70 text-emerald-400 border border-slate-700 hover:border-emerald-500 transition-colors flex items-center gap-1 font-semibold"
                         title="Stream Live Logs"
                       >
                         <Terminal size={12} />
@@ -461,16 +532,18 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                       <Code2 size={12} />
                     </button>
 
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onRowAction('delete', item);
-                      }}
-                      className="p-1 rounded bg-slate-800 hover:bg-rose-900/80 text-rose-400 hover:text-rose-200 border border-slate-700 hover:border-rose-500 transition-colors"
-                      title="Delete Resource"
-                    >
-                      <Trash2 size={12} />
-                    </button>
+                    {kind !== 'events' && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRowAction('delete', item);
+                        }}
+                        className="p-1 rounded bg-slate-800 hover:bg-rose-900/80 text-rose-400 hover:text-rose-200 border border-slate-700 hover:border-rose-500 transition-colors"
+                        title="Delete Resource"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

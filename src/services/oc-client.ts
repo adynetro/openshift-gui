@@ -74,6 +74,7 @@ export class OcClient {
     if (kind === 'statefulsets') cmdKind = 'sts';
     if (kind === 'daemonsets') cmdKind = 'ds';
     if (kind === 'configmaps') cmdKind = 'cm';
+    if (kind === 'events') cmdKind = 'events';
 
     const cmd = `oc get ${cmdKind} ${nsFlag} -o json || kubectl get ${cmdKind} ${nsFlag} -o json`;
     const { stdout, stderr } = await this.runCommand(cmd);
@@ -116,9 +117,9 @@ export class OcClient {
    * Transforms raw Kubernetes/OpenShift JSON items to normalized ResourceItem format.
    */
   static transformResources(kind: ResourceKind, items: any[], namespace: string): ResourceItem[] {
-    return items.map((raw: any) => {
+    const transformed = items.map((raw: any) => {
       const name = raw.metadata?.name || 'unknown';
-      const ns = raw.metadata?.namespace || (namespace === 'all-projects' ? 'default' : namespace) || 'default';
+      const ns = raw.metadata?.namespace || raw.involvedObject?.namespace || (namespace === 'all-projects' ? 'default' : namespace) || 'default';
       const creationTimestamp = raw.metadata?.creationTimestamp;
       const age = formatAge(creationTimestamp);
 
@@ -263,7 +264,7 @@ export class OcClient {
             namespace: ns,
             kind,
             status: type,
-            statusColor: 'cyan',
+            statusColor: 'cyan' as const,
             age,
             ip: clusterIP,
             extra: { ports },
@@ -289,7 +290,7 @@ export class OcClient {
             namespace: ns,
             kind,
             status,
-            statusColor: admitted ? 'green' : 'yellow',
+            statusColor: (admitted ? 'green' : 'yellow') as 'green' | 'yellow',
             age,
             extra: { host, path, targetService, tls },
             labels: raw.metadata?.labels || {},
@@ -323,7 +324,7 @@ export class OcClient {
             namespace: ns,
             kind,
             status: `${sortedTags.length} tags`,
-            statusColor: sortedTags.length > 0 ? 'green' : 'gray',
+            statusColor: (sortedTags.length > 0 ? 'green' : 'gray') as 'green' | 'gray',
             age,
             tags: sortedTags,
             tagCount: sortedTags.length,
@@ -346,7 +347,7 @@ export class OcClient {
             namespace: ns,
             kind,
             status: `${dataCount} keys`,
-            statusColor: 'cyan',
+            statusColor: 'cyan' as const,
             age,
             extra: { dataCount, type: raw.type || 'Opaque' },
             labels: raw.metadata?.labels || {},
@@ -370,9 +371,45 @@ export class OcClient {
             namespace: '',
             kind,
             status: isReady ? 'Ready' : 'NotReady',
-            statusColor: isReady ? 'green' : 'red',
+            statusColor: (isReady ? 'green' : 'red') as 'green' | 'red',
             age,
             extra: { roles, version: kubeletVersion },
+            labels: raw.metadata?.labels || {},
+            raw,
+          };
+        }
+
+        case 'events': {
+          const eventType = raw.type || 'Normal';
+          const reason = raw.reason || 'Event';
+          const message = raw.message || '';
+          const count = raw.count || 1;
+          const objectKind = raw.involvedObject?.kind || 'Object';
+          const objectName = raw.involvedObject?.name || name;
+          const sourceComponent = raw.source?.component || raw.reportingComponent || '-';
+          const timestamp = raw.lastTimestamp || raw.eventTime || raw.metadata?.creationTimestamp;
+          const eventAge = formatAge(timestamp);
+
+          return {
+            id: `${ns}/${name}`,
+            name: `${objectKind}/${objectName}`,
+            namespace: ns,
+            kind: 'events' as const,
+            status: reason,
+            statusColor: (eventType === 'Warning' ? 'red' : 'green') as 'red' | 'green',
+            age: eventAge,
+            extra: {
+              eventType,
+              reason,
+              message,
+              count,
+              source: sourceComponent,
+              objectKind,
+              objectName,
+              firstSeen: raw.firstTimestamp,
+              lastSeen: timestamp,
+              rawTimestamp: timestamp ? new Date(timestamp).getTime() : 0,
+            },
             labels: raw.metadata?.labels || {},
             raw,
           };
@@ -385,13 +422,20 @@ export class OcClient {
             namespace: ns,
             kind,
             status: 'Active',
-            statusColor: 'green',
+            statusColor: 'green' as const,
             age,
             labels: raw.metadata?.labels || {},
             raw,
           };
       }
     });
+
+    if (kind === 'events') {
+      // Sort newest events first
+      transformed.sort((a, b) => (b.extra?.rawTimestamp || 0) - (a.extra?.rawTimestamp || 0));
+    }
+
+    return transformed;
   }
 
   /**
@@ -404,6 +448,7 @@ export class OcClient {
     if (kind === 'statefulsets') cmdKind = 'sts';
     if (kind === 'daemonsets') cmdKind = 'ds';
     if (kind === 'configmaps') cmdKind = 'cm';
+    if (kind === 'events') cmdKind = 'event';
 
     const nsFlag = namespace && namespace !== 'all-projects' ? `-n "${namespace}"` : '';
     const cmd = `oc describe ${cmdKind} "${name}" ${nsFlag} || kubectl describe ${cmdKind} "${name}" ${nsFlag}`;
@@ -421,6 +466,7 @@ export class OcClient {
     if (kind === 'statefulsets') cmdKind = 'sts';
     if (kind === 'daemonsets') cmdKind = 'ds';
     if (kind === 'configmaps') cmdKind = 'cm';
+    if (kind === 'events') cmdKind = 'event';
 
     const nsFlag = namespace && namespace !== 'all-projects' ? `-n "${namespace}"` : '';
     const cmd = `oc get ${cmdKind} "${name}" ${nsFlag} -o yaml || kubectl get ${cmdKind} "${name}" ${nsFlag} -o yaml`;
@@ -541,6 +587,7 @@ export class OcClient {
     if (kind === 'statefulsets') cmdKind = 'sts';
     if (kind === 'daemonsets') cmdKind = 'ds';
     if (kind === 'configmaps') cmdKind = 'cm';
+    if (kind === 'events') cmdKind = 'event';
 
     const nsFlag = namespace && namespace !== 'all-projects' ? `-n "${namespace}"` : '';
     const cmd = `oc delete ${cmdKind} "${name}" ${nsFlag} || kubectl delete ${cmdKind} "${name}" ${nsFlag}`;

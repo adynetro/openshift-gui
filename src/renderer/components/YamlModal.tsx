@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Code2, FileText, Copy, Check, RefreshCw } from 'lucide-react';
+import { X, Code2, FileText, Copy, Check, RefreshCw, Edit3 } from 'lucide-react';
 import CodeMirror from '@uiw/react-codemirror';
 import { yaml } from '@codemirror/lang-yaml';
 import { monokai } from '@uiw/codemirror-theme-monokai';
@@ -10,9 +10,10 @@ interface YamlModalProps {
   item: ResourceItem;
   namespace: string;
   onClose: () => void;
+  onEdit?: () => void;
 }
 
-export const YamlModal: React.FC<YamlModalProps> = ({ mode, item, namespace, onClose }) => {
+export const YamlModal: React.FC<YamlModalProps> = ({ mode, item, namespace, onClose, onEdit }) => {
   const [content, setContent] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [copied, setCopied] = useState<boolean>(false);
@@ -28,6 +29,7 @@ export const YamlModal: React.FC<YamlModalProps> = ({ mode, item, namespace, onC
         if (cmdKind === 'statefulsets') cmdKind = 'sts';
         if (cmdKind === 'daemonsets') cmdKind = 'ds';
         if (cmdKind === 'configmaps') cmdKind = 'cm';
+        if (cmdKind === 'events') cmdKind = 'event';
 
         if (mode === 'yaml') {
           text = await (window as any).electronAPI.getYaml(cmdKind, item.name, namespace);
@@ -71,9 +73,21 @@ export const YamlModal: React.FC<YamlModalProps> = ({ mode, item, namespace, onC
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Direct Edit YAML Button in YAML View */}
+            {mode === 'yaml' && onEdit && item.kind !== 'nodes' && item.kind !== 'events' && (
+              <button
+                onClick={onEdit}
+                className="px-3 py-1.5 rounded-lg bg-[#a6e22e] hover:bg-[#a6e22e]/80 text-[#272822] text-xs font-bold flex items-center gap-1.5 shadow transition-all"
+                title="Open interactive in-app editor"
+              >
+                <Edit3 size={13} />
+                <span>Edit YAML</span>
+              </button>
+            )}
+
             <button
               onClick={handleCopy}
-              className="px-2.5 py-1 rounded bg-[#272822] hover:bg-[#3e3d32] text-[#f8f8f2] text-xs font-medium flex items-center gap-1 border border-[#49483e] transition-colors"
+              className="px-2.5 py-1.5 rounded bg-[#272822] hover:bg-[#3e3d32] text-[#f8f8f2] text-xs font-medium flex items-center gap-1 border border-[#49483e] transition-colors"
             >
               {copied ? <Check size={13} className="text-[#a6e22e]" /> : <Copy size={13} />}
               <span>{copied ? 'Copied' : 'Copy'}</span>

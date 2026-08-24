@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, X, Zap, Terminal, Sparkles, RefreshCw, SlidersHorizontal, FileText, Code2, Trash2, Edit3, Filter, Eraser } from 'lucide-react';
+import { Search, X, Zap, Terminal, Sparkles, RefreshCw, SlidersHorizontal, FileText, Code2, Trash2, Edit3, Filter, Eraser, Activity } from 'lucide-react';
 import { ResourceKind, ResourceItem } from '../../types/k8s.js';
 
 interface SearchBarProps {
@@ -31,16 +31,25 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   const getActionPills = () => {
     const pills: { id: string; label: string; icon: any; color: string; disabled?: boolean }[] = [];
 
-    // Edit YAML action available for all resources
-    pills.push({
-      id: 'edit-yaml',
-      label: 'Edit YAML',
-      icon: Edit3,
-      color: 'hover:border-emerald-500 hover:text-emerald-300 hover:bg-emerald-950/40 text-emerald-400 border-emerald-900/50 bg-emerald-950/20 font-semibold',
-      disabled: !selectedItem,
-    });
+    // Edit YAML action available for all workloads
+    if (currentKind !== 'events' && currentKind !== 'nodes') {
+      pills.push({
+        id: 'edit-yaml',
+        label: 'Edit YAML',
+        icon: Edit3,
+        color: 'hover:border-emerald-500 hover:text-emerald-300 hover:bg-emerald-950/40 text-emerald-400 border-emerald-900/50 bg-emerald-950/20 font-semibold',
+        disabled: !selectedItem,
+      });
+    }
 
-    if (currentKind === 'pods' || currentKind === 'deployments' || currentKind === 'deploymentconfigs') {
+    // Live logs for pods, deployments, deploymentconfigs, statefulsets, daemonsets
+    if (
+      currentKind === 'pods' ||
+      currentKind === 'deployments' ||
+      currentKind === 'deploymentconfigs' ||
+      currentKind === 'statefulsets' ||
+      currentKind === 'daemonsets'
+    ) {
       pills.push({
         id: 'logs',
         label: 'Live Logs',
@@ -110,13 +119,15 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       disabled: !selectedItem,
     });
 
-    pills.push({
-      id: 'delete',
-      label: 'Delete',
-      icon: Trash2,
-      color: 'hover:border-red-500 hover:text-red-300 hover:bg-red-950/40 text-red-400 border-red-900/50 bg-red-950/20',
-      disabled: !selectedItem,
-    });
+    if (currentKind !== 'events') {
+      pills.push({
+        id: 'delete',
+        label: 'Delete',
+        icon: Trash2,
+        color: 'hover:border-red-500 hover:text-red-300 hover:bg-red-950/40 text-red-400 border-red-900/50 bg-red-950/20',
+        disabled: !selectedItem,
+      });
+    }
 
     return pills;
   };
@@ -136,7 +147,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             type="text"
             value={query}
             onChange={(e) => onChangeQuery(e.target.value)}
-            placeholder={`Filter ${currentKind} by name, IP, node, labels (press '/' to focus)...`}
+            placeholder={`Filter ${currentKind === 'events' ? 'events by message, reason, object' : currentKind} by name, IP, node, labels (press '/' to focus)...`}
             className="w-full pl-9 pr-8 py-1.5 bg-slate-900 border border-slate-700 focus:border-cyan-500 rounded-lg text-xs text-slate-100 placeholder-slate-500 shadow-inner transition-colors"
           />
 
@@ -153,16 +164,26 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         {/* Status Filter Dropdown */}
         <div className="flex items-center gap-1.5 bg-slate-900 px-2.5 py-1.5 rounded-lg border border-slate-700 text-xs">
           <Filter size={13} className="text-slate-400" />
-          <span className="text-slate-400 text-[11px] font-semibold">Status:</span>
+          <span className="text-slate-400 text-[11px] font-semibold">{currentKind === 'events' ? 'Event Type:' : 'Status:'}</span>
           <select
             value={statusFilter}
             onChange={(e) => onChangeStatusFilter(e.target.value)}
             className="bg-transparent text-xs text-slate-200 font-mono outline-none cursor-pointer"
           >
             <option value="ALL" className="bg-slate-900 text-slate-200">
-              All Statuses
+              {currentKind === 'events' ? 'All Events' : 'All Statuses'}
             </option>
-            {availableStatuses.map((st) => (
+            {currentKind === 'events' && (
+              <>
+                <option value="Warning" className="bg-slate-900 text-rose-300">
+                  ⚠️ Warnings Only
+                </option>
+                <option value="Normal" className="bg-slate-900 text-emerald-300">
+                  ✓ Normal Only
+                </option>
+              </>
+            )}
+            {currentKind !== 'events' && availableStatuses.map((st) => (
               <option key={st} value={st} className="bg-slate-900 text-slate-200">
                 {st}
               </option>

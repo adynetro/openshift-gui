@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 export interface IpcApi {
+  openExternal: (url: string) => Promise<void>;
   getContexts: () => Promise<{ contexts: any[]; currentContext: string | null }>;
   switchContext: (contextName: string) => Promise<boolean>;
   getProjects: () => Promise<any[]>;
@@ -28,6 +29,7 @@ export interface IpcApi {
 }
 
 const api: IpcApi = {
+  openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
   getContexts: () => ipcRenderer.invoke('kube:getContexts'),
   switchContext: (ctx) => ipcRenderer.invoke('kube:switchContext', ctx),
   getProjects: () => ipcRenderer.invoke('kube:getProjects'),

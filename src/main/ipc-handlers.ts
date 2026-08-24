@@ -5,10 +5,17 @@ import { HelmService } from '../services/helm.js';
 import { LogStreamer, LogEntry } from '../services/log-streamer.js';
 import { ResourceKind } from '../types/k8s.js';
 
-const { ipcMain } = electron;
+const { ipcMain, shell } = electron;
 const activeStreamers = new Map<string, LogStreamer>();
 
 export function registerIpcHandlers(mainWindow: electron.BrowserWindow): void {
+  // External Browser Link Handler
+  ipcMain.handle('shell:openExternal', async (_event, url: string) => {
+    if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+      await shell.openExternal(url);
+    }
+  });
+
   // Kubeconfig / Cluster Handlers
   ipcMain.handle('kube:getContexts', async () => {
     return await KubeConfigService.getContexts();

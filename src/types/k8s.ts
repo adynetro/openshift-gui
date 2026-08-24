@@ -10,7 +10,8 @@ export type ResourceKind =
   | 'configmaps'
   | 'secrets'
   | 'helm'
-  | 'nodes';
+  | 'nodes'
+  | 'events';
 
 export interface ResourceItem {
   id: string;

@@ -118,9 +118,9 @@ export const App: React.FC = () => {
     if (!autoRefresh) return;
     const interval = setInterval(() => {
       fetchResources(true);
-    }, 4000);
+    }, currentKind === 'events' ? 2500 : 4000);
     return () => clearInterval(interval);
-  }, [autoRefresh, fetchResources]);
+  }, [autoRefresh, currentKind, fetchResources]);
 
   // Available statuses in current resource list
   const availableStatuses = useMemo(() => {
@@ -146,17 +146,21 @@ export const App: React.FC = () => {
 
     // Filter by status if selected
     if (statusFilter !== 'ALL') {
-      items = items.filter((item) => item.status === statusFilter);
+      if (currentKind === 'events') {
+        items = items.filter((item) => item.extra?.eventType === statusFilter);
+      } else {
+        items = items.filter((item) => item.status === statusFilter);
+      }
     }
 
     // Filter by search query
     if (query.trim()) {
-      const matcher = new FuzzyMatcher(items, ['name', 'status', 'namespace', 'ip', 'node', 'age']);
+      const matcher = new FuzzyMatcher(items, ['name', 'status', 'namespace', 'ip', 'node', 'age', 'extra.message', 'extra.reason']);
       items = matcher.search(query);
     }
 
     return items;
-  }, [resources, statusFilter, query]);
+  }, [resources, statusFilter, query, currentKind]);
 
   // Handle Clear Completed & Failed Pods
   const handleClearCompletedFailedPods = async () => {
@@ -280,6 +284,7 @@ export const App: React.FC = () => {
       else if (e.key === '3') setCurrentKind('deploymentconfigs');
       else if (e.key === '4') setCurrentKind('statefulsets');
       else if (e.key === '5') setCurrentKind('daemonsets');
+      else if (e.key === 'e') setCurrentKind('events');
       else if (e.key === '6') setCurrentKind('routes');
       else if (e.key === '7') setCurrentKind('services');
       else if (e.key === '8') setCurrentKind('imagestreams');
@@ -419,13 +424,14 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Read-Only YAML / Describe Modal */}
+      {/* Read-Only YAML / Describe Modal with direct Edit Button */}
       {(modalMode === 'yaml' || modalMode === 'describe') && selectedItem && (
         <YamlModal
           mode={modalMode}
           item={selectedItem}
           namespace={selectedItem.namespace || currentProject}
           onClose={() => setModalMode('none')}
+          onEdit={() => setModalMode('edit-yaml')}
         />
       )}
 
