@@ -332,6 +332,20 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleNavigate = (kind: ResourceKind, searchTarget?: string, targetNs?: string) => {
+    if (targetNs && targetNs !== currentProject && currentProject !== 'all-projects') {
+      const isCluster = kind === 'nodes' || kind === 'pv' || kind === 'crd' || kind === 'clusteroperators';
+      if (!isCluster) {
+        handleSwitchProject(targetNs);
+      }
+    }
+    setCurrentKind(kind);
+    if (searchTarget) {
+      setQuery(searchTarget);
+    }
+    showToast(`Navigated to ${kind}${searchTarget ? `: ${searchTarget}` : ''}`);
+  };
+
   // Keyboard shortcut listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -360,6 +374,7 @@ export const App: React.FC = () => {
       else if (e.key === '6') setCurrentKind('daemonsets');
       else if (e.key === '7') setCurrentKind('routes');
       else if (e.key === '8') setCurrentKind('services');
+      else if (e.key === 'w') setCurrentKind('networkpolicies');
       else if (e.key === '9') setCurrentKind('pvc');
       else if (e.key === '0') setCurrentKind('pv');
       else if (e.key === 'k') setCurrentKind('crd');
@@ -467,6 +482,7 @@ export const App: React.FC = () => {
                 error={fetchError}
                 isUnauthorized={isUnauthorized}
                 onRowAction={(action, item) => handleAction(action, item)}
+                onNavigate={handleNavigate}
                 onOpenContextModal={() => {
                   loadKubeInfo();
                   openModal('context');

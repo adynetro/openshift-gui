@@ -20,6 +20,9 @@ import {
   Boxes,
   SquareTerminal,
   ScrollText,
+  Copy,
+  HardDrive,
+  Network,
 } from 'lucide-react';
 import { ResourceKind, ResourceItem, ImageStreamResource } from '../../types/k8s.js';
 
@@ -33,6 +36,7 @@ interface ResourceTableProps {
   error?: string | null;
   isUnauthorized?: boolean;
   onRowAction: (actionType: string, item: ResourceItem) => void;
+  onNavigate?: (kind: ResourceKind, searchTarget?: string, targetNs?: string) => void;
   onOpenContextModal?: () => void;
   onRetry?: () => void;
 }
@@ -47,6 +51,7 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
   error,
   isUnauthorized,
   onRowAction,
+  onNavigate,
   onOpenContextModal,
   onRetry,
 }) => {
@@ -202,6 +207,7 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
               <>
                 <th className="py-3 px-3">Type</th>
                 <th className="py-3 px-3">Cluster IP</th>
+                <th className="py-3 px-3">Internal FQDN</th>
                 <th className="py-3 px-3">Ports</th>
               </>
             )}
@@ -212,6 +218,14 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                 <th className="py-3 px-3">Service</th>
                 <th className="py-3 px-3">TLS</th>
                 <th className="py-3 px-3">Status</th>
+              </>
+            )}
+            {kind === 'networkpolicies' && (
+              <>
+                <th className="py-3 px-3">Policy Types</th>
+                <th className="py-3 px-3">Pod Selector</th>
+                <th className="py-3 px-3">Ingress</th>
+                <th className="py-3 px-3">Egress</th>
               </>
             )}
             {kind === 'imagestreams' && (
@@ -456,18 +470,40 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                 {kind === 'services' && (
                   <>
                     <td className="py-2.5 px-3">
-                      <span className="px-2 py-0.5 rounded bg-purple-950/60 text-purple-300 border border-purple-800 text-[11px] font-mono">
+                      <span className="px-2 py-0.5 rounded bg-purple-950/60 text-purple-300 border border-purple-800 text-[11px] font-mono font-bold">
                         {item.status}
                       </span>
                     </td>
                     <td className="py-2.5 px-3 font-mono text-slate-400">{item.ip || '-'}</td>
+                    <td className="py-2.5 px-3 font-mono">
+                      <div className="flex items-center gap-1.5 group/fqdn">
+                        <span
+                          className="text-cyan-300 font-semibold select-all text-xs truncate max-w-[260px]"
+                          title={item.extra?.fqdn || `${item.name}.${item.namespace || 'default'}.svc.cluster.local`}
+                        >
+                          {item.extra?.fqdn || `${item.name}.${item.namespace || 'default'}.svc.cluster.local`}
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(
+                              item.extra?.fqdn || `${item.name}.${item.namespace || 'default'}.svc.cluster.local`
+                            );
+                          }}
+                          className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-[#a6e22e] opacity-60 group-hover/fqdn:opacity-100 transition-all shrink-0"
+                          title="Copy full internal FQDN"
+                        >
+                          <Copy size={11} />
+                        </button>
+                      </div>
+                    </td>
                     <td className="py-2.5 px-3 font-mono text-amber-300 truncate max-w-[200px]" title={item.extra?.ports}>
                       {item.extra?.ports || '-'}
                     </td>
                   </>
                 )}
 
-                {/* Route Columns with Clickable Direct External Links */}
+                {/* Route Columns with Clickable Direct External Links & Target Service Link */}
                 {kind === 'routes' && (
                   <>
                     <td className="py-2.5 px-3 font-mono text-cyan-300 truncate max-w-[260px]">
@@ -489,13 +525,49 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                       )}
                     </td>
                     <td className="py-2.5 px-3 font-mono text-slate-400">{item.extra?.path || '/'}</td>
-                    <td className="py-2.5 px-3 font-mono text-slate-300">{item.extra?.targetService || '-'}</td>
+                    <td className="py-2.5 px-3 font-mono text-slate-300">
+                      {item.extra?.targetService && item.extra.targetService !== '-' ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onNavigate && item.extra?.targetService) {
+                              onNavigate('services', item.extra.targetService, item.namespace);
+                            }
+                          }}
+                          className="font-mono text-cyan-300 hover:text-cyan-100 hover:underline flex items-center gap-1.5 cursor-pointer font-bold transition-colors"
+                          title={`Jump to Service ${item.extra.targetService}`}
+                        >
+                          <Network size={12} className="text-cyan-400 shrink-0" />
+                          <span>{item.extra.targetService}</span>
+                        </button>
+                      ) : (
+                        <span className="text-slate-500">-</span>
+                      )}
+                    </td>
                     <td className="py-2.5 px-3">
                       <span className="px-1.5 py-0.5 rounded bg-slate-800 text-yellow-300 font-mono text-[10px]">
                         {item.extra?.tls || 'None'}
                       </span>
                     </td>
                     <td className="py-2.5 px-3">{getStatusBadge(item.status, item.statusColor)}</td>
+                  </>
+                )}
+
+                {/* NetworkPolicy Columns */}
+                {kind === 'networkpolicies' && (
+                  <>
+                    <td className="py-2.5 px-3">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-950/70 text-cyan-300 border border-cyan-800 font-mono">
+                        {item.extra?.types || 'Ingress'}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 font-mono text-slate-300 truncate max-w-[280px]" title={item.extra?.podSelector}>
+                      <span className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-xs">
+                        {item.extra?.podSelector || 'All Pods ({})'}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 font-mono text-emerald-300">{item.extra?.ingressRulesCount ?? 0} rules</td>
+                    <td className="py-2.5 px-3 font-mono text-purple-300">{item.extra?.egressRulesCount ?? 0} rules</td>
                   </>
                 )}
 
@@ -538,12 +610,28 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                   </>
                 )}
 
-                {/* PersistentVolumeClaim Columns */}
+                {/* PersistentVolumeClaim Columns with Clickable Jump to Bound PV */}
                 {kind === 'pvc' && (
                   <>
                     <td className="py-2.5 px-3">{getStatusBadge(item.status, item.statusColor)}</td>
                     <td className="py-2.5 px-3 font-mono text-cyan-300 truncate max-w-[200px]" title={item.extra?.volume}>
-                      {item.extra?.volume || '-'}
+                      {item.extra?.volume && item.extra.volume !== '-' ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onNavigate && item.extra?.volume) {
+                              onNavigate('pv', item.extra.volume);
+                            }
+                          }}
+                          className="font-mono text-cyan-300 hover:text-cyan-100 hover:underline flex items-center gap-1.5 cursor-pointer font-bold transition-colors truncate max-w-[200px]"
+                          title={`Jump to PersistentVolume ${item.extra.volume}`}
+                        >
+                          <HardDrive size={12} className="text-cyan-400 shrink-0" />
+                          <span className="truncate">{item.extra.volume}</span>
+                        </button>
+                      ) : (
+                        <span className="text-slate-500">-</span>
+                      )}
                     </td>
                     <td className="py-2.5 px-3 font-mono font-bold text-slate-200">{item.extra?.capacity || '-'}</td>
                     <td className="py-2.5 px-3 font-mono text-amber-300">{item.extra?.accessModes || '-'}</td>

@@ -7,6 +7,7 @@ export type ResourceKind =
   | 'daemonsets'
   | 'services'
   | 'routes'
+  | 'networkpolicies'
   | 'pvc'
   | 'pv'
   | 'crd'

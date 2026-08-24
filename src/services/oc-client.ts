@@ -79,6 +79,7 @@ export class OcClient {
     if (kind === 'pvc') cmdKind = 'pvc';
     if (kind === 'pv') cmdKind = 'pv';
     if (kind === 'crd') cmdKind = 'crd';
+    if (kind === 'networkpolicies') cmdKind = 'netpol';
     if (kind === 'clusteroperators') cmdKind = 'co';
 
     const cmd = `oc get ${cmdKind} ${nsFlag} -o json || kubectl get ${cmdKind} ${nsFlag} -o json`;
@@ -262,6 +263,7 @@ export class OcClient {
           const ports = (raw.spec?.ports || [])
             .map((p: any) => `${p.port}${p.nodePort ? `:${p.nodePort}` : ''}/${p.protocol || 'TCP'}`)
             .join(', ');
+          const fqdn = `${name}.${ns || 'default'}.svc.cluster.local`;
 
           return {
             id: `${ns}/${name}`,
@@ -272,7 +274,7 @@ export class OcClient {
             statusColor: 'cyan' as const,
             age,
             ip: clusterIP,
-            extra: { ports },
+            extra: { ports, clusterIP, type, fqdn },
             labels: raw.metadata?.labels || {},
             raw,
           };
@@ -298,6 +300,39 @@ export class OcClient {
             statusColor: (admitted ? 'green' : 'yellow') as 'green' | 'yellow',
             age,
             extra: { host, path, targetService, tls },
+            labels: raw.metadata?.labels || {},
+            raw,
+          };
+        }
+
+        case 'networkpolicies': {
+          const policyTypes = raw.spec?.policyTypes || ['Ingress'];
+          const types = policyTypes.join(', ');
+          const matchLabels = raw.spec?.podSelector?.matchLabels || {};
+          const podSelector =
+            Object.keys(matchLabels).length > 0
+              ? Object.entries(matchLabels)
+                  .map(([k, v]) => `${k}=${v}`)
+                  .join(', ')
+              : 'All Pods ({})';
+          const ingressRulesCount = (raw.spec?.ingress || []).length;
+          const egressRulesCount = (raw.spec?.egress || []).length;
+
+          return {
+            id: `${ns}/${name}`,
+            name,
+            namespace: ns,
+            kind,
+            status: types,
+            statusColor: 'cyan' as const,
+            age,
+            extra: {
+              types,
+              podSelector,
+              ingressRulesCount,
+              egressRulesCount,
+              policyTypes,
+            },
             labels: raw.metadata?.labels || {},
             raw,
           };

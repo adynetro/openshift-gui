@@ -16,6 +16,7 @@ import {
   Database,
   Boxes,
   ShieldCheck,
+  Shield,
 } from 'lucide-react';
 import { ResourceKind } from '../../types/k8s.js';
 
@@ -63,6 +64,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { kind: 'routes', label: 'Routes', icon: Network, hotkey: '7', badgeText: 'OpenShift', badgeColor: 'bg-red-950 text-red-300 border-red-800' },
       { kind: 'services', label: 'Services', icon: Network, hotkey: '8' },
+      { kind: 'networkpolicies', label: 'NetworkPolicies', icon: Shield, hotkey: 'w', badgeText: 'Security', badgeColor: 'bg-cyan-950 text-cyan-300 border-cyan-800' },
     ],
   },
   {
