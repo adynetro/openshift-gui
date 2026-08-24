@@ -1,6 +1,6 @@
 {
   "name": "openshift-gui",
-  "version": "0.2.0",
+  "version": "1.1.0",
   "description": "Modern Graphical Desktop GUI & CLI for OpenShift and Kubernetes with Helm & SemVer ImageStream Cleanup",
   "bin": {
     "openshift-gui": "./bin/openshift-gui.js",
