@@ -87,7 +87,12 @@ export const ActionDialog: React.FC<ActionDialogProps> = ({
   const Icon = config.icon;
 
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150"
+    >
       <div className={`bg-[#0f172a] border ${config.borderColor} rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col`}>
         {/* Header */}
         <div className="p-4 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between">
@@ -103,8 +108,13 @@ export const ActionDialog: React.FC<ActionDialogProps> = ({
             </div>
           </div>
 
-          <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
-            <X size={16} />
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-rose-950/80 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-700/80 flex items-center justify-center transition-all cursor-pointer shadow-sm shrink-0"
+            title="Close window (Esc or click backdrop)"
+            aria-label="Close window"
+          >
+            <X size={18} />
           </button>
         </div>
 

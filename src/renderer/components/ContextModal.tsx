@@ -42,7 +42,12 @@ export const ContextModal: React.FC<ContextModalProps> = ({
   const Icon = mode === 'context' ? Layers : FolderGit2;
 
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150"
+    >
       <div className="bg-[#0f172a] border border-cyan-500/40 rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="p-4 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between">
@@ -58,8 +63,13 @@ export const ContextModal: React.FC<ContextModalProps> = ({
             </div>
           </div>
 
-          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
-            <X size={18} />
+          <button
+            onClick={onClose}
+            className="w-9 h-9 rounded-lg bg-slate-800 hover:bg-rose-950/80 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-700/80 flex items-center justify-center transition-all cursor-pointer shadow-sm shrink-0 ml-1"
+            title="Close window (Esc or click backdrop)"
+            aria-label="Close window"
+          >
+            <X size={20} />
           </button>
         </div>
 

@@ -118,7 +118,12 @@ export const EditYamlModal: React.FC<EditYamlModalProps> = ({
   const isDirty = yamlText !== originalYaml;
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 z-50 animate-in fade-in duration-150">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 z-50 animate-in fade-in duration-150"
+    >
       <div className="bg-[#1e1f1c] border border-[#49483e] rounded-xl shadow-2xl w-[96vw] max-w-[1750px] h-[94vh] flex flex-col overflow-hidden">
         {/* Monokai Header */}
         <div className="p-3 bg-[#272822] border-b border-[#3e3d32] flex items-center justify-between">
@@ -153,7 +158,7 @@ export const EditYamlModal: React.FC<EditYamlModalProps> = ({
             {isDirty && (
               <button
                 onClick={handleReset}
-                className="px-2.5 py-1 rounded bg-[#272822] hover:bg-[#3e3d32] text-[#f8f8f2] text-xs font-medium flex items-center gap-1 border border-[#49483e] transition-colors"
+                className="px-2.5 py-1.5 rounded-lg bg-[#272822] hover:bg-[#3e3d32] text-[#f8f8f2] text-xs font-medium flex items-center gap-1 border border-[#49483e] transition-colors cursor-pointer"
                 title="Reset to original"
               >
                 <RotateCcw size={12} />
@@ -163,7 +168,7 @@ export const EditYamlModal: React.FC<EditYamlModalProps> = ({
 
             <button
               onClick={handleCopy}
-              className="px-2.5 py-1 rounded bg-[#272822] hover:bg-[#3e3d32] text-[#f8f8f2] text-xs font-medium flex items-center gap-1 border border-[#49483e] transition-colors"
+              className="px-2.5 py-1.5 rounded-lg bg-[#272822] hover:bg-[#3e3d32] text-[#f8f8f2] text-xs font-medium flex items-center gap-1 border border-[#49483e] transition-colors cursor-pointer"
             >
               {copied ? <Check size={13} className="text-[#a6e22e]" /> : <Copy size={13} />}
               <span>{copied ? 'Copied' : 'Copy'}</span>
@@ -172,7 +177,7 @@ export const EditYamlModal: React.FC<EditYamlModalProps> = ({
             <button
               onClick={handleSave}
               disabled={saving || loading || !!validationError}
-              className="px-3.5 py-1 rounded-lg bg-[#a6e22e] hover:bg-[#a6e22e]/80 text-[#272822] text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-black/40 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              className="px-3.5 py-1.5 rounded-lg bg-[#a6e22e] hover:bg-[#a6e22e]/80 text-[#272822] text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-black/40 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
               title="Save changes and apply to cluster (Cmd+S)"
             >
               {saving ? <RefreshCw size={13} className="animate-spin" /> : <Save size={13} />}
@@ -181,9 +186,11 @@ export const EditYamlModal: React.FC<EditYamlModalProps> = ({
 
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-[#75715e] hover:text-[#f8f8f2] hover:bg-[#3e3d32] transition-colors"
+              className="w-9 h-9 rounded-lg bg-[#272822] hover:bg-rose-950/80 text-[#75715e] hover:text-rose-300 border border-[#49483e] hover:border-rose-700/80 flex items-center justify-center transition-all cursor-pointer shadow-sm shrink-0 ml-1"
+              title="Close window (Esc or click backdrop)"
+              aria-label="Close window"
             >
-              <X size={18} />
+              <X size={20} />
             </button>
           </div>
         </div>
