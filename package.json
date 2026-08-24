@@ -1,0 +1,58 @@
+{
+  "name": "openshift-gui",
+  "version": "0.1.0",
+  "description": "Interactive Modern Terminal UI for OpenShift and Kubernetes CLI with Helm & SemVer ImageStream Cleanup",
+  "bin": {
+    "openshift-gui": "./bin/openshift-gui.js",
+    "oc-gui": "./bin/openshift-gui.js"
+  },
+  "main": "dist/index.js",
+  "type": "module",
+  "files": [
+    "bin",
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "start": "node bin/openshift-gui.js",
+    "dev": "tsx src/index.tsx",
+    "test": "node --test dist/**/*.test.js",
+    "release": "node scripts/build-release.js"
+  },
+  "keywords": [
+    "openshift",
+    "kubernetes",
+    "cli",
+    "tui",
+    "ink",
+    "helm",
+    "imagestream",
+    "semver"
+  ],
+  "author": "Alexandru Chiscari",
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^5.4.1",
+    "commander": "^13.1.0",
+    "figures": "^6.1.0",
+    "fuse.js": "^7.1.0",
+    "ink": "^5.1.0",
+    "ink-select-input": "^6.0.0",
+    "ink-spinner": "^5.0.0",
+    "ink-text-input": "^6.0.0",
+    "react": "^18.3.1",
+    "semver": "^7.7.1",
+    "yaml": "^2.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.5",
+    "@types/react": "^18.3.18",
+    "@types/semver": "^7.5.8",
+    "esbuild": "^0.25.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}
