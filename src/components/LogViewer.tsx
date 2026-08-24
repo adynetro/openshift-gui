@@ -28,7 +28,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({
   const streamerRef = useRef<LogStreamer | null>(null);
 
   useEffect(() => {
-    const streamer = new LogStreamer(podName, namespace, container, 150);
+    const streamer = new LogStreamer(podName, namespace, 'pods', container, 150);
     streamerRef.current = streamer;
 
     streamer.on('update', (allLogs: LogEntry[]) => {

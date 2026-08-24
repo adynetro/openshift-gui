@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { X, Terminal, Play, Pause, ArrowDown, Trash2, Copy, Search, Check, Sparkles } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { X, Terminal, Play, Pause, ArrowDown, Trash2, Copy, Search, Check, Sparkles, Layers, Box } from 'lucide-react';
 import { ResourceItem } from '../../types/k8s.js';
 
 interface LogViewerProps {
@@ -10,8 +10,30 @@ interface LogViewerProps {
 
 interface LogEntry {
   id: number;
+  pod?: string;
+  container?: string;
   timestamp?: string;
   raw: string;
+}
+
+// Consistent Monokai color palette for different pod badges
+const POD_COLORS = [
+  'bg-[#66d9ef]/15 text-[#66d9ef] border-[#66d9ef]/40',
+  'bg-[#a6e22e]/15 text-[#a6e22e] border-[#a6e22e]/40',
+  'bg-[#fd971f]/15 text-[#fd971f] border-[#fd971f]/40',
+  'bg-[#ae81ff]/15 text-[#ae81ff] border-[#ae81ff]/40',
+  'bg-[#e6db74]/15 text-[#e6db74] border-[#e6db74]/40',
+  'bg-[#f92672]/15 text-[#f92672] border-[#f92672]/40',
+];
+
+function getPodColor(podName: string): string {
+  let hash = 0;
+  for (let i = 0; i < podName.length; i++) {
+    hash = (hash << 5) - hash + podName.charCodeAt(i);
+    hash |= 0;
+  }
+  const index = Math.abs(hash) % POD_COLORS.length;
+  return POD_COLORS[index];
 }
 
 export const LogViewer: React.FC<LogViewerProps> = ({ item, namespace, onClose }) => {
@@ -19,15 +41,22 @@ export const LogViewer: React.FC<LogViewerProps> = ({ item, namespace, onClose }
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [autoScroll, setAutoScroll] = useState<boolean>(true);
   const [filterQuery, setFilterQuery] = useState<string>('');
+  const [selectedPod, setSelectedPod] = useState<string>('ALL');
   const [selectedContainer, setSelectedContainer] = useState<string>('');
   const [copied, setCopied] = useState<boolean>(false);
 
   const terminalEndRef = useRef<HTMLDivElement | null>(null);
   const streamIdRef = useRef<string | null>(null);
 
+  const isWorkload =
+    item.kind === 'deployments' ||
+    item.kind === 'deploymentconfigs' ||
+    item.kind === 'statefulsets' ||
+    item.kind === 'daemonsets';
+
   const containers: string[] =
-    item.raw?.spec?.containers?.map((c: any) => c.name) ||
     item.raw?.spec?.template?.spec?.containers?.map((c: any) => c.name) ||
+    item.raw?.spec?.containers?.map((c: any) => c.name) ||
     [];
 
   useEffect(() => {
@@ -38,6 +67,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ item, namespace, onClose }
         const streamId = await (window as any).electronAPI.startLogStream(
           item.name,
           namespace,
+          item.kind,
           selectedContainer || undefined
         );
         streamIdRef.current = streamId;
@@ -46,7 +76,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ item, namespace, onClose }
           if (data.streamId === streamId && !isPaused) {
             setLogs((prev) => {
               const next = [...prev, data.line];
-              if (next.length > 2000) next.shift();
+              if (next.length > 2500) next.shift();
               return next;
             });
           }
@@ -64,7 +94,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ item, namespace, onClose }
         (window as any).electronAPI.stopLogStream(streamIdRef.current);
       }
     };
-  }, [item.name, namespace, selectedContainer, isPaused]);
+  }, [item.name, item.kind, namespace, selectedContainer, isPaused]);
 
   useEffect(() => {
     if (autoScroll && terminalEndRef.current) {
@@ -72,13 +102,30 @@ export const LogViewer: React.FC<LogViewerProps> = ({ item, namespace, onClose }
     }
   }, [logs, autoScroll]);
 
-  const filteredLogs = logs.filter((l) => {
-    if (!filterQuery.trim()) return true;
-    return l.raw.toLowerCase().includes(filterQuery.toLowerCase());
-  });
+  // Discover all unique active pods in this stream
+  const activePods = useMemo(() => {
+    const set = new Set<string>();
+    for (const l of logs) {
+      if (l.pod) set.add(l.pod);
+    }
+    return Array.from(set).sort();
+  }, [logs]);
+
+  // Filter logs by pod filter, container, and search query
+  const filteredLogs = useMemo(() => {
+    return logs.filter((l) => {
+      if (selectedPod !== 'ALL' && l.pod && l.pod !== selectedPod) {
+        return false;
+      }
+      if (!filterQuery.trim()) return true;
+      return l.raw.toLowerCase().includes(filterQuery.toLowerCase()) || (l.pod && l.pod.toLowerCase().includes(filterQuery.toLowerCase()));
+    });
+  }, [logs, selectedPod, filterQuery]);
 
   const handleCopyAll = () => {
-    const text = filteredLogs.map((l) => `${l.timestamp ? `[${l.timestamp}] ` : ''}${l.raw}`).join('\n');
+    const text = filteredLogs
+      .map((l) => `${l.pod ? `[${l.pod}] ` : ''}${l.timestamp ? `[${l.timestamp}] ` : ''}${l.raw}`)
+      .join('\n');
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -88,15 +135,6 @@ export const LogViewer: React.FC<LogViewerProps> = ({ item, namespace, onClose }
   const renderLogLine = (entry: LogEntry) => {
     const raw = entry.raw;
     const lower = raw.toLowerCase();
-
-    // Monokai Colors:
-    // Red/Pink: #f92672
-    // Green: #a6e22e
-    // Yellow/Orange: #e6db74 / #fd971f
-    // Cyan: #66d9ef
-    // Purple: #ae81ff
-    // Dim: #75715e
-    // Default text: #f8f8f2
 
     let textColor = 'text-[#f8f8f2]';
     let prefixTag = null;
@@ -115,15 +153,26 @@ export const LogViewer: React.FC<LogViewerProps> = ({ item, namespace, onClose }
       textColor = 'text-[#75715e]';
     }
 
+    const podColor = entry.pod ? getPodColor(entry.pod) : '';
+
     return (
       <div key={entry.id} className="flex items-start gap-2 leading-relaxed hover:bg-[#3e3d32]/30 px-1 py-0.5 rounded transition-colors font-mono">
+        {/* Pod Badge (Multi-Pod Aggregated Stream) */}
+        {entry.pod && (
+          <span className={`px-1.5 py-0.2 rounded border text-[10px] font-mono shrink-0 select-none ${podColor}`} title={`Pod: ${entry.pod}`}>
+            {entry.pod}
+          </span>
+        )}
+
+        {/* Timestamp */}
         {entry.timestamp && (
           <span className="text-[#75715e] select-none shrink-0 font-mono text-[11px]">
             {entry.timestamp.slice(11, 19)}
           </span>
         )}
+
         {prefixTag}
-        <span className={`${textColor} whitespace-pre-wrap break-all select-text`}>{raw}</span>
+        <span className={`${textColor} whitespace-pre-wrap break-all select-text flex-1`}>{raw}</span>
       </div>
     );
   };
@@ -139,38 +188,70 @@ export const LogViewer: React.FC<LogViewerProps> = ({ item, namespace, onClose }
             </div>
             <div>
               <h2 className="text-sm font-bold text-[#f8f8f2] flex items-center gap-2">
-                Monokai Log Terminal: <span className="text-[#66d9ef] font-mono">{item.name}</span>
+                Live Log Stream:{' '}
+                <span className="text-[#66d9ef] font-mono">
+                  {item.kind}/{item.name}
+                </span>
+                {isWorkload && (
+                  <span className="px-2 py-0.2 rounded-full bg-[#ae81ff]/20 text-[#ae81ff] border border-[#ae81ff]/40 text-[10px] font-bold flex items-center gap-1 font-sans">
+                    <Layers size={10} /> Multi-Pod Aggregated ({activePods.length > 0 ? `${activePods.length} Pods` : 'All Replicas'})
+                  </span>
+                )}
               </h2>
               <p className="text-[11px] text-[#75715e] font-mono">
-                Project: {namespace} • Buffer: {logs.length} lines • JetBrains Mono
+                Project: {namespace} • Buffer: {logs.length} lines • Monokai Theme
               </p>
             </div>
           </div>
 
-          {/* Container Selector if multi-container */}
-          {containers.length > 1 && (
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-[#75715e]">Container:</span>
-              <select
-                value={selectedContainer}
-                onChange={(e) => {
-                  setLogs([]);
-                  setSelectedContainer(e.target.value);
-                }}
-                className="bg-[#272822] border border-[#49483e] text-[#f8f8f2] rounded px-2 py-1 text-xs outline-none"
-              >
-                <option value="">All Containers</option>
-                {containers.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Right Action Buttons */}
+          {/* Controls: Pod Filter & Container Selector */}
           <div className="flex items-center gap-2">
+            {/* Pod Selector for Multi-Pod Workloads */}
+            {activePods.length > 1 && (
+              <div className="flex items-center gap-1.5 text-xs bg-[#1e1f1c] px-2 py-1 rounded border border-[#49483e]">
+                <Box size={12} className="text-[#ae81ff]" />
+                <span className="text-[#75715e] text-[11px]">Pod:</span>
+                <select
+                  value={selectedPod}
+                  onChange={(e) => setSelectedPod(e.target.value)}
+                  className="bg-transparent text-xs text-[#f8f8f2] font-mono outline-none cursor-pointer"
+                >
+                  <option value="ALL" className="bg-[#272822] text-[#f8f8f2]">
+                    All Pods ({activePods.length} Aggregated)
+                  </option>
+                  {activePods.map((p) => (
+                    <option key={p} value={p} className="bg-[#272822] text-[#f8f8f2]">
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Container Selector */}
+            {containers.length > 1 && (
+              <div className="flex items-center gap-1.5 text-xs bg-[#1e1f1c] px-2 py-1 rounded border border-[#49483e]">
+                <span className="text-[#75715e] text-[11px]">Container:</span>
+                <select
+                  value={selectedContainer}
+                  onChange={(e) => {
+                    setLogs([]);
+                    setSelectedContainer(e.target.value);
+                  }}
+                  className="bg-transparent text-xs text-[#f8f8f2] font-mono outline-none cursor-pointer"
+                >
+                  <option value="" className="bg-[#272822] text-[#f8f8f2]">
+                    All Containers
+                  </option>
+                  {containers.map((c) => (
+                    <option key={c} value={c} className="bg-[#272822] text-[#f8f8f2]">
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {/* Pause / Resume */}
             <button
               onClick={() => setIsPaused((prev) => !prev)}
@@ -232,7 +313,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ item, namespace, onClose }
             type="text"
             value={filterQuery}
             onChange={(e) => setFilterQuery(e.target.value)}
-            placeholder="Filter within live logs..."
+            placeholder={`Filter live logs for ${item.kind}/${item.name}...`}
             className="w-full bg-transparent text-xs text-[#f8f8f2] placeholder-[#75715e] outline-none font-mono"
           />
           {filterQuery && (
@@ -245,7 +326,9 @@ export const LogViewer: React.FC<LogViewerProps> = ({ item, namespace, onClose }
         {/* Monokai Terminal Screen */}
         <div className="flex-1 overflow-auto p-4 font-mono text-xs space-y-0.5 bg-[#272822] selection:bg-[#49483e]">
           {filteredLogs.length === 0 ? (
-            <div className="text-[#75715e] italic p-4">Waiting for log stream output from container...</div>
+            <div className="text-[#75715e] italic p-4">
+              Waiting for log stream output from {item.kind}/{item.name} across pods...
+            </div>
           ) : (
             filteredLogs.map(renderLogLine)
           )}
@@ -256,9 +339,12 @@ export const LogViewer: React.FC<LogViewerProps> = ({ item, namespace, onClose }
         <div className="p-2 bg-[#1e1f1c] border-t border-[#3e3d32] flex items-center justify-between text-[11px] text-[#75715e] font-mono">
           <div className="flex items-center gap-2">
             <Sparkles size={12} className="text-[#fd971f]" />
-            <span>Monokai Terminal Theme</span>
+            <span>Multi-Pod Log Streamer • Monokai Theme</span>
           </div>
-          <span>{logs.length} buffered lines</span>
+          <span>
+            {isWorkload && activePods.length > 0 ? `${activePods.length} pods streaming • ` : ''}
+            {logs.length} buffered lines
+          </span>
         </div>
       </div>
     </div>

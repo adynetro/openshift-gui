@@ -22,7 +22,7 @@ export interface IpcApi {
   getHelmHistory: (releaseName: string, namespace: string) => Promise<any[]>;
   rollbackHelm: (releaseName: string, revision: string | number, namespace: string) => Promise<{ success: boolean; message: string }>;
   uninstallHelm: (releaseName: string, namespace: string) => Promise<{ success: boolean; message: string }>;
-  startLogStream: (podName: string, namespace: string, container?: string) => Promise<string>;
+  startLogStream: (targetName: string, namespace: string, kind?: string, container?: string) => Promise<string>;
   stopLogStream: (streamId: string) => Promise<void>;
   onLogLine: (callback: (data: { streamId: string; line: any }) => void) => () => void;
 }
@@ -49,7 +49,7 @@ const api: IpcApi = {
   getHelmHistory: (rel, ns) => ipcRenderer.invoke('helm:getHistory', rel, ns),
   rollbackHelm: (rel, rev, ns) => ipcRenderer.invoke('helm:rollback', rel, rev, ns),
   uninstallHelm: (rel, ns) => ipcRenderer.invoke('helm:uninstall', rel, ns),
-  startLogStream: (pod, ns, container) => ipcRenderer.invoke('logs:startStream', pod, ns, container),
+  startLogStream: (target, ns, kind, container) => ipcRenderer.invoke('logs:startStream', target, ns, kind, container),
   stopLogStream: (streamId) => ipcRenderer.invoke('logs:stopStream', streamId),
   onLogLine: (callback) => {
     const handler = (_event: any, data: any) => callback(data);

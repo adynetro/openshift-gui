@@ -99,10 +99,10 @@ export function registerIpcHandlers(mainWindow: electron.BrowserWindow): void {
     return await HelmService.uninstall(releaseName, namespace);
   });
 
-  // Log Stream Handlers
-  ipcMain.handle('logs:startStream', async (_event, podName: string, namespace: string, container?: string) => {
-    const streamId = `${namespace}/${podName}/${container || 'default'}-${Date.now()}`;
-    const streamer = new LogStreamer(podName, namespace, container, 200);
+  // Log Stream Handlers with Multi-Pod Workload Aggregation Support
+  ipcMain.handle('logs:startStream', async (_event, targetName: string, namespace: string, kind: string = 'pods', container?: string) => {
+    const streamId = `${namespace}/${kind}/${targetName}/${container || 'all'}-${Date.now()}`;
+    const streamer = new LogStreamer(targetName, namespace, kind, container, 250);
 
     streamer.on('line', (entry: LogEntry) => {
       if (!mainWindow.isDestroyed()) {
