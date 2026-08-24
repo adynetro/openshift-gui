@@ -15,6 +15,7 @@ export type ResourceKind =
   | 'secrets'
   | 'helm'
   | 'nodes'
+  | 'clusteroperators'
   | 'events';
 
 export interface ResourceItem {

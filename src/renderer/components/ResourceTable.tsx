@@ -262,6 +262,16 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                 <th className="py-3 px-3">Kubelet Version</th>
               </>
             )}
+            {kind === 'clusteroperators' && (
+              <>
+                <th className="py-3 px-3">Status</th>
+                <th className="py-3 px-3">Version</th>
+                <th className="py-3 px-3">Available</th>
+                <th className="py-3 px-3">Progressing</th>
+                <th className="py-3 px-3">Degraded</th>
+                <th className="py-3 px-3">Message</th>
+              </>
+            )}
             <th className="py-3 px-3">Age</th>
             {kind !== 'events' && !isWorkload && <th className="py-3 px-4 text-right">Actions</th>}
           </tr>
@@ -577,6 +587,50 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                     <td className="py-2.5 px-3">{getStatusBadge(item.status, item.statusColor)}</td>
                     <td className="py-2.5 px-3 font-mono text-amber-300">{item.extra?.roles || 'worker'}</td>
                     <td className="py-2.5 px-3 font-mono text-slate-400">{item.extra?.version || '-'}</td>
+                  </>
+                )}
+
+                {/* Cluster Operator Columns */}
+                {kind === 'clusteroperators' && (
+                  <>
+                    <td className="py-2.5 px-3">{getStatusBadge(item.status, item.statusColor)}</td>
+                    <td className="py-2.5 px-3 font-mono font-bold text-cyan-300">{item.extra?.version || '-'}</td>
+                    <td className="py-2.5 px-3">
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          item.extra?.available === 'True'
+                            ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                            : 'bg-rose-950 text-rose-300 border border-rose-800'
+                        }`}
+                      >
+                        {item.extra?.available || 'False'}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          item.extra?.progressing === 'True'
+                            ? 'bg-amber-950 text-amber-300 border border-amber-800'
+                            : 'bg-slate-800 text-slate-400'
+                        }`}
+                      >
+                        {item.extra?.progressing || 'False'}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          item.extra?.degraded === 'True'
+                            ? 'bg-rose-950 text-rose-300 border border-rose-800'
+                            : 'bg-emerald-950/60 text-emerald-400'
+                        }`}
+                      >
+                        {item.extra?.degraded || 'False'}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 font-mono text-slate-400 truncate max-w-[280px]" title={item.extra?.message}>
+                      {item.extra?.message || '-'}
+                    </td>
                   </>
                 )}
 

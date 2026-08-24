@@ -15,6 +15,7 @@ import {
   Activity,
   Database,
   Boxes,
+  ShieldCheck,
 } from 'lucide-react';
 import { ResourceKind } from '../../types/k8s.js';
 
@@ -84,6 +85,7 @@ const NAV_GROUPS: NavGroup[] = [
     title: 'Observe & Cluster',
     items: [
       { kind: 'nodes', label: 'Cluster Nodes', icon: HardDrive, hotkey: 'n' },
+      { kind: 'clusteroperators', label: 'Cluster Operators', icon: ShieldCheck, hotkey: 'o', badgeText: 'OpenShift', badgeColor: 'bg-red-950 text-red-300 border-red-800' },
       { kind: 'events', label: 'Live Events', icon: Activity, hotkey: 'e', badgeText: 'Stream', badgeColor: 'bg-amber-950 text-amber-300 border-amber-800' },
     ],
   },

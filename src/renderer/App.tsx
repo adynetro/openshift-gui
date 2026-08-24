@@ -368,6 +368,7 @@ export const App: React.FC = () => {
       else if (e.key === 'c') setCurrentKind('configmaps');
       else if (e.key === 's') setCurrentKind('secrets');
       else if (e.key === 'n') setCurrentKind('nodes');
+      else if (e.key === 'o') setCurrentKind('clusteroperators');
       else if (e.key === 'e') setCurrentKind('events');
       else if (e.key === '?') openModal('help');
     };

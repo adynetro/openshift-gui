@@ -66,7 +66,7 @@ export class OcClient {
     }
 
     const isAll = !namespace || namespace === 'all-projects' || namespace === '__all__';
-    const isClusterScoped = kind === 'nodes' || kind === 'pv' || kind === 'crd';
+    const isClusterScoped = kind === 'nodes' || kind === 'pv' || kind === 'crd' || kind === 'clusteroperators';
     const nsFlag = isClusterScoped ? '' : (isAll ? '-A' : `-n "${namespace}"`);
 
     let cmdKind = kind as string;
@@ -79,6 +79,7 @@ export class OcClient {
     if (kind === 'pvc') cmdKind = 'pvc';
     if (kind === 'pv') cmdKind = 'pv';
     if (kind === 'crd') cmdKind = 'crd';
+    if (kind === 'clusteroperators') cmdKind = 'co';
 
     const cmd = `oc get ${cmdKind} ${nsFlag} -o json || kubectl get ${cmdKind} ${nsFlag} -o json`;
     const { stdout, stderr } = await this.runCommand(cmd);
@@ -458,6 +459,53 @@ export class OcClient {
             statusColor: (isReady ? 'green' : 'red') as 'green' | 'red',
             age,
             extra: { roles, version: kubeletVersion },
+            labels: raw.metadata?.labels || {},
+            raw,
+          };
+        }
+
+        case 'clusteroperators': {
+          const conditions = raw.status?.conditions || [];
+          const availCond = conditions.find((c: any) => c.type === 'Available');
+          const progCond = conditions.find((c: any) => c.type === 'Progressing');
+          const degCond = conditions.find((c: any) => c.type === 'Degraded');
+
+          const isAvailable = availCond?.status === 'True';
+          const isProgressing = progCond?.status === 'True';
+          const isDegraded = degCond?.status === 'True';
+
+          const version = raw.status?.versions?.[0]?.version || '-';
+          const message = degCond?.message || progCond?.message || availCond?.message || '';
+
+          let status = 'Available';
+          let statusColor: 'green' | 'red' | 'yellow' | 'gray' = 'green';
+
+          if (isDegraded) {
+            status = 'Degraded';
+            statusColor = 'red';
+          } else if (isProgressing) {
+            status = 'Progressing';
+            statusColor = 'yellow';
+          } else if (!isAvailable) {
+            status = 'Unavailable';
+            statusColor = 'red';
+          }
+
+          return {
+            id: name,
+            name,
+            namespace: 'cluster',
+            kind,
+            status,
+            statusColor,
+            age,
+            extra: {
+              version,
+              available: isAvailable ? 'True' : 'False',
+              progressing: isProgressing ? 'True' : 'False',
+              degraded: isDegraded ? 'True' : 'False',
+              message,
+            },
             labels: raw.metadata?.labels || {},
             raw,
           };
