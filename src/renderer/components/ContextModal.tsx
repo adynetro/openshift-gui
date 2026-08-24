@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { X, Search, Layers, FolderGit2, CheckCircle2, Server, User, ArrowRight } from 'lucide-react';
+import { X, Search, Layers, FolderGit2, CheckCircle2, Server, User, ArrowRight, Globe } from 'lucide-react';
 import { KubeContext, ProjectInfo } from '../../types/k8s.js';
 import { FuzzyMatcher } from '../../utils/fuzzy.js';
 
@@ -84,7 +84,8 @@ export const ContextModal: React.FC<ContextModalProps> = ({
             <div className="p-8 text-center text-slate-500 text-xs">No matching {mode}s found.</div>
           ) : (
             items.map((item: any) => {
-              const isCurrent = mode === 'context' ? item.name === currentContext : item.name === currentProject;
+              const isCurrent = mode === 'context' ? item.name === currentContext : (item.name === currentProject || (item.name === 'all-projects' && (!currentProject || currentProject === 'all-projects')));
+              const isAllProjects = mode === 'project' && item.name === 'all-projects';
 
               return (
                 <div
@@ -96,14 +97,22 @@ export const ContextModal: React.FC<ContextModalProps> = ({
                   className={`w-full flex items-center justify-between p-3 rounded-lg text-left transition-all cursor-pointer group ${
                     isCurrent
                       ? 'bg-cyan-950/40 border border-cyan-500/50 shadow-sm'
+                      : isAllProjects
+                      ? 'bg-purple-950/20 hover:bg-purple-950/40 border border-purple-900/40'
                       : 'hover:bg-slate-800/70 border border-transparent'
                   }`}
                 >
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-sm font-semibold text-white group-hover:text-cyan-300 transition-colors">
-                        {item.name}
+                      {isAllProjects && <Globe size={15} className="text-purple-400 shrink-0" />}
+                      <span className={`font-mono text-sm font-semibold transition-colors ${isAllProjects ? 'text-purple-300 group-hover:text-purple-200' : 'text-white group-hover:text-cyan-300'}`}>
+                        {item.displayName || item.name}
                       </span>
+                      {isAllProjects && (
+                        <span className="px-2 py-0.2 rounded bg-purple-950 text-purple-300 border border-purple-800 text-[10px] font-mono">
+                          Cluster-Wide
+                        </span>
+                      )}
                       {isCurrent && (
                         <span className="px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800 text-[10px] font-bold flex items-center gap-1">
                           <CheckCircle2 size={10} /> Active
@@ -128,7 +137,11 @@ export const ContextModal: React.FC<ContextModalProps> = ({
                       </div>
                     ) : (
                       <div className="text-[11px] text-slate-400 font-mono">
-                        Status: <span className="text-emerald-400">{item.status || 'Active'}</span>
+                        {isAllProjects ? (
+                          <span className="text-purple-400">View all resources across all namespaces</span>
+                        ) : (
+                          <>Status: <span className="text-emerald-400">{item.status || 'Active'}</span></>
+                        )}
                       </div>
                     )}
                   </div>

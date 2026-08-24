@@ -19,7 +19,7 @@ export const App: React.FC = () => {
   const [contexts, setContexts] = useState<KubeContext[]>([]);
   const [currentContext, setCurrentContext] = useState<string | null>(null);
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
-  const [currentProject, setCurrentProject] = useState<string>('default');
+  const [currentProject, setCurrentProject] = useState<string>('all-projects');
   const [clusterInfo, setClusterInfo] = useState<any>(null);
   const [isUnauthorized, setIsUnauthorized] = useState<boolean>(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -61,9 +61,6 @@ export const App: React.FC = () => {
       const currCtx = res?.currentContext || null;
       setContexts(ctxList);
       setCurrentContext(currCtx);
-
-      const ns = await api.getCurrentNamespace();
-      setCurrentProject(ns || 'default');
 
       const info = await api.getClusterInfo();
       setClusterInfo(info);
@@ -168,7 +165,8 @@ export const App: React.FC = () => {
       return;
     }
 
-    if (!window.confirm(`Are you sure you want to permanently delete all ${clearablePodsCount} completed and failed pods in project '${currentProject}'?`)) {
+    const targetScope = currentProject === 'all-projects' ? 'all projects' : `project '${currentProject}'`;
+    if (!window.confirm(`Are you sure you want to permanently delete all ${clearablePodsCount} completed and failed pods across ${targetScope}?`)) {
       return;
     }
 
@@ -208,7 +206,8 @@ export const App: React.FC = () => {
     const api = (window as any).electronAPI;
     const ok = await api.switchProject(projectName);
     if (ok) {
-      showToast(`Switched project to ${projectName}`);
+      const display = projectName === 'all-projects' ? 'All Projects (Cluster-Wide)' : projectName;
+      showToast(`Switched to ${display}`);
       setCurrentProject(projectName);
       fetchResources(false);
     } else {
@@ -336,8 +335,8 @@ export const App: React.FC = () => {
             <div
               className={`px-4 py-2 text-xs font-semibold flex items-center justify-between border-b ${
                 statusNotification.type === 'error'
-                  ? 'bg-rose-950/90 text-rose-200 border-rose-800'
-                  : 'bg-emerald-950/90 text-emerald-200 border-emerald-800'
+                  ? 'bg-[#f92672]/20 text-[#f92672] border-[#f92672]/40'
+                  : 'bg-[#a6e22e]/20 text-[#a6e22e] border-[#a6e22e]/40'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -365,6 +364,7 @@ export const App: React.FC = () => {
           <ResourceTable
             kind={currentKind}
             items={filteredItems}
+            currentProject={currentProject}
             selectedItem={selectedItem}
             onSelectItem={(item) => setSelectedItem(item)}
             loading={loading}
@@ -414,7 +414,7 @@ export const App: React.FC = () => {
       {modalMode === 'logs' && selectedItem && (
         <LogViewer
           item={selectedItem}
-          namespace={currentProject}
+          namespace={selectedItem.namespace || currentProject}
           onClose={() => setModalMode('none')}
         />
       )}
@@ -424,7 +424,7 @@ export const App: React.FC = () => {
         <YamlModal
           mode={modalMode}
           item={selectedItem}
-          namespace={currentProject}
+          namespace={selectedItem.namespace || currentProject}
           onClose={() => setModalMode('none')}
         />
       )}
@@ -433,7 +433,7 @@ export const App: React.FC = () => {
       {modalMode === 'edit-yaml' && selectedItem && (
         <EditYamlModal
           item={selectedItem}
-          namespace={currentProject}
+          namespace={selectedItem.namespace || currentProject}
           onClose={() => setModalMode('none')}
           onSuccess={(msg) => {
             showToast(msg, 'success');
@@ -446,7 +446,7 @@ export const App: React.FC = () => {
       {modalMode === 'clean-is' && selectedItem && (
         <ImageStreamModal
           imageStream={selectedItem as ImageStreamResource}
-          namespace={currentProject}
+          namespace={selectedItem.namespace || currentProject}
           onClose={() => setModalMode('none')}
           onRefresh={() => fetchResources(false)}
         />
@@ -456,7 +456,7 @@ export const App: React.FC = () => {
       {modalMode === 'helm' && selectedItem && (
         <HelmModal
           release={selectedItem}
-          namespace={currentProject}
+          namespace={selectedItem.namespace || currentProject}
           onClose={() => setModalMode('none')}
           onRefresh={() => fetchResources(false)}
         />
@@ -467,7 +467,7 @@ export const App: React.FC = () => {
         <ActionDialog
           mode={modalMode}
           item={selectedItem}
-          namespace={currentProject}
+          namespace={selectedItem.namespace || currentProject}
           onClose={() => setModalMode('none')}
           onSuccess={(msg) => {
             setModalMode('none');

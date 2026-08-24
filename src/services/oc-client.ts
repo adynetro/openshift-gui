@@ -37,12 +37,12 @@ export class OcClient {
   /**
    * Run a CLI command safely with timeout and error handling.
    */
-  static async runCommand(command: string, timeout = 15000): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+  static async runCommand(command: string, timeout = 25000): Promise<{ stdout: string; stderr: string; exitCode: number }> {
     try {
       const result = await execAsync(command, {
         timeout,
         env: getExecEnv(),
-        maxBuffer: 25 * 1024 * 1024,
+        maxBuffer: 30 * 1024 * 1024,
       });
       return { stdout: result.stdout || '', stderr: result.stderr || '', exitCode: 0 };
     } catch (error: any) {
@@ -55,7 +55,7 @@ export class OcClient {
   }
 
   /**
-   * Fetches resources of a given kind in the specified namespace.
+   * Fetches resources of a given kind in the specified namespace or all namespaces.
    */
   static async getResources(
     kind: ResourceKind,
@@ -65,7 +65,9 @@ export class OcClient {
       return { items: [] };
     }
 
-    const nsFlag = namespace ? `-n "${namespace}"` : '';
+    const isAll = !namespace || namespace === 'all-projects' || namespace === '__all__';
+    const nsFlag = isAll ? '-A' : `-n "${namespace}"`;
+
     let cmdKind = kind as string;
     if (kind === 'deploymentconfigs') cmdKind = 'dc';
     if (kind === 'imagestreams') cmdKind = 'is';
@@ -116,7 +118,7 @@ export class OcClient {
   static transformResources(kind: ResourceKind, items: any[], namespace: string): ResourceItem[] {
     return items.map((raw: any) => {
       const name = raw.metadata?.name || 'unknown';
-      const ns = raw.metadata?.namespace || namespace || 'default';
+      const ns = raw.metadata?.namespace || (namespace === 'all-projects' ? 'default' : namespace) || 'default';
       const creationTimestamp = raw.metadata?.creationTimestamp;
       const age = formatAge(creationTimestamp);
 
@@ -403,7 +405,7 @@ export class OcClient {
     if (kind === 'daemonsets') cmdKind = 'ds';
     if (kind === 'configmaps') cmdKind = 'cm';
 
-    const nsFlag = namespace ? `-n "${namespace}"` : '';
+    const nsFlag = namespace && namespace !== 'all-projects' ? `-n "${namespace}"` : '';
     const cmd = `oc describe ${cmdKind} "${name}" ${nsFlag} || kubectl describe ${cmdKind} "${name}" ${nsFlag}`;
     const { stdout, stderr } = await this.runCommand(cmd, 15000);
     return stdout || stderr || 'No description available.';
@@ -420,7 +422,7 @@ export class OcClient {
     if (kind === 'daemonsets') cmdKind = 'ds';
     if (kind === 'configmaps') cmdKind = 'cm';
 
-    const nsFlag = namespace ? `-n "${namespace}"` : '';
+    const nsFlag = namespace && namespace !== 'all-projects' ? `-n "${namespace}"` : '';
     const cmd = `oc get ${cmdKind} "${name}" ${nsFlag} -o yaml || kubectl get ${cmdKind} "${name}" ${nsFlag} -o yaml`;
     const { stdout, stderr } = await this.runCommand(cmd, 15000);
     return stdout || stderr || 'No YAML available.';
@@ -433,7 +435,7 @@ export class OcClient {
     const tmpFile = path.join(os.tmpdir(), `oc-edit-${Date.now()}.yaml`);
     try {
       fs.writeFileSync(tmpFile, yamlContent, 'utf8');
-      const nsFlag = namespace ? `-n "${namespace}"` : '';
+      const nsFlag = namespace && namespace !== 'all-projects' ? `-n "${namespace}"` : '';
       const cmd = `oc apply -f "${tmpFile}" ${nsFlag} || kubectl apply -f "${tmpFile}" ${nsFlag}`;
       const { stdout, stderr } = await this.runCommand(cmd);
 
@@ -473,7 +475,7 @@ export class OcClient {
       }
 
       const podNames = matchingPods.map((p) => p.name);
-      const nsFlag = namespace ? `-n "${namespace}"` : '';
+      const nsFlag = namespace && namespace !== 'all-projects' ? `-n "${namespace}"` : '';
       const cmd = `oc delete pod ${podNames.map((n) => `"${n}"`).join(' ')} ${nsFlag}`;
       const { stdout, stderr } = await this.runCommand(cmd, 30000);
 
@@ -500,7 +502,7 @@ export class OcClient {
     if (kind === 'deploymentconfigs') cmdKind = 'dc';
     if (kind === 'statefulsets') cmdKind = 'sts';
 
-    const nsFlag = namespace ? `-n "${namespace}"` : '';
+    const nsFlag = namespace && namespace !== 'all-projects' ? `-n "${namespace}"` : '';
     const cmd = `oc scale ${cmdKind} "${name}" --replicas=${replicas} ${nsFlag} || kubectl scale ${cmdKind} "${name}" --replicas=${replicas} ${nsFlag}`;
     const { stdout, stderr } = await this.runCommand(cmd);
     if (stderr && !stdout) {
@@ -516,7 +518,7 @@ export class OcClient {
     let cmdKind = kind;
     if (kind === 'deploymentconfigs') cmdKind = 'dc';
 
-    const nsFlag = namespace ? `-n "${namespace}"` : '';
+    const nsFlag = namespace && namespace !== 'all-projects' ? `-n "${namespace}"` : '';
     let cmd = `oc rollout restart ${cmdKind}/${name} ${nsFlag} || kubectl rollout restart ${cmdKind}/${name} ${nsFlag}`;
     if (cmdKind === 'dc') {
       cmd = `oc rollout latest dc/"${name}" ${nsFlag} || ${cmd}`;
@@ -540,7 +542,7 @@ export class OcClient {
     if (kind === 'daemonsets') cmdKind = 'ds';
     if (kind === 'configmaps') cmdKind = 'cm';
 
-    const nsFlag = namespace ? `-n "${namespace}"` : '';
+    const nsFlag = namespace && namespace !== 'all-projects' ? `-n "${namespace}"` : '';
     const cmd = `oc delete ${cmdKind} "${name}" ${nsFlag} || kubectl delete ${cmdKind} "${name}" ${nsFlag}`;
     const { stdout, stderr } = await this.runCommand(cmd);
     if (stderr && !stdout) {
@@ -553,7 +555,7 @@ export class OcClient {
    * Deletes a specific ImageStream tag (oc tag -d <is>:<tag>).
    */
   static async deleteImageStreamTag(isName: string, tag: string, namespace: string): Promise<{ success: boolean; message: string }> {
-    const nsFlag = namespace ? `-n "${namespace}"` : '';
+    const nsFlag = namespace && namespace !== 'all-projects' ? `-n "${namespace}"` : '';
     const cmd = `oc tag -d "${isName}:${tag}" ${nsFlag}`;
     const { stdout, stderr } = await this.runCommand(cmd);
     if (stderr && !stdout) {

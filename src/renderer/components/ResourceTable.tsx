@@ -21,6 +21,7 @@ import { ResourceKind, ResourceItem, ImageStreamResource } from '../../types/k8s
 interface ResourceTableProps {
   kind: ResourceKind;
   items: ResourceItem[];
+  currentProject?: string;
   selectedItem: ResourceItem | null;
   onSelectItem: (item: ResourceItem) => void;
   loading: boolean;
@@ -34,6 +35,7 @@ interface ResourceTableProps {
 export const ResourceTable: React.FC<ResourceTableProps> = ({
   kind,
   items,
+  currentProject,
   selectedItem,
   onSelectItem,
   loading,
@@ -43,6 +45,8 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
   onOpenContextModal,
   onRetry,
 }) => {
+  const isAllProjects = !currentProject || currentProject === 'all-projects' || currentProject === '__all__';
+
   const getStatusBadge = (status: string, color?: string) => {
     const s = (status || '').toLowerCase();
     let bg = 'bg-slate-800 text-slate-300 border-slate-700';
@@ -136,6 +140,9 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
         <thead className="sticky top-0 bg-[#0f172a] border-b border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider z-10 select-none shadow-sm">
           <tr>
             <th className="py-3 px-4">Name</th>
+            {isAllProjects && kind !== 'nodes' && (
+              <th className="py-3 px-3">Project</th>
+            )}
             {kind === 'pods' && (
               <>
                 <th className="py-3 px-3">Ready</th>
@@ -229,6 +236,15 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                     {item.name}
                   </span>
                 </td>
+
+                {/* Project Column (When All Projects is active) */}
+                {isAllProjects && kind !== 'nodes' && (
+                  <td className="py-2.5 px-3 font-mono text-purple-300 text-xs">
+                    <span className="px-1.5 py-0.5 rounded bg-purple-950/60 border border-purple-800/80">
+                      {item.namespace || 'default'}
+                    </span>
+                  </td>
+                )}
 
                 {/* Pod Columns */}
                 {kind === 'pods' && (

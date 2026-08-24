@@ -112,16 +112,26 @@ export class KubeConfigService {
 
   /**
    * Retrieves all available projects / namespaces in the current cluster.
+   * 'All Projects (Cluster-Wide)' is ALWAYS the first option in the list.
    */
   static async getProjects(): Promise<ProjectInfo[]> {
     const currentNs = await this.getCurrentNamespace();
+
+    const allProjectsFirst: ProjectInfo = {
+      name: 'all-projects',
+      displayName: 'All Projects (Cluster-Wide)',
+      status: 'Active',
+      isCurrent: currentNs === 'all-projects' || currentNs === '',
+    };
+
+    let projectList: ProjectInfo[] = [];
 
     // Strategy 1: oc get projects -o json
     try {
       const { stdout } = await execAsync('oc get projects -o json', { env: getExecEnv(), maxBuffer: 15 * 1024 * 1024 });
       const data = JSON.parse(stdout);
       if (data && Array.isArray(data.items) && data.items.length > 0) {
-        return data.items.map((item: any) => ({
+        projectList = data.items.map((item: any) => ({
           name: item.metadata?.name,
           displayName: item.metadata?.annotations?.['openshift.io/display-name'] || item.metadata?.name,
           status: item.status?.phase || 'Active',
@@ -131,40 +141,45 @@ export class KubeConfigService {
     } catch (e) {}
 
     // Strategy 2: oc projects -q
-    try {
-      const { stdout } = await execAsync('oc projects -q', { env: getExecEnv() });
-      const lines = stdout.trim().split('\n').map((l) => l.trim()).filter(Boolean);
-      if (lines.length > 0) {
-        return lines.map((name) => ({
-          name,
-          displayName: name,
-          status: 'Active',
-          isCurrent: name === currentNs,
-        }));
-      }
-    } catch (e) {}
+    if (projectList.length === 0) {
+      try {
+        const { stdout } = await execAsync('oc projects -q', { env: getExecEnv() });
+        const lines = stdout.trim().split('\n').map((l) => l.trim()).filter(Boolean);
+        if (lines.length > 0) {
+          projectList = lines.map((name) => ({
+            name,
+            displayName: name,
+            status: 'Active',
+            isCurrent: name === currentNs,
+          }));
+        }
+      } catch (e) {}
+    }
 
     // Strategy 3: kubectl get namespaces -o json
-    try {
-      const { stdout } = await execAsync('kubectl get namespaces -o json || oc get namespaces -o json', {
-        env: getExecEnv(),
-        maxBuffer: 15 * 1024 * 1024,
-      });
-      const data = JSON.parse(stdout);
-      if (data && Array.isArray(data.items) && data.items.length > 0) {
-        return data.items.map((item: any) => ({
-          name: item.metadata?.name,
-          displayName: item.metadata?.name,
-          status: item.status?.phase || 'Active',
-          isCurrent: item.metadata?.name === currentNs,
-        }));
-      }
-    } catch (e) {}
+    if (projectList.length === 0) {
+      try {
+        const { stdout } = await execAsync('kubectl get namespaces -o json || oc get namespaces -o json', {
+          env: getExecEnv(),
+          maxBuffer: 15 * 1024 * 1024,
+        });
+        const data = JSON.parse(stdout);
+        if (data && Array.isArray(data.items) && data.items.length > 0) {
+          projectList = data.items.map((item: any) => ({
+            name: item.metadata?.name,
+            displayName: item.metadata?.name,
+            status: item.status?.phase || 'Active',
+            isCurrent: item.metadata?.name === currentNs,
+          }));
+        }
+      } catch (e) {}
+    }
 
-    return [
-      { name: currentNs, displayName: currentNs, status: 'Active', isCurrent: true },
-      { name: 'default', displayName: 'default', status: 'Active', isCurrent: currentNs === 'default' },
-    ];
+    // Sort projects alphabetically
+    projectList.sort((a, b) => a.name.localeCompare(b.name));
+
+    // Guarantee All Projects is FIRST
+    return [allProjectsFirst, ...projectList.filter((p) => p.name !== 'all-projects')];
   }
 
   /**
@@ -184,13 +199,17 @@ export class KubeConfigService {
       }
     } catch (e) {}
 
-    return 'default';
+    return 'all-projects';
   }
 
   /**
    * Switches current active namespace/project.
    */
   static async switchProject(projectName: string): Promise<boolean> {
+    if (projectName === 'all-projects' || !projectName) {
+      return true;
+    }
+
     try {
       await execAsync(`oc project "${projectName}"`, { env: getExecEnv() });
       return true;
@@ -224,7 +243,7 @@ export class KubeConfigService {
       server: active?.cluster || 'Unknown Cluster',
       user: clusterUser || active?.user || 'Unknown User',
       context: currentContext || 'None',
-      namespace: ns || 'default',
+      namespace: ns || 'all-projects',
       connected: !!currentContext,
     };
   }
