@@ -17,6 +17,7 @@ export interface IpcApi {
   rolloutRestart: (kind: string, name: string, namespace: string) => Promise<{ success: boolean; message: string }>;
   deleteResource: (kind: string, name: string, namespace: string) => Promise<{ success: boolean; message: string }>;
   deleteImageStreamTag: (isName: string, tag: string, namespace: string) => Promise<{ success: boolean; message: string }>;
+  getWorkloadDetails: (kind: string, name: string, namespace: string) => Promise<{ details?: any; error?: string }>;
   getHelmValues: (releaseName: string, namespace: string) => Promise<string>;
   upgradeHelmValues: (releaseName: string, valuesYaml: string, namespace: string) => Promise<{ success: boolean; message: string }>;
   getHelmManifest: (releaseName: string, namespace: string) => Promise<string>;
@@ -45,6 +46,7 @@ const api: IpcApi = {
   rolloutRestart: (kind, name, ns) => ipcRenderer.invoke('kube:rolloutRestart', kind, name, ns),
   deleteResource: (kind, name, ns) => ipcRenderer.invoke('kube:deleteResource', kind, name, ns),
   deleteImageStreamTag: (isName, tag, ns) => ipcRenderer.invoke('kube:deleteImageStreamTag', isName, tag, ns),
+  getWorkloadDetails: (kind, name, ns) => ipcRenderer.invoke('kube:getWorkloadDetails', kind, name, ns),
   getHelmValues: (rel, ns) => ipcRenderer.invoke('helm:getValues', rel, ns),
   upgradeHelmValues: (rel, yaml, ns) => ipcRenderer.invoke('helm:upgradeValues', rel, yaml, ns),
   getHelmManifest: (rel, ns) => ipcRenderer.invoke('helm:getManifest', rel, ns),

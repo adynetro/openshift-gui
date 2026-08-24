@@ -81,6 +81,10 @@ export function registerIpcHandlers(mainWindow: electron.BrowserWindow): void {
     return await OcClient.deleteImageStreamTag(isName, tag, namespace);
   });
 
+  ipcMain.handle('kube:getWorkloadDetails', async (_event, kind: ResourceKind, name: string, namespace: string) => {
+    return await OcClient.getWorkloadDetails(kind, name, namespace);
+  });
+
   // Helm Handlers
   ipcMain.handle('helm:getValues', async (_event, releaseName: string, namespace: string) => {
     return await HelmService.getValues(releaseName, namespace);

@@ -10,6 +10,7 @@ import { EditYamlModal } from './components/EditYamlModal.js';
 import { ImageStreamModal } from './components/ImageStreamModal.js';
 import { HelmModal } from './components/HelmModal.js';
 import { ActionDialog } from './components/ActionDialog.js';
+import { WorkloadDetailsModal } from './components/WorkloadDetailsModal.js';
 import { ResourceKind, ResourceItem, KubeContext, ProjectInfo, ImageStreamResource } from '../types/k8s.js';
 import { FuzzyMatcher } from '../utils/fuzzy.js';
 import { CheckCircle2, AlertTriangle } from 'lucide-react';
@@ -37,7 +38,7 @@ export const App: React.FC = () => {
 
   // Modal State
   const [modalMode, setModalMode] = useState<
-    'none' | 'context' | 'project' | 'logs' | 'yaml' | 'edit-yaml' | 'describe' | 'scale' | 'restart' | 'delete' | 'clean-is' | 'helm' | 'help'
+    'none' | 'context' | 'project' | 'workload-details' | 'logs' | 'yaml' | 'edit-yaml' | 'describe' | 'scale' | 'restart' | 'delete' | 'clean-is' | 'helm' | 'help'
   >('none');
 
   const showToast = (text: string, type: 'success' | 'error' = 'success') => {
@@ -227,6 +228,9 @@ export const App: React.FC = () => {
     if (item) setSelectedItem(item);
 
     switch (actionType) {
+      case 'workload-details':
+        setModalMode('workload-details');
+        break;
       case 'view-pods':
         if (item) {
           if (item.namespace && currentProject !== 'all-projects' && item.namespace !== currentProject) {
@@ -423,6 +427,49 @@ export const App: React.FC = () => {
           onSelectContext={() => {}}
           onSelectProject={handleSwitchProject}
           onClose={() => setModalMode('none')}
+        />
+      )}
+
+      {/* Workload Hierarchy Details Modal (Replicasets / ReplicationControllers & Live Pods) */}
+      {modalMode === 'workload-details' && selectedItem && (
+        <WorkloadDetailsModal
+          item={selectedItem}
+          namespace={selectedItem.namespace || currentProject}
+          onClose={() => setModalMode('none')}
+          onAction={(act, target) => handleAction(act, target || selectedItem)}
+          onOpenPodLogs={(podName) => {
+            setSelectedItem({
+              id: podName,
+              name: podName,
+              namespace: selectedItem.namespace || currentProject,
+              kind: 'pods',
+              status: 'Running',
+              age: '',
+            });
+            setModalMode('logs');
+          }}
+          onOpenPodDescribe={(podName) => {
+            setSelectedItem({
+              id: podName,
+              name: podName,
+              namespace: selectedItem.namespace || currentProject,
+              kind: 'pods',
+              status: 'Running',
+              age: '',
+            });
+            setModalMode('describe');
+          }}
+          onOpenPodYaml={(podName) => {
+            setSelectedItem({
+              id: podName,
+              name: podName,
+              namespace: selectedItem.namespace || currentProject,
+              kind: 'pods',
+              status: 'Running',
+              age: '',
+            });
+            setModalMode('yaml');
+          }}
         />
       )}
 

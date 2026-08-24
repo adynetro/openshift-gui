@@ -32,6 +32,48 @@ export interface ResourceItem {
   extra?: Record<string, any>;
 }
 
+export interface WorkloadRevisionItem {
+  name: string;
+  kind: 'ReplicaSet' | 'ReplicationController' | 'ControllerRevision';
+  revision: string;
+  desired: number;
+  current: number;
+  ready: number;
+  status: string;
+  statusColor?: 'green' | 'red' | 'yellow' | 'blue' | 'gray';
+  age: string;
+  images: string[];
+  active: boolean;
+}
+
+export interface WorkloadPodItem {
+  name: string;
+  namespace: string;
+  ready: string;
+  status: string;
+  statusColor?: 'green' | 'red' | 'yellow' | 'blue' | 'gray';
+  restarts: number;
+  ip: string;
+  node: string;
+  age: string;
+  containers: { name: string; image: string; ready: boolean; state: string }[];
+}
+
+export interface WorkloadDetails {
+  kind: ResourceKind;
+  name: string;
+  namespace: string;
+  strategy?: string;
+  triggers?: string;
+  selectors?: Record<string, string>;
+  desiredReplicas: number;
+  readyReplicas: number;
+  images: string[];
+  revisions: WorkloadRevisionItem[];
+  pods: WorkloadPodItem[];
+  manifestYaml?: string;
+}
+
 export interface ImageStreamTagInfo {
   tag: string;
   created: string;

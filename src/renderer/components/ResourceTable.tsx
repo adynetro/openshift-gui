@@ -256,9 +256,26 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                       isSelected ? 'bg-cyan-400' : 'bg-transparent group-hover:bg-slate-600'
                     }`}
                   />
-                  <span className="truncate max-w-[280px]" title={item.name}>
-                    {item.name}
-                  </span>
+                  {(kind === 'deployments' ||
+                    kind === 'deploymentconfigs' ||
+                    kind === 'statefulsets' ||
+                    kind === 'daemonsets') ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectItem(item);
+                        onRowAction('workload-details', item);
+                      }}
+                      className="text-left font-bold text-slate-100 hover:text-[#66d9ef] hover:underline truncate max-w-[280px] transition-colors cursor-pointer"
+                      title={`Click to view Replicasets / Replication Controllers and Pods for ${item.name}`}
+                    >
+                      {item.name}
+                    </button>
+                  ) : (
+                    <span className="truncate max-w-[280px]" title={item.name}>
+                      {item.name}
+                    </span>
+                  )}
                 </td>
 
                 {/* Project Column (When All Projects is active) */}
@@ -316,10 +333,10 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          onRowAction('view-pods', item);
+                          onRowAction('workload-details', item);
                         }}
-                        className="hover:text-cyan-300 hover:underline flex items-center gap-1 group/pods"
-                        title={`Click to view Pods for ${item.name}`}
+                        className="hover:text-cyan-300 hover:underline flex items-center gap-1 cursor-pointer"
+                        title={`Click to view Replication Controllers and Pods for ${item.name}`}
                       >
                         <span>{item.ready || '-'}</span>
                       </button>
@@ -340,10 +357,10 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          onRowAction('view-pods', item);
+                          onRowAction('workload-details', item);
                         }}
-                        className="hover:text-cyan-300 hover:underline flex items-center gap-1 group/pods"
-                        title={`Click to view Pods for ${item.name}`}
+                        className="hover:text-cyan-300 hover:underline flex items-center gap-1 cursor-pointer"
+                        title={`Click to view Replicasets and Pods for ${item.name}`}
                       >
                         <span>{item.ready || '-'}</span>
                       </button>
@@ -456,24 +473,21 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                 {kind !== 'events' && (
                   <td className="py-2 px-4 text-right">
                     <div className="flex items-center justify-end gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
-                      {/* View Workload Pods */}
+                      {/* Workload Details Drilldown */}
                       {(kind === 'deployments' ||
                         kind === 'deploymentconfigs' ||
                         kind === 'statefulsets' ||
-                        kind === 'daemonsets' ||
-                        kind === 'services' ||
-                        kind === 'nodes' ||
-                        kind === 'helm') && (
+                        kind === 'daemonsets') && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            onRowAction('view-pods', item);
+                            onRowAction('workload-details', item);
                           }}
-                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-amber-950 text-amber-300 border border-slate-700 hover:border-amber-500 transition-colors"
-                          title={`View Pods for ${item.name}`}
-                          aria-label="View Pods"
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-cyan-950 text-cyan-300 border border-slate-700 hover:border-cyan-500 transition-colors"
+                          title="View Replicasets / Replication Controllers & Pods"
+                          aria-label="Workload Details"
                         >
-                          <Box size={14} />
+                          <Layers size={14} />
                         </button>
                       )}
 

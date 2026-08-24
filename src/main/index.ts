@@ -35,10 +35,10 @@ async function createWindow() {
   const iconPath = path.join(__dirname, '../../build/icon.png');
 
   mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 840,
-    minWidth: 960,
-    minHeight: 600,
+    width: 1560,
+    height: 920,
+    minWidth: 1100,
+    minHeight: 650,
     titleBarStyle: 'hiddenInset',
     backgroundColor: '#0b0f19',
     vibrancy: 'under-window',

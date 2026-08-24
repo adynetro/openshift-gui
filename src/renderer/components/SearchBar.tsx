@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, X, Zap, Terminal, Sparkles, RefreshCw, SlidersHorizontal, FileText, Code2, Trash2, Filter, Eraser, Anchor, Box } from 'lucide-react';
+import { Search, X, Zap, Terminal, Sparkles, RefreshCw, SlidersHorizontal, FileText, Code2, Trash2, Filter, Eraser, Anchor, Layers } from 'lucide-react';
 import { ResourceKind, ResourceItem } from '../../types/k8s.js';
 
 interface SearchBarProps {
@@ -32,22 +32,19 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     if (currentKind === 'events') return [];
     const pills: { id: string; label: string; tooltip: string; icon: any; color: string; disabled?: boolean }[] = [];
 
-    // View Pods action pill for workloads
+    // Details action pill for workloads
     if (
       currentKind === 'deployments' ||
       currentKind === 'deploymentconfigs' ||
       currentKind === 'statefulsets' ||
-      currentKind === 'daemonsets' ||
-      currentKind === 'services' ||
-      currentKind === 'nodes' ||
-      currentKind === 'helm'
+      currentKind === 'daemonsets'
     ) {
       pills.push({
-        id: 'view-pods',
-        label: 'Pods',
-        tooltip: 'View Pods for this resource',
-        icon: Box,
-        color: 'hover:border-amber-500 hover:text-amber-300 hover:bg-amber-950/40 text-amber-400 border-amber-900/50 bg-amber-950/20 font-semibold',
+        id: 'workload-details',
+        label: 'Details',
+        tooltip: 'View Replicasets / Replication Controllers & Live Pods',
+        icon: Layers,
+        color: 'hover:border-cyan-500 hover:text-cyan-300 hover:bg-cyan-950/40 text-cyan-400 border-cyan-900/50 bg-cyan-950/20 font-semibold',
         disabled: !selectedItem,
       });
     }

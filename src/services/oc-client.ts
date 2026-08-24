@@ -3,7 +3,7 @@ import { promisify } from 'node:util';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { ResourceKind, ResourceItem, ImageStreamResource } from '../types/k8s.js';
+import { ResourceKind, ResourceItem, ImageStreamResource, WorkloadDetails, WorkloadRevisionItem, WorkloadPodItem } from '../types/k8s.js';
 import { formatAge, getStatusColor } from '../utils/formatters.js';
 import { SemverSorter } from './semver-sorter.js';
 
@@ -609,5 +609,247 @@ export class OcClient {
       return { success: false, message: stderr };
     }
     return { success: true, message: stdout.trim() || `Deleted tag ${isName}:${tag}` };
+  }
+
+  /**
+   * Fetches comprehensive workload details including manifest, replication controllers / replicasets, and live pods.
+   */
+  static async getWorkloadDetails(
+    kind: ResourceKind,
+    name: string,
+    namespace: string
+  ): Promise<{ details?: WorkloadDetails; error?: string }> {
+    try {
+      let cmdKind = kind as string;
+      if (kind === 'deploymentconfigs') cmdKind = 'dc';
+      if (kind === 'statefulsets') cmdKind = 'sts';
+      if (kind === 'daemonsets') cmdKind = 'ds';
+
+      const nsFlag = namespace && namespace !== 'all-projects' ? `-n "${namespace}"` : '';
+
+      // 1. Fetch workload manifest JSON
+      const workloadCmd = `oc get ${cmdKind} "${name}" ${nsFlag} -o json || kubectl get ${cmdKind} "${name}" ${nsFlag} -o json`;
+      
+      // 2. Fetch revisions (RC for dc, RS for deployments, ControllerRevision for statefulset)
+      let revisionsCmd = '';
+      if (kind === 'deploymentconfigs') {
+        revisionsCmd = `oc get rc ${nsFlag} -o json || kubectl get rc ${nsFlag} -o json`;
+      } else if (kind === 'deployments') {
+        revisionsCmd = `oc get rs ${nsFlag} -o json || kubectl get rs ${nsFlag} -o json`;
+      } else if (kind === 'statefulsets') {
+        revisionsCmd = `oc get controllerrevision ${nsFlag} -o json || kubectl get controllerrevision ${nsFlag} -o json`;
+      }
+
+      // 3. Fetch Pods
+      const podsCmd = `oc get pods ${nsFlag} -o json || kubectl get pods ${nsFlag} -o json`;
+
+      // Execute in parallel
+      const [workloadRes, revisionsRes, podsRes] = await Promise.all([
+        this.runCommand(workloadCmd),
+        revisionsCmd ? this.runCommand(revisionsCmd) : Promise.resolve({ stdout: '', stderr: '', exitCode: 0 }),
+        this.runCommand(podsCmd),
+      ]);
+
+      if (!workloadRes.stdout.trim()) {
+        return { error: workloadRes.stderr || `Workload ${kind}/${name} not found` };
+      }
+
+      const workloadJson = JSON.parse(workloadRes.stdout);
+      const spec = workloadJson.spec || {};
+      const status = workloadJson.status || {};
+      const actualNamespace = workloadJson.metadata?.namespace || namespace;
+
+      // Extract containers images
+      const containers = spec.template?.spec?.containers || [];
+      const images: string[] = containers.map((c: any) => c.image).filter(Boolean);
+
+      // Extract selectors
+      const selectors: Record<string, string> = spec.selector?.matchLabels || spec.selector || {};
+
+      // Extract strategy & triggers
+      const strategy = spec.strategy?.type || spec.updateStrategy?.type || 'Rolling';
+      const triggers = workloadJson.spec?.triggers?.map((t: any) => t.type).join(', ') || 'Config';
+
+      // Parse Revisions
+      const revisions: WorkloadRevisionItem[] = [];
+      if (revisionsRes.stdout.trim()) {
+        try {
+          const revList = JSON.parse(revisionsRes.stdout).items || [];
+          for (const item of revList) {
+            const meta = item.metadata || {};
+            const itemSpec = item.spec || {};
+            const itemStatus = item.status || {};
+
+            let isMatch = false;
+            let revNumber = '1';
+            let phase = 'Active';
+
+            if (kind === 'deploymentconfigs') {
+              const dcName = meta.annotations?.['openshift.io/deployment-config.name'];
+              if (dcName === name || meta.name?.startsWith(`${name}-`)) {
+                isMatch = true;
+                revNumber = meta.annotations?.['openshift.io/deployment-config.latest-version'] || 
+                            meta.annotations?.['openshift.io/deployment.revision'] ||
+                            meta.name?.replace(`${name}-`, '') || '1';
+                phase = meta.annotations?.['openshift.io/deployment.phase'] || (itemSpec.replicas > 0 ? 'Active' : 'Complete');
+              }
+            } else if (kind === 'deployments') {
+              const owners = meta.ownerReferences || [];
+              if (owners.some((o: any) => o.name === name) || meta.name?.startsWith(`${name}-`)) {
+                isMatch = true;
+                revNumber = meta.annotations?.['deployment.kubernetes.io/revision'] || '1';
+                phase = (itemSpec.replicas || 0) > 0 ? 'Active' : 'Scaled Down';
+              }
+            } else if (kind === 'statefulsets') {
+              const owners = meta.ownerReferences || [];
+              if (owners.some((o: any) => o.name === name) || meta.name?.startsWith(`${name}-`)) {
+                isMatch = true;
+                revNumber = String(item.revision || meta.annotations?.['deployment.kubernetes.io/revision'] || '1');
+                phase = 'Active';
+              }
+            }
+
+            if (isMatch) {
+              const revContainers = itemSpec.template?.spec?.containers || [];
+              const revImages = revContainers.map((c: any) => c.image).filter(Boolean);
+              const desired = itemSpec.replicas || 0;
+              const current = itemStatus.replicas || 0;
+              const ready = itemStatus.readyReplicas || 0;
+
+              let statusColor: 'green' | 'red' | 'yellow' | 'blue' | 'gray' = 'gray';
+              if (phase === 'Complete' || phase === 'Active') statusColor = desired > 0 ? 'green' : 'gray';
+              else if (phase === 'Failed') statusColor = 'red';
+              else if (phase === 'Running' || phase === 'Pending') statusColor = 'yellow';
+
+              revisions.push({
+                name: meta.name,
+                kind: kind === 'deploymentconfigs' ? 'ReplicationController' : 'ReplicaSet',
+                revision: revNumber,
+                desired,
+                current,
+                ready,
+                status: phase,
+                statusColor,
+                age: formatAge(meta.creationTimestamp),
+                images: revImages.length > 0 ? revImages : images,
+                active: desired > 0,
+              });
+            }
+          }
+        } catch (err) {
+          console.error('Error parsing revisions:', err);
+        }
+      }
+
+      // Sort revisions descending by revision number
+      revisions.sort((a, b) => {
+        const numA = parseInt(a.revision, 10);
+        const numB = parseInt(b.revision, 10);
+        if (!isNaN(numA) && !isNaN(numB)) return numB - numA;
+        return b.name.localeCompare(a.name);
+      });
+
+      // Parse Pods
+      const pods: WorkloadPodItem[] = [];
+      if (podsRes.stdout.trim()) {
+        try {
+          const podList = JSON.parse(podsRes.stdout).items || [];
+          for (const pod of podList) {
+            const meta = pod.metadata || {};
+            const podSpec = pod.spec || {};
+            const podStatus = pod.status || {};
+            const labels = meta.labels || {};
+
+            let isMatch = false;
+            if (kind === 'deploymentconfigs') {
+              if (labels['deploymentconfig'] === name || 
+                  labels['deployment']?.startsWith(`${name}-`) ||
+                  meta.name?.startsWith(`${name}-`)) {
+                isMatch = true;
+              }
+            } else if (kind === 'deployments') {
+              const owners = meta.ownerReferences || [];
+              const matchOwner = owners.some((o: any) => revisions.some(r => r.name === o.name) || o.name === name);
+              const matchLabel = Object.entries(selectors).every(([k, v]) => labels[k] === v);
+              if (matchOwner || (matchLabel && Object.keys(selectors).length > 0) || meta.name?.startsWith(`${name}-`)) {
+                isMatch = true;
+              }
+            } else if (kind === 'statefulsets') {
+              if (labels['app'] === name || 
+                  labels['statefulset.kubernetes.io/pod-name']?.startsWith(name) ||
+                  meta.name?.startsWith(`${name}-`)) {
+                isMatch = true;
+              }
+            } else if (kind === 'daemonsets') {
+              const matchLabel = Object.entries(selectors).every(([k, v]) => labels[k] === v);
+              if ((matchLabel && Object.keys(selectors).length > 0) || meta.name?.startsWith(`${name}-`)) {
+                isMatch = true;
+              }
+            }
+
+            if (isMatch) {
+              const containerStatuses = podStatus.containerStatuses || [];
+              const readyContainers = containerStatuses.filter((c: any) => c.ready).length;
+              const totalContainers = podSpec.containers?.length || containerStatuses.length || 1;
+              const restarts = containerStatuses.reduce((acc: number, c: any) => acc + (c.restartCount || 0), 0);
+              const phase = podStatus.phase || 'Unknown';
+
+              let statusColor: 'green' | 'red' | 'yellow' | 'blue' | 'gray' = 'gray';
+              if (phase === 'Running') statusColor = 'green';
+              else if (phase === 'Succeeded' || phase === 'Completed') statusColor = 'blue';
+              else if (phase === 'Pending') statusColor = 'yellow';
+              else if (phase === 'Failed' || phase === 'CrashLoopBackOff') statusColor = 'red';
+
+              const podContainers = (podSpec.containers || []).map((c: any) => {
+                const cStatus = containerStatuses.find((cs: any) => cs.name === c.name);
+                const state = cStatus?.state?.running ? 'Running' : cStatus?.state?.waiting?.reason || cStatus?.state?.terminated?.reason || 'Unknown';
+                return {
+                  name: c.name,
+                  image: c.image,
+                  ready: !!cStatus?.ready,
+                  state,
+                };
+              });
+
+              pods.push({
+                name: meta.name,
+                namespace: meta.namespace || actualNamespace,
+                ready: `${readyContainers}/${totalContainers}`,
+                status: phase,
+                statusColor,
+                restarts,
+                ip: podStatus.podIP || '-',
+                node: podSpec.nodeName || '-',
+                age: formatAge(meta.creationTimestamp),
+                containers: podContainers,
+              });
+            }
+          }
+        } catch (err) {
+          console.error('Error parsing pods for workload:', err);
+        }
+      }
+
+      // Sort pods by name
+      pods.sort((a, b) => a.name.localeCompare(b.name));
+
+      const details: WorkloadDetails = {
+        kind,
+        name,
+        namespace: actualNamespace,
+        strategy,
+        triggers,
+        selectors,
+        desiredReplicas: spec.replicas ?? 1,
+        readyReplicas: status.readyReplicas ?? status.replicas ?? 0,
+        images,
+        revisions,
+        pods,
+      };
+
+      return { details };
+    } catch (err: any) {
+      return { error: err.message || 'Failed to fetch workload details' };
+    }
   }
 }
