@@ -1,4 +1,5 @@
 export type ResourceKind =
+  | 'topology'
   | 'pods'
   | 'deployments'
   | 'deploymentconfigs'
@@ -6,6 +7,9 @@ export type ResourceKind =
   | 'daemonsets'
   | 'services'
   | 'routes'
+  | 'pvc'
+  | 'pv'
+  | 'crd'
   | 'imagestreams'
   | 'configmaps'
   | 'secrets'
@@ -30,6 +34,33 @@ export interface ResourceItem {
   labels?: Record<string, string>;
   raw?: any;
   extra?: Record<string, any>;
+}
+
+export interface TopologyNode {
+  id: string;
+  name: string;
+  namespace: string;
+  kind: ResourceKind;
+  status: string;
+  statusColor?: 'green' | 'red' | 'yellow' | 'blue' | 'gray';
+  desiredReplicas: number;
+  readyReplicas: number;
+  podCount: number;
+  images: string[];
+  appName?: string;
+  routes: { name: string; host: string; url: string; tls: boolean }[];
+  services: { name: string; type: string; clusterIP: string; ports: string }[];
+  pvcs: { name: string; status: string; capacity: string; storageClass: string }[];
+  pods: { name: string; status: string; statusColor?: string; ready: string; restarts: number }[];
+  age: string;
+}
+
+export interface TopologyData {
+  namespace: string;
+  workloads: TopologyNode[];
+  standaloneServices: ResourceItem[];
+  standaloneRoutes: ResourceItem[];
+  standalonePvcs: ResourceItem[];
 }
 
 export interface WorkloadRevisionItem {

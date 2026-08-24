@@ -3,7 +3,6 @@ import { TopNav } from './components/TopNav.js';
 import { Sidebar } from './components/Sidebar.js';
 import { SearchBar } from './components/SearchBar.js';
 import { ResourceTable } from './components/ResourceTable.js';
-import { ContextModal } from './components/ContextModal.js';
 import { LogViewer } from './components/LogViewer.js';
 import { YamlModal } from './components/YamlModal.js';
 import { EditYamlModal } from './components/EditYamlModal.js';
@@ -11,9 +10,32 @@ import { ImageStreamModal } from './components/ImageStreamModal.js';
 import { HelmModal } from './components/HelmModal.js';
 import { ActionDialog } from './components/ActionDialog.js';
 import { WorkloadDetailsModal } from './components/WorkloadDetailsModal.js';
+import { TopologyView } from './components/TopologyView.js';
+import { ContextModal } from './components/ContextModal.js';
 import { ResourceKind, ResourceItem, KubeContext, ProjectInfo, ImageStreamResource } from '../types/k8s.js';
 import { FuzzyMatcher } from '../utils/fuzzy.js';
 import { CheckCircle2, AlertTriangle } from 'lucide-react';
+
+type ModalMode =
+  | 'none'
+  | 'context'
+  | 'project'
+  | 'workload-details'
+  | 'logs'
+  | 'yaml'
+  | 'edit-yaml'
+  | 'describe'
+  | 'scale'
+  | 'restart'
+  | 'delete'
+  | 'clean-is'
+  | 'helm'
+  | 'help';
+
+interface ModalStackEntry {
+  mode: ModalMode;
+  item: ResourceItem | null;
+}
 
 export const App: React.FC = () => {
   // Context & Project State
@@ -25,21 +47,39 @@ export const App: React.FC = () => {
   const [isUnauthorized, setIsUnauthorized] = useState<boolean>(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  // Resource State
-  const [currentKind, setCurrentKind] = useState<ResourceKind>('pods');
+  // Resource State - Topology is first tab by default
+  const [currentKind, setCurrentKind] = useState<ResourceKind>('topology');
   const [resources, setResources] = useState<ResourceItem[]>([]);
   const [counts, setCounts] = useState<Partial<Record<ResourceKind, number>>>({});
   const [selectedItem, setSelectedItem] = useState<ResourceItem | null>(null);
   const [query, setQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [loading, setLoading] = useState<boolean>(true);
-  const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
   const [statusNotification, setStatusNotification] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
-  // Modal State
-  const [modalMode, setModalMode] = useState<
-    'none' | 'context' | 'project' | 'workload-details' | 'logs' | 'yaml' | 'edit-yaml' | 'describe' | 'scale' | 'restart' | 'delete' | 'clean-is' | 'helm' | 'help'
-  >('none');
+  // Modal Navigation Stack for deep child modal back navigation
+  const [modalMode, setModalMode] = useState<ModalMode>('none');
+  const [modalStack, setModalStack] = useState<ModalStackEntry[]>([]);
+
+  const openModal = (mode: ModalMode, item?: ResourceItem | null) => {
+    const nextItem = item !== undefined ? item : selectedItem;
+    if (modalMode !== 'none') {
+      setModalStack((prev) => [...prev, { mode: modalMode, item: selectedItem }]);
+    }
+    if (nextItem !== undefined) setSelectedItem(nextItem);
+    setModalMode(mode);
+  };
+
+  const closeModal = () => {
+    if (modalStack.length > 0) {
+      const parent = modalStack[modalStack.length - 1];
+      setModalStack((prev) => prev.slice(0, -1));
+      setModalMode(parent.mode);
+      setSelectedItem(parent.item);
+    } else {
+      setModalMode('none');
+    }
+  };
 
   const showToast = (text: string, type: 'success' | 'error' = 'success') => {
     setStatusNotification({ text, type });
@@ -52,10 +92,7 @@ export const App: React.FC = () => {
   const loadKubeInfo = useCallback(async () => {
     try {
       const api = (window as any).electronAPI;
-      if (!api) {
-        console.error('electronAPI is not available on window');
-        return;
-      }
+      if (!api) return;
 
       const res = await api.getContexts();
       const ctxList = res?.contexts || [];
@@ -76,6 +113,7 @@ export const App: React.FC = () => {
   // Fetch resources for active kind and project
   const fetchResources = useCallback(
     async (isBackground = false) => {
+      if (currentKind === 'topology') return;
       const api = (window as any).electronAPI;
       if (!api) return;
 
@@ -111,17 +149,19 @@ export const App: React.FC = () => {
   useEffect(() => {
     setSelectedItem(null);
     setStatusFilter('ALL');
-    fetchResources(false);
-  }, [fetchResources]);
+    if (currentKind !== 'topology') {
+      fetchResources(false);
+    }
+  }, [fetchResources, currentKind]);
 
   // Auto-polling interval
   useEffect(() => {
-    if (!autoRefresh) return;
+    if (currentKind === 'topology') return;
     const interval = setInterval(() => {
       fetchResources(true);
-    }, currentKind === 'events' ? 2500 : 4000);
+    }, currentKind === 'events' ? 2500 : 3500);
     return () => clearInterval(interval);
-  }, [autoRefresh, currentKind, fetchResources]);
+  }, [currentKind, fetchResources]);
 
   // Available statuses in current resource list
   const availableStatuses = useMemo(() => {
@@ -156,7 +196,7 @@ export const App: React.FC = () => {
 
     // Filter by search query
     if (query.trim()) {
-      const matcher = new FuzzyMatcher(items, ['name', 'status', 'namespace', 'ip', 'node', 'age', 'extra.message', 'extra.reason']);
+      const matcher = new FuzzyMatcher(items, ['name', 'status', 'namespace', 'ip', 'node', 'age', 'extra.message', 'extra.reason', 'extra.volume', 'extra.capacity', 'extra.group']);
       items = matcher.search(query);
     }
 
@@ -193,43 +233,41 @@ export const App: React.FC = () => {
 
   // Handle Switch Context
   const handleSwitchContext = async (contextName: string) => {
-    setModalMode('none');
+    closeModal();
     const api = (window as any).electronAPI;
     const ok = await api.switchContext(contextName);
     if (ok) {
       showToast(`Switched context to ${contextName}`);
-      await loadKubeInfo();
+      setCurrentContext(contextName);
+      loadKubeInfo();
       fetchResources(false);
     } else {
-      showToast(`Failed to switch context`, 'error');
+      showToast(`Failed to switch context to ${contextName}`, 'error');
     }
   };
 
   // Handle Switch Project
   const handleSwitchProject = async (projectName: string) => {
-    setModalMode('none');
+    closeModal();
     const api = (window as any).electronAPI;
     const ok = await api.switchProject(projectName);
     if (ok) {
-      const display = projectName === 'all-projects' ? 'All Projects (Cluster-Wide)' : projectName;
-      showToast(`Switched to ${display}`);
       setCurrentProject(projectName);
+      showToast(projectName === 'all-projects' ? 'Switched to All Projects' : `Switched to project ${projectName}`);
       fetchResources(false);
     } else {
-      showToast(`Failed to switch project`, 'error');
+      showToast(`Failed to switch project to ${projectName}`, 'error');
     }
   };
 
-  // Action Dispatcher
+  // Action Dispatcher with Modal Stack preservation
   const handleAction = (actionType: string, targetItem?: ResourceItem) => {
     const item = targetItem || selectedItem;
     if (!item && actionType !== 'help') return;
 
-    if (item) setSelectedItem(item);
-
     switch (actionType) {
       case 'workload-details':
-        setModalMode('workload-details');
+        openModal('workload-details', item);
         break;
       case 'view-pods':
         if (item) {
@@ -243,33 +281,33 @@ export const App: React.FC = () => {
         }
         break;
       case 'edit-yaml':
-        setModalMode('edit-yaml');
+        openModal('edit-yaml', item);
         break;
       case 'logs':
-        setModalMode('logs');
+        openModal('logs', item);
         break;
       case 'scale':
-        setModalMode('scale');
+        openModal('scale', item);
         break;
       case 'restart':
-        setModalMode('restart');
+        openModal('restart', item);
         break;
       case 'clean-is':
-        setModalMode('clean-is');
+        openModal('clean-is', item);
         break;
       case 'helm-values':
       case 'yaml':
-        setModalMode('yaml');
+        openModal('yaml', item);
         break;
       case 'describe':
-        setModalMode('describe');
+        openModal('describe', item);
         break;
       case 'helm-manage':
       case 'helm-history':
-        setModalMode('helm');
+        openModal('helm', item);
         break;
       case 'delete':
-        setModalMode('delete');
+        openModal('delete', item);
         break;
     }
   };
@@ -278,36 +316,40 @@ export const App: React.FC = () => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (modalMode !== 'none' || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-        if (e.key === 'Escape') setModalMode('none');
+        if (e.key === 'Escape') closeModal();
         return;
       }
 
       if (e.key === 'c') {
         e.preventDefault();
         loadKubeInfo();
-        setModalMode('context');
+        openModal('context');
       } else if (e.key === 'p') {
         e.preventDefault();
         loadKubeInfo();
-        setModalMode('project');
+        openModal('project');
       } else if (e.key === '/') {
         e.preventDefault();
         const searchInput = document.querySelector('input[type="text"]') as HTMLInputElement;
         if (searchInput) searchInput.focus();
-      } else if (e.key === '1') setCurrentKind('pods');
-      else if (e.key === '2') setCurrentKind('deployments');
-      else if (e.key === '3') setCurrentKind('deploymentconfigs');
-      else if (e.key === '4') setCurrentKind('statefulsets');
-      else if (e.key === '5') setCurrentKind('daemonsets');
-      else if (e.key === 'e') setCurrentKind('events');
-      else if (e.key === '6') setCurrentKind('routes');
-      else if (e.key === '7') setCurrentKind('services');
-      else if (e.key === '8') setCurrentKind('imagestreams');
-      else if (e.key === '9') setCurrentKind('helm');
-      else if (e.key === '0') setCurrentKind('configmaps');
-      else if (e.key === '-') setCurrentKind('secrets');
+      } else if (e.key === '1') setCurrentKind('topology');
+      else if (e.key === '2') setCurrentKind('pods');
+      else if (e.key === '3') setCurrentKind('deployments');
+      else if (e.key === '4') setCurrentKind('deploymentconfigs');
+      else if (e.key === '5') setCurrentKind('statefulsets');
+      else if (e.key === '6') setCurrentKind('daemonsets');
+      else if (e.key === '7') setCurrentKind('routes');
+      else if (e.key === '8') setCurrentKind('services');
+      else if (e.key === '9') setCurrentKind('pvc');
+      else if (e.key === '0') setCurrentKind('pv');
+      else if (e.key === 'k') setCurrentKind('crd');
+      else if (e.key === 'i') setCurrentKind('imagestreams');
+      else if (e.key === 'h') setCurrentKind('helm');
+      else if (e.key === 'c') setCurrentKind('configmaps');
+      else if (e.key === 's') setCurrentKind('secrets');
       else if (e.key === 'n') setCurrentKind('nodes');
-      else if (e.key === '?' || e.key === 'h') setModalMode('help');
+      else if (e.key === 'e') setCurrentKind('events');
+      else if (e.key === '?') openModal('help');
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -326,11 +368,11 @@ export const App: React.FC = () => {
         isUnauthorized={isUnauthorized}
         onOpenContextModal={() => {
           loadKubeInfo();
-          setModalMode('context');
+          openModal('context');
         }}
         onOpenProjectModal={() => {
           loadKubeInfo();
-          setModalMode('project');
+          openModal('project');
         }}
       />
 
@@ -341,7 +383,7 @@ export const App: React.FC = () => {
           currentKind={currentKind}
           onSelectKind={(kind) => setCurrentKind(kind)}
           counts={counts}
-          onOpenHelp={() => setModalMode('help')}
+          onOpenHelp={() => openModal('help')}
         />
 
         {/* Center Main Content Area */}
@@ -362,41 +404,61 @@ export const App: React.FC = () => {
             </div>
           )}
 
-          {/* Autocomplete Search & Action Bar with Status Filter & Clear Pods */}
-          <SearchBar
-            query={query}
-            onChangeQuery={setQuery}
-            statusFilter={statusFilter}
-            onChangeStatusFilter={setStatusFilter}
-            availableStatuses={availableStatuses}
-            currentKind={currentKind}
-            selectedItem={selectedItem}
-            onAction={handleAction}
-            onClearCompletedFailed={handleClearCompletedFailedPods}
-            clearablePodsCount={clearablePodsCount}
-          />
+          {/* Render Topology View or Resource Table */}
+          {currentKind === 'topology' ? (
+            <TopologyView
+              currentProject={currentProject}
+              onSelectWorkload={(item) => openModal('workload-details', item)}
+              onOpenWorkloadLogs={(item) => openModal('logs', item)}
+              onOpenWorkloadYaml={(item) => openModal('edit-yaml', item)}
+              onOpenWorkloadScale={(item) => openModal('scale', item)}
+              onOpenExternal={async (url) => {
+                const api = (window as any).electronAPI;
+                if (api && api.openExternal) await api.openExternal(url);
+                else window.open(url, '_blank');
+              }}
+            />
+          ) : (
+            <>
+              {/* Autocomplete Search & Action Bar with Status Filter & Clear Pods */}
+              <SearchBar
+                query={query}
+                onChangeQuery={setQuery}
+                statusFilter={statusFilter}
+                onChangeStatusFilter={setStatusFilter}
+                availableStatuses={availableStatuses}
+                currentKind={currentKind}
+                selectedItem={selectedItem}
+                onAction={handleAction}
+                onClearCompletedFailed={handleClearCompletedFailedPods}
+                clearablePodsCount={clearablePodsCount}
+              />
 
-          {/* Resource Table */}
-          <ResourceTable
-            kind={currentKind}
-            items={filteredItems}
-            currentProject={currentProject}
-            selectedItem={selectedItem}
-            onSelectItem={(item) => setSelectedItem(item)}
-            loading={loading}
-            error={fetchError}
-            isUnauthorized={isUnauthorized}
-            onRowAction={(action, item) => handleAction(action, item)}
-            onOpenContextModal={() => {
-              loadKubeInfo();
-              setModalMode('context');
-            }}
-            onRetry={() => fetchResources(false)}
-          />
+              {/* Resource Table */}
+              <ResourceTable
+                kind={currentKind}
+                items={filteredItems}
+                currentProject={currentProject}
+                selectedItem={selectedItem}
+                onSelectItem={(item) => setSelectedItem(item)}
+                loading={loading}
+                error={fetchError}
+                isUnauthorized={isUnauthorized}
+                onRowAction={(action, item) => handleAction(action, item)}
+                onOpenContextModal={() => {
+                  loadKubeInfo();
+                  openModal('context');
+                }}
+                onRetry={() => fetchResources(false)}
+              />
+            </>
+          )}
         </main>
       </div>
 
-      {/* Modals & Dialog Windows */}
+      {/* ========================================================================= */}
+      {/* MODAL WINDOWS WITH FULL STACK BACK-NAVIGATION                             */}
+      {/* ========================================================================= */}
 
       {/* Context Switcher Modal */}
       {modalMode === 'context' && (
@@ -408,7 +470,7 @@ export const App: React.FC = () => {
           currentProject={currentProject}
           onSelectContext={handleSwitchContext}
           onSelectProject={() => {}}
-          onClose={() => setModalMode('none')}
+          onClose={closeModal}
         />
       )}
 
@@ -422,7 +484,7 @@ export const App: React.FC = () => {
           currentProject={currentProject}
           onSelectContext={() => {}}
           onSelectProject={handleSwitchProject}
-          onClose={() => setModalMode('none')}
+          onClose={closeModal}
         />
       )}
 
@@ -431,10 +493,10 @@ export const App: React.FC = () => {
         <WorkloadDetailsModal
           item={selectedItem}
           namespace={selectedItem.namespace || currentProject}
-          onClose={() => setModalMode('none')}
+          onClose={closeModal}
           onAction={(act, target) => handleAction(act, target || selectedItem)}
           onOpenPodLogs={(podName) => {
-            setSelectedItem({
+            openModal('logs', {
               id: podName,
               name: podName,
               namespace: selectedItem.namespace || currentProject,
@@ -442,10 +504,9 @@ export const App: React.FC = () => {
               status: 'Running',
               age: '',
             });
-            setModalMode('logs');
           }}
           onOpenPodDescribe={(podName) => {
-            setSelectedItem({
+            openModal('describe', {
               id: podName,
               name: podName,
               namespace: selectedItem.namespace || currentProject,
@@ -453,10 +514,9 @@ export const App: React.FC = () => {
               status: 'Running',
               age: '',
             });
-            setModalMode('describe');
           }}
           onOpenPodYaml={(podName) => {
-            setSelectedItem({
+            openModal('yaml', {
               id: podName,
               name: podName,
               namespace: selectedItem.namespace || currentProject,
@@ -464,7 +524,6 @@ export const App: React.FC = () => {
               status: 'Running',
               age: '',
             });
-            setModalMode('yaml');
           }}
         />
       )}
@@ -474,7 +533,7 @@ export const App: React.FC = () => {
         <LogViewer
           item={selectedItem}
           namespace={selectedItem.namespace || currentProject}
-          onClose={() => setModalMode('none')}
+          onClose={closeModal}
         />
       )}
 
@@ -484,8 +543,8 @@ export const App: React.FC = () => {
           mode={modalMode}
           item={selectedItem}
           namespace={selectedItem.namespace || currentProject}
-          onClose={() => setModalMode('none')}
-          onEdit={() => setModalMode('edit-yaml')}
+          onClose={closeModal}
+          onEdit={() => openModal('edit-yaml')}
         />
       )}
 
@@ -494,7 +553,7 @@ export const App: React.FC = () => {
         <EditYamlModal
           item={selectedItem}
           namespace={selectedItem.namespace || currentProject}
-          onClose={() => setModalMode('none')}
+          onClose={closeModal}
           onSuccess={(msg) => {
             showToast(msg, 'success');
             fetchResources(false);
@@ -507,7 +566,7 @@ export const App: React.FC = () => {
         <ImageStreamModal
           imageStream={selectedItem as ImageStreamResource}
           namespace={selectedItem.namespace || currentProject}
-          onClose={() => setModalMode('none')}
+          onClose={closeModal}
           onRefresh={() => fetchResources(false)}
         />
       )}
@@ -517,7 +576,7 @@ export const App: React.FC = () => {
         <HelmModal
           release={selectedItem}
           namespace={selectedItem.namespace || currentProject}
-          onClose={() => setModalMode('none')}
+          onClose={closeModal}
           onRefresh={() => fetchResources(false)}
         />
       )}
@@ -528,14 +587,14 @@ export const App: React.FC = () => {
           mode={modalMode}
           item={selectedItem}
           namespace={selectedItem.namespace || currentProject}
-          onClose={() => setModalMode('none')}
+          onClose={closeModal}
           onSuccess={(msg) => {
-            setModalMode('none');
+            closeModal();
             showToast(msg, 'success');
             fetchResources(false);
           }}
           onError={(msg) => {
-            setModalMode('none');
+            closeModal();
             showToast(msg, 'error');
           }}
         />

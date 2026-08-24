@@ -222,6 +222,33 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                 <th className="py-3 px-3">App Version</th>
               </>
             )}
+            {kind === 'pvc' && (
+              <>
+                <th className="py-3 px-3">Status</th>
+                <th className="py-3 px-3">Volume</th>
+                <th className="py-3 px-3">Capacity</th>
+                <th className="py-3 px-3">Access Modes</th>
+                <th className="py-3 px-3">StorageClass</th>
+              </>
+            )}
+            {kind === 'pv' && (
+              <>
+                <th className="py-3 px-3">Capacity</th>
+                <th className="py-3 px-3">Access Modes</th>
+                <th className="py-3 px-3">Reclaim Policy</th>
+                <th className="py-3 px-3">Status</th>
+                <th className="py-3 px-3">Claim</th>
+                <th className="py-3 px-3">StorageClass</th>
+              </>
+            )}
+            {kind === 'crd' && (
+              <>
+                <th className="py-3 px-3">Group</th>
+                <th className="py-3 px-3">Kind</th>
+                <th className="py-3 px-3">Scope</th>
+                <th className="py-3 px-3">Versions</th>
+              </>
+            )}
             {kind === 'nodes' && (
               <>
                 <th className="py-3 px-3">Status</th>
@@ -453,6 +480,49 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                       {item.extra?.chart || '-'}
                     </td>
                     <td className="py-2.5 px-3 font-mono text-yellow-300">{item.extra?.appVersion || '-'}</td>
+                  </>
+                )}
+
+                {/* PersistentVolumeClaim Columns */}
+                {kind === 'pvc' && (
+                  <>
+                    <td className="py-2.5 px-3">{getStatusBadge(item.status, item.statusColor)}</td>
+                    <td className="py-2.5 px-3 font-mono text-cyan-300 truncate max-w-[200px]" title={item.extra?.volume}>
+                      {item.extra?.volume || '-'}
+                    </td>
+                    <td className="py-2.5 px-3 font-mono font-bold text-slate-200">{item.extra?.capacity || '-'}</td>
+                    <td className="py-2.5 px-3 font-mono text-amber-300">{item.extra?.accessModes || '-'}</td>
+                    <td className="py-2.5 px-3 font-mono text-slate-400">{item.extra?.storageClass || '-'}</td>
+                  </>
+                )}
+
+                {/* PersistentVolume Columns */}
+                {kind === 'pv' && (
+                  <>
+                    <td className="py-2.5 px-3 font-mono font-bold text-slate-200">{item.extra?.capacity || '-'}</td>
+                    <td className="py-2.5 px-3 font-mono text-amber-300">{item.extra?.accessModes || '-'}</td>
+                    <td className="py-2.5 px-3 font-mono text-slate-300">{item.extra?.reclaimPolicy || 'Retain'}</td>
+                    <td className="py-2.5 px-3">{getStatusBadge(item.status, item.statusColor)}</td>
+                    <td className="py-2.5 px-3 font-mono text-cyan-300 truncate max-w-[200px]" title={item.extra?.claim}>
+                      {item.extra?.claim || '-'}
+                    </td>
+                    <td className="py-2.5 px-3 font-mono text-slate-400">{item.extra?.storageClass || '-'}</td>
+                  </>
+                )}
+
+                {/* CustomResourceDefinition Columns */}
+                {kind === 'crd' && (
+                  <>
+                    <td className="py-2.5 px-3 font-mono text-purple-300 truncate max-w-[220px]" title={item.extra?.group}>
+                      {item.extra?.group || '-'}
+                    </td>
+                    <td className="py-2.5 px-3 font-mono font-bold text-cyan-300">{item.extra?.crdKind || '-'}</td>
+                    <td className="py-2.5 px-3 font-mono text-slate-300">
+                      <span className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px]">
+                        {item.extra?.scope || 'Namespaced'}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 font-mono text-slate-400">{item.extra?.versions || '-'}</td>
                   </>
                 )}
 

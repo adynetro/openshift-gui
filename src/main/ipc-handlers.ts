@@ -85,6 +85,10 @@ export function registerIpcHandlers(mainWindow: electron.BrowserWindow): void {
     return await OcClient.getWorkloadDetails(kind, name, namespace);
   });
 
+  ipcMain.handle('kube:getTopologyData', async (_event, namespace: string) => {
+    return await OcClient.getTopologyData(namespace);
+  });
+
   // Helm Handlers
   ipcMain.handle('helm:getValues', async (_event, releaseName: string, namespace: string) => {
     return await HelmService.getValues(releaseName, namespace);

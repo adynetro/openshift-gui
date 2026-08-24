@@ -3,7 +3,7 @@ import { promisify } from 'node:util';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { ResourceKind, ResourceItem, ImageStreamResource, WorkloadDetails, WorkloadRevisionItem, WorkloadPodItem } from '../types/k8s.js';
+import { ResourceKind, ResourceItem, ImageStreamResource, WorkloadDetails, WorkloadRevisionItem, WorkloadPodItem, TopologyData, TopologyNode } from '../types/k8s.js';
 import { formatAge, getStatusColor } from '../utils/formatters.js';
 import { SemverSorter } from './semver-sorter.js';
 
@@ -61,12 +61,13 @@ export class OcClient {
     kind: ResourceKind,
     namespace: string
   ): Promise<{ items: ResourceItem[]; error?: string; isUnauthorized?: boolean }> {
-    if (kind === 'helm') {
+    if (kind === 'helm' || kind === 'topology') {
       return { items: [] };
     }
 
     const isAll = !namespace || namespace === 'all-projects' || namespace === '__all__';
-    const nsFlag = isAll ? '-A' : `-n "${namespace}"`;
+    const isClusterScoped = kind === 'nodes' || kind === 'pv' || kind === 'crd';
+    const nsFlag = isClusterScoped ? '' : (isAll ? '-A' : `-n "${namespace}"`);
 
     let cmdKind = kind as string;
     if (kind === 'deploymentconfigs') cmdKind = 'dc';
@@ -75,6 +76,9 @@ export class OcClient {
     if (kind === 'daemonsets') cmdKind = 'ds';
     if (kind === 'configmaps') cmdKind = 'cm';
     if (kind === 'events') cmdKind = 'events';
+    if (kind === 'pvc') cmdKind = 'pvc';
+    if (kind === 'pv') cmdKind = 'pv';
+    if (kind === 'crd') cmdKind = 'crd';
 
     const cmd = `oc get ${cmdKind} ${nsFlag} -o json || kubectl get ${cmdKind} ${nsFlag} -o json`;
     const { stdout, stderr } = await this.runCommand(cmd);
@@ -350,6 +354,86 @@ export class OcClient {
             statusColor: 'cyan' as const,
             age,
             extra: { dataCount, type: raw.type || 'Opaque' },
+            labels: raw.metadata?.labels || {},
+            raw,
+          };
+        }
+
+        case 'pvc': {
+          const status = raw.status?.phase || 'Pending';
+          const volume = raw.spec?.volumeName || '-';
+          const capacity = raw.status?.capacity?.storage || raw.spec?.resources?.requests?.storage || '-';
+          const accessModes = (raw.spec?.accessModes || [])
+            .map((m: string) => m.replace('ReadWriteOnce', 'RWO').replace('ReadWriteMany', 'RWX').replace('ReadOnlyMany', 'ROX'))
+            .join(', ') || '-';
+          const storageClass = raw.spec?.storageClassName || '-';
+
+          let statusColor: 'green' | 'yellow' | 'red' | 'gray' = 'gray';
+          if (status === 'Bound') statusColor = 'green';
+          else if (status === 'Pending') statusColor = 'yellow';
+          else if (status === 'Lost') statusColor = 'red';
+
+          return {
+            id: `${ns}/${name}`,
+            name,
+            namespace: ns,
+            kind,
+            status,
+            statusColor,
+            age,
+            extra: { volume, capacity, accessModes, storageClass },
+            labels: raw.metadata?.labels || {},
+            raw,
+          };
+        }
+
+        case 'pv': {
+          const status = raw.status?.phase || 'Available';
+          const capacity = raw.spec?.capacity?.storage || '-';
+          const accessModes = (raw.spec?.accessModes || [])
+            .map((m: string) => m.replace('ReadWriteOnce', 'RWO').replace('ReadWriteMany', 'RWX').replace('ReadOnlyMany', 'ROX'))
+            .join(', ') || '-';
+          const reclaimPolicy = raw.spec?.persistentVolumeReclaimPolicy || 'Retain';
+          const storageClass = raw.spec?.storageClassName || '-';
+          const claim = raw.spec?.claimRef ? `${raw.spec.claimRef.namespace}/${raw.spec.claimRef.name}` : '-';
+
+          let statusColor: 'green' | 'blue' | 'yellow' | 'red' | 'gray' = 'gray';
+          if (status === 'Bound') statusColor = 'green';
+          else if (status === 'Available') statusColor = 'blue';
+          else if (status === 'Released') statusColor = 'yellow';
+          else if (status === 'Failed') statusColor = 'red';
+
+          return {
+            id: name,
+            name,
+            namespace: 'cluster',
+            kind,
+            status,
+            statusColor,
+            age,
+            extra: { capacity, accessModes, reclaimPolicy, storageClass, claim },
+            labels: raw.metadata?.labels || {},
+            raw,
+          };
+        }
+
+        case 'crd': {
+          const group = raw.spec?.group || '-';
+          const scope = raw.spec?.scope || 'Namespaced';
+          const crdKind = raw.spec?.names?.kind || '-';
+          const versions = (raw.spec?.versions || []).map((v: any) => v.name).join(', ') || '-';
+          const established = raw.status?.conditions?.some((c: any) => c.type === 'Established' && c.status === 'True');
+          const status = established ? 'Established' : 'Active';
+
+          return {
+            id: name,
+            name,
+            namespace: 'cluster',
+            kind,
+            status,
+            statusColor: 'cyan' as const,
+            age,
+            extra: { group, scope, crdKind, versions },
             labels: raw.metadata?.labels || {},
             raw,
           };
@@ -867,6 +951,236 @@ export class OcClient {
       return { details };
     } catch (err: any) {
       return { error: err.message || 'Failed to fetch workload details' };
+    }
+  }
+
+  /**
+   * Fetches topology data combining workloads, services, routes, pvcs, and pods for a project.
+   */
+  static async getTopologyData(namespace: string): Promise<{ data?: TopologyData; error?: string }> {
+    try {
+      const isAll = !namespace || namespace === 'all-projects' || namespace === '__all__';
+      const nsFlag = isAll ? '-A' : `-n "${namespace}"`;
+
+      const [dcsRes, deprsRes, stsRes, dsRes, svcsRes, routesRes, pvcsRes, podsRes] = await Promise.all([
+        this.runCommand(`oc get dc ${nsFlag} -o json || true`),
+        this.runCommand(`oc get deployments ${nsFlag} -o json || kubectl get deployments ${nsFlag} -o json || true`),
+        this.runCommand(`oc get statefulsets ${nsFlag} -o json || kubectl get statefulsets ${nsFlag} -o json || true`),
+        this.runCommand(`oc get daemonsets ${nsFlag} -o json || kubectl get daemonsets ${nsFlag} -o json || true`),
+        this.runCommand(`oc get services ${nsFlag} -o json || kubectl get services ${nsFlag} -o json || true`),
+        this.runCommand(`oc get routes ${nsFlag} -o json || true`),
+        this.runCommand(`oc get pvc ${nsFlag} -o json || kubectl get pvc ${nsFlag} -o json || true`),
+        this.runCommand(`oc get pods ${nsFlag} -o json || kubectl get pods ${nsFlag} -o json || true`),
+      ]);
+
+      const parseItems = (stdout: string) => {
+        try {
+          if (!stdout.trim()) return [];
+          const j = JSON.parse(stdout);
+          return j.items || (j.kind ? [j] : []);
+        } catch {
+          return [];
+        }
+      };
+
+      const dcs = parseItems(dcsRes.stdout);
+      const deprs = parseItems(deprsRes.stdout);
+      const sts = parseItems(stsRes.stdout);
+      const ds = parseItems(dsRes.stdout);
+      const svcs = parseItems(svcsRes.stdout);
+      const routes = parseItems(routesRes.stdout);
+      const pvcs = parseItems(pvcsRes.stdout);
+      const pods = parseItems(podsRes.stdout);
+
+      const allWorkloadRaw: { kind: ResourceKind; raw: any }[] = [
+        ...dcs.map((r: any) => ({ kind: 'deploymentconfigs' as ResourceKind, raw: r })),
+        ...deprs.map((r: any) => ({ kind: 'deployments' as ResourceKind, raw: r })),
+        ...sts.map((r: any) => ({ kind: 'statefulsets' as ResourceKind, raw: r })),
+        ...ds.map((r: any) => ({ kind: 'daemonsets' as ResourceKind, raw: r })),
+      ];
+
+      const workloads: TopologyNode[] = [];
+      const claimedServices = new Set<string>();
+      const claimedRoutes = new Set<string>();
+      const claimedPvcs = new Set<string>();
+
+      for (const { kind, raw } of allWorkloadRaw) {
+        const meta = raw.metadata || {};
+        const spec = raw.spec || {};
+        const status = raw.status || {};
+        const name = meta.name || '';
+        const ns = meta.namespace || namespace;
+        const labels = meta.labels || {};
+        const selectors: Record<string, string> = spec.selector?.matchLabels || spec.selector || {};
+
+        const appName = labels['app.kubernetes.io/part-of'] || labels['app'] || labels['app.kubernetes.io/name'] || name;
+        const containers = spec.template?.spec?.containers || [];
+        const images: string[] = containers.map((c: any) => c.image).filter(Boolean);
+
+        const desiredReplicas = spec.replicas ?? (status.desiredNumberScheduled ?? 1);
+        const readyReplicas = status.readyReplicas ?? status.numberReady ?? (status.replicas || 0);
+
+        // Find linked pods
+        const linkedPods = pods
+          .filter((p: any) => {
+            const pMeta = p.metadata || {};
+            const pLabels = pMeta.labels || {};
+            const pOwners = pMeta.ownerReferences || [];
+            if (pMeta.name?.endsWith('-deploy')) return false;
+
+            if (kind === 'deploymentconfigs') {
+              return pLabels['deploymentconfig'] === name || pLabels['openshift.io/deployment-config.name'] === name;
+            } else if (kind === 'deployments') {
+              return (
+                pOwners.some((o: any) => o.kind === 'ReplicaSet' && o.name?.startsWith(`${name}-`)) ||
+                (Object.keys(selectors).length > 0 && Object.entries(selectors).every(([k, v]) => pLabels[k] === v))
+              );
+            } else if (kind === 'statefulsets') {
+              return pLabels['app'] === name || (pMeta.name && new RegExp(`^${name}-\\d+$`).test(pMeta.name));
+            } else if (kind === 'daemonsets') {
+              return pOwners.some((o: any) => o.kind === 'DaemonSet' && o.name === name);
+            }
+            return false;
+          })
+          .map((p: any) => ({
+            name: p.metadata?.name || '',
+            status: p.status?.phase || 'Unknown',
+            statusColor: p.status?.phase === 'Running' ? 'green' : 'gray',
+            ready: `${p.status?.containerStatuses?.filter((c: any) => c.ready).length || 0}/${p.spec?.containers?.length || 1}`,
+            restarts: (p.status?.containerStatuses || []).reduce((acc: number, c: any) => acc + (c.restartCount || 0), 0),
+          }));
+
+        // Find linked services (matching selector)
+        const linkedServices: { name: string; type: string; clusterIP: string; ports: string }[] = [];
+        for (const svc of svcs) {
+          const svcMeta = svc.metadata || {};
+          const svcSpec = svc.spec || {};
+          const svcSelector = svcSpec.selector || {};
+          const svcNs = svcMeta.namespace || ns;
+
+          if (svcNs === ns && Object.keys(svcSelector).length > 0) {
+            const isMatch = Object.entries(svcSelector).every(
+              ([k, v]) => labels[k] === v || spec.template?.metadata?.labels?.[k] === v
+            );
+            if (isMatch || svcMeta.name === name || svcMeta.name === appName) {
+              claimedServices.add(`${svcNs}/${svcMeta.name}`);
+              const ports = (svcSpec.ports || []).map((p: any) => `${p.port}/${p.protocol || 'TCP'}`).join(', ');
+              linkedServices.push({
+                name: svcMeta.name,
+                type: svcSpec.type || 'ClusterIP',
+                clusterIP: svcSpec.clusterIP || '-',
+                ports,
+              });
+            }
+          }
+        }
+
+        // Find linked routes (targeting linked services or directly named)
+        const linkedRoutes: { name: string; host: string; url: string; tls: boolean }[] = [];
+        for (const r of routes) {
+          const rMeta = r.metadata || {};
+          const rSpec = r.spec || {};
+          const targetSvc = rSpec.to?.name;
+          const rNs = rMeta.namespace || ns;
+
+          if (
+            rNs === ns &&
+            (linkedServices.some((s) => s.name === targetSvc) || rMeta.name === name || rMeta.name === appName)
+          ) {
+            claimedRoutes.add(`${rNs}/${rMeta.name}`);
+            const host = rSpec.host || '';
+            const path = rSpec.path || '';
+            const tls = !!rSpec.tls;
+            const url = host ? `${tls ? 'https' : 'http'}://${host}${path}` : '';
+            linkedRoutes.push({
+              name: rMeta.name,
+              host,
+              url,
+              tls,
+            });
+          }
+        }
+
+        // Find linked PVCs (referenced in volumes)
+        const linkedPvcs: { name: string; status: string; capacity: string; storageClass: string }[] = [];
+        const volumes = spec.template?.spec?.volumes || [];
+        for (const vol of volumes) {
+          const pvcClaimName = vol.persistentVolumeClaim?.claimName;
+          if (pvcClaimName) {
+            claimedPvcs.add(`${ns}/${pvcClaimName}`);
+            const matchingPvc = pvcs.find((p: any) => p.metadata?.name === pvcClaimName && (p.metadata?.namespace || ns) === ns);
+            if (matchingPvc) {
+              linkedPvcs.push({
+                name: pvcClaimName,
+                status: matchingPvc.status?.phase || 'Bound',
+                capacity: matchingPvc.status?.capacity?.storage || matchingPvc.spec?.resources?.requests?.storage || '-',
+                storageClass: matchingPvc.spec?.storageClassName || '-',
+              });
+            } else {
+              linkedPvcs.push({
+                name: pvcClaimName,
+                status: 'Bound',
+                capacity: '-',
+                storageClass: '-',
+              });
+            }
+          }
+        }
+
+        let statusColor: 'green' | 'red' | 'yellow' | 'blue' | 'gray' = 'gray';
+        if (readyReplicas === desiredReplicas && desiredReplicas > 0) statusColor = 'green';
+        else if (readyReplicas > 0) statusColor = 'yellow';
+        else if (desiredReplicas === 0) statusColor = 'gray';
+        else statusColor = 'red';
+
+        workloads.push({
+          id: `${ns}/${name}`,
+          name,
+          namespace: ns,
+          kind,
+          status: readyReplicas === desiredReplicas && desiredReplicas > 0 ? 'Running' : `${readyReplicas}/${desiredReplicas} Ready`,
+          statusColor,
+          desiredReplicas,
+          readyReplicas,
+          podCount: linkedPods.length,
+          images,
+          appName,
+          routes: linkedRoutes,
+          services: linkedServices,
+          pvcs: linkedPvcs,
+          pods: linkedPods,
+          age: formatAge(meta.creationTimestamp),
+        });
+      }
+
+      // Standalone items not claimed by any workload
+      const standaloneServices = this.transformResources(
+        'services',
+        svcs.filter((s: any) => !claimedServices.has(`${s.metadata?.namespace || namespace}/${s.metadata?.name}`)),
+        namespace
+      );
+      const standaloneRoutes = this.transformResources(
+        'routes',
+        routes.filter((r: any) => !claimedRoutes.has(`${r.metadata?.namespace || namespace}/${r.metadata?.name}`)),
+        namespace
+      );
+      const standalonePvcs = this.transformResources(
+        'pvc',
+        pvcs.filter((p: any) => !claimedPvcs.has(`${p.metadata?.namespace || namespace}/${p.metadata?.name}`)),
+        namespace
+      );
+
+      return {
+        data: {
+          namespace,
+          workloads,
+          standaloneServices,
+          standaloneRoutes,
+          standalonePvcs,
+        },
+      };
+    } catch (err: any) {
+      return { error: err.message || 'Failed to fetch topology data' };
     }
   }
 }
