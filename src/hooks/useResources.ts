@@ -15,15 +15,15 @@ export function useResources(kind: ResourceKind, namespace: string, autoRefresh 
     try {
       if (!isBackground) setLoading(true);
 
-      let items: ResourceItem[] = [];
+      let res: { items: ResourceItem[]; error?: string; isUnauthorized?: boolean };
       if (kind === 'helm') {
-        items = await HelmService.getReleases(namespace);
+        res = await HelmService.getReleases(namespace);
       } else {
-        items = await OcClient.getResources(kind, namespace);
+        res = await OcClient.getResources(kind, namespace);
       }
 
-      setResources(items);
-      setError(null);
+      setResources(res.items || []);
+      setError(res.error || null);
     } catch (err: any) {
       setError(err.message || `Failed to fetch ${kind}`);
     } finally {
@@ -47,21 +47,21 @@ export function useResources(kind: ResourceKind, namespace: string, autoRefresh 
     return () => clearInterval(interval);
   }, [autoRefresh, refreshInterval, fetchResources]);
 
-  // Fuzzy filter
+  // Fuzzy filter matching
   const filteredResources = useMemo(() => {
-    if (!filterQuery.trim()) return resources;
+    if (!filterQuery.trim()) {
+      return resources;
+    }
     const matcher = new FuzzyMatcher(resources, ['name', 'status', 'namespace', 'age']);
     return matcher.search(filterQuery);
   }, [resources, filterQuery]);
 
-  // Clamp selection index when filtered items change
-  useEffect(() => {
-    if (selectedIndex >= filteredResources.length) {
-      setSelectedIndex(Math.max(0, filteredResources.length - 1));
-    }
-  }, [filteredResources.length, selectedIndex]);
-
-  const selectedItem = filteredResources[selectedIndex] || null;
+  // Selected item
+  const selectedItem = useMemo(() => {
+    if (filteredResources.length === 0) return null;
+    const idx = Math.min(selectedIndex, filteredResources.length - 1);
+    return filteredResources[idx] || null;
+  }, [filteredResources, selectedIndex]);
 
   return {
     resources: filteredResources,

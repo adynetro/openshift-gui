@@ -24,7 +24,7 @@ interface SidebarProps {
 interface NavItem {
   kind: ResourceKind;
   label: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  icon: any;
   hotkey: string;
   badgeColor?: string;
   badgeText?: string;
