@@ -22,7 +22,14 @@ export function parseCliArgs(argv: string[]): { options: CliOptions } {
     .option('--clean-is <imagestream>', 'Direct CLI mode to inspect & clean semver tags for an ImageStream')
     .option('--keep <count>', 'Number of latest semver tags to keep in CLI clean mode', '3');
 
-  program.parse(argv);
+  // In Node SEA standalone binaries, argv is [binary, ...userArgs] instead of [node, script.js, ...userArgs]
+  const isDirectBinary = argv.length > 0 && !argv[0]?.toLowerCase().includes('node') && !argv[1]?.endsWith('.js') && !argv[1]?.endsWith('.ts') && !argv[1]?.endsWith('.tsx');
+  
+  if (isDirectBinary) {
+    program.parse(argv, { from: 'electron' });
+  } else {
+    program.parse(argv);
+  }
 
   const options = program.opts<CliOptions>();
 
