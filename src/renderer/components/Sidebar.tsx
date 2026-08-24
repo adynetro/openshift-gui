@@ -38,7 +38,6 @@ const NAV_ITEMS: NavItem[] = [
   { kind: 'deploymentconfigs', label: 'DeploymentConfigs', icon: Layers2, hotkey: '3', badgeText: 'OpenShift', badgeColor: 'bg-red-950 text-red-300 border-red-800' },
   { kind: 'statefulsets', label: 'StatefulSets', icon: Server, hotkey: '4' },
   { kind: 'daemonsets', label: 'DaemonSets', icon: Cpu, hotkey: '5' },
-  { kind: 'events', label: 'Live Events', icon: Activity, hotkey: 'e', badgeText: 'Live Stream', badgeColor: 'bg-amber-950 text-amber-300 border-amber-800' },
   { kind: 'routes', label: 'Routes', icon: Network, hotkey: '6', badgeText: 'OpenShift', badgeColor: 'bg-red-950 text-red-300 border-red-800' },
   { kind: 'services', label: 'Services', icon: Network, hotkey: '7' },
   { kind: 'imagestreams', label: 'ImageStreams', icon: Image, hotkey: '8', badgeText: 'SemVer', badgeColor: 'bg-purple-950 text-purple-300 border-purple-800' },
@@ -46,6 +45,7 @@ const NAV_ITEMS: NavItem[] = [
   { kind: 'configmaps', label: 'ConfigMaps', icon: FileText, hotkey: '0' },
   { kind: 'secrets', label: 'Secrets', icon: Key, hotkey: '-' },
   { kind: 'nodes', label: 'Cluster Nodes', icon: HardDrive, hotkey: 'n' },
+  { kind: 'events', label: 'Live Events', icon: Activity, hotkey: 'e', badgeText: 'Stream', badgeColor: 'bg-amber-950 text-amber-300 border-amber-800' },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({
