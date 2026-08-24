@@ -230,7 +230,7 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
               </>
             )}
             <th className="py-3 px-3">Age</th>
-            <th className="py-3 px-4 text-right">Actions</th>
+            {kind !== 'events' && <th className="py-3 px-4 text-right">Actions</th>}
           </tr>
         </thead>
 
@@ -430,100 +430,100 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                 <td className="py-2.5 px-3 font-mono text-slate-400">{item.age}</td>
 
                 {/* Clean Pictogram Quick Action Buttons with Hover Tooltips */}
-                <td className="py-2 px-4 text-right">
-                  <div className="flex items-center justify-end gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
-                    {/* Live Logs: Pods, Deployments, DeploymentConfigs, StatefulSets, DaemonSets */}
-                    {(kind === 'pods' ||
-                      kind === 'deployments' ||
-                      kind === 'deploymentconfigs' ||
-                      kind === 'statefulsets' ||
-                      kind === 'daemonsets') && (
+                {kind !== 'events' && (
+                  <td className="py-2 px-4 text-right">
+                    <div className="flex items-center justify-end gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
+                      {/* Live Logs: Pods, Deployments, DeploymentConfigs, StatefulSets, DaemonSets */}
+                      {(kind === 'pods' ||
+                        kind === 'deployments' ||
+                        kind === 'deploymentconfigs' ||
+                        kind === 'statefulsets' ||
+                        kind === 'daemonsets') && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRowAction('logs', item);
+                          }}
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-emerald-950 text-emerald-400 border border-slate-700 hover:border-emerald-500 transition-colors"
+                          title="Stream Live Aggregated Logs"
+                          aria-label="Live Logs"
+                        >
+                          <Terminal size={14} />
+                        </button>
+                      )}
+
+                      {/* Scale Replicas */}
+                      {(kind === 'deployments' || kind === 'deploymentconfigs' || kind === 'statefulsets') && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRowAction('scale', item);
+                          }}
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-cyan-950 text-cyan-400 border border-slate-700 hover:border-cyan-500 transition-colors"
+                          title="Scale Replicas"
+                          aria-label="Scale"
+                        >
+                          <SlidersHorizontal size={14} />
+                        </button>
+                      )}
+
+                      {/* SemVer Clean */}
+                      {kind === 'imagestreams' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRowAction('clean-is', item);
+                          }}
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-purple-950 text-purple-300 border border-slate-700 hover:border-purple-500 transition-colors"
+                          title="Open SemVer Tag Cleanup Wizard"
+                          aria-label="SemVer Tag Cleanup Wizard"
+                        >
+                          <Sparkles size={14} />
+                        </button>
+                      )}
+
+                      {/* Helm Manage */}
+                      {kind === 'helm' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRowAction('helm-manage', item);
+                          }}
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-blue-950 text-blue-300 border border-slate-700 hover:border-blue-500 transition-colors"
+                          title="Manage Helm Release & Edit Values"
+                          aria-label="Manage Helm Release"
+                        >
+                          <Anchor size={14} />
+                        </button>
+                      )}
+
+                      {/* Describe Resource */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          onRowAction('logs', item);
+                          onRowAction('describe', item);
                         }}
-                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-emerald-950 text-emerald-400 border border-slate-700 hover:border-emerald-500 transition-colors"
-                        title="Stream Live Aggregated Logs"
-                        aria-label="Live Logs"
+                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors"
+                        title="Describe Resource Details"
+                        aria-label="Describe Details"
                       >
-                        <Terminal size={14} />
+                        <FileText size={14} />
                       </button>
-                    )}
 
-                    {/* Scale Replicas */}
-                    {(kind === 'deployments' || kind === 'deploymentconfigs' || kind === 'statefulsets') && (
+                      {/* View & Edit YAML */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          onRowAction('scale', item);
+                          onRowAction('yaml', item);
                         }}
-                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-cyan-950 text-cyan-400 border border-slate-700 hover:border-cyan-500 transition-colors"
-                        title="Scale Replicas"
-                        aria-label="Scale"
+                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors"
+                        title="View & Edit YAML Definition"
+                        aria-label="View & Edit YAML"
                       >
-                        <SlidersHorizontal size={14} />
+                        <Code2 size={14} />
                       </button>
-                    )}
 
-                    {/* SemVer Clean */}
-                    {kind === 'imagestreams' && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onRowAction('clean-is', item);
-                        }}
-                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-purple-950 text-purple-300 border border-slate-700 hover:border-purple-500 transition-colors"
-                        title="Open SemVer Tag Cleanup Wizard"
-                        aria-label="SemVer Tag Cleanup Wizard"
-                      >
-                        <Sparkles size={14} />
-                      </button>
-                    )}
-
-                    {/* Helm Manage */}
-                    {kind === 'helm' && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onRowAction('helm-manage', item);
-                        }}
-                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-blue-950 text-blue-300 border border-slate-700 hover:border-blue-500 transition-colors"
-                        title="Manage Helm Release & Edit Values"
-                        aria-label="Manage Helm Release"
-                      >
-                        <Anchor size={14} />
-                      </button>
-                    )}
-
-                    {/* Describe Resource */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onRowAction('describe', item);
-                      }}
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors"
-                      title="Describe Resource Details"
-                      aria-label="Describe Details"
-                    >
-                      <FileText size={14} />
-                    </button>
-
-                    {/* View & Edit YAML */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onRowAction('yaml', item);
-                      }}
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors"
-                      title="View & Edit YAML Definition"
-                      aria-label="View & Edit YAML"
-                    >
-                      <Code2 size={14} />
-                    </button>
-
-                    {/* Delete Resource */}
-                    {kind !== 'events' && (
+                      {/* Delete Resource */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -535,9 +535,9 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                       >
                         <Trash2 size={14} />
                       </button>
-                    )}
-                  </div>
-                </td>
+                    </div>
+                  </td>
+                )}
               </tr>
             );
           })}

@@ -29,6 +29,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 }) => {
   // Contextual action pills based on current resource tab
   const getActionPills = () => {
+    if (currentKind === 'events') return [];
     const pills: { id: string; label: string; tooltip: string; icon: any; color: string; disabled?: boolean }[] = [];
 
     // Live logs for pods, deployments, deploymentconfigs, statefulsets, daemonsets
@@ -116,16 +117,14 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       disabled: !selectedItem,
     });
 
-    if (currentKind !== 'events') {
-      pills.push({
-        id: 'delete',
-        label: 'Delete',
-        tooltip: 'Delete Selected Resource',
-        icon: Trash2,
-        color: 'hover:border-red-500 hover:text-red-300 hover:bg-red-950/40 text-red-400 border-red-900/50 bg-red-950/20',
-        disabled: !selectedItem,
-      });
-    }
+    pills.push({
+      id: 'delete',
+      label: 'Delete',
+      tooltip: 'Delete Selected Resource',
+      icon: Trash2,
+      color: 'hover:border-red-500 hover:text-red-300 hover:bg-red-950/40 text-red-400 border-red-900/50 bg-red-950/20',
+      disabled: !selectedItem,
+    });
 
     return pills;
   };
@@ -224,27 +223,29 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       </div>
 
       {/* Clean Compact Action Buttons */}
-      <div className="flex items-center gap-1.5 flex-wrap text-xs">
-        <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1 uppercase tracking-wider">
-          <Zap size={11} className="text-amber-400" /> Actions:
-        </span>
+      {actionPills.length > 0 && (
+        <div className="flex items-center gap-1.5 flex-wrap text-xs">
+          <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1 uppercase tracking-wider">
+            <Zap size={11} className="text-amber-400" /> Actions:
+          </span>
 
-        {actionPills.map((pill) => {
-          const Icon = pill.icon;
-          return (
-            <button
-              key={pill.id}
-              onClick={() => onAction(pill.id)}
-              disabled={pill.disabled}
-              title={pill.tooltip}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-all disabled:opacity-30 disabled:cursor-not-allowed ${pill.color}`}
-            >
-              <Icon size={13} />
-              <span>{pill.label}</span>
-            </button>
-          );
-        })}
-      </div>
+          {actionPills.map((pill) => {
+            const Icon = pill.icon;
+            return (
+              <button
+                key={pill.id}
+                onClick={() => onAction(pill.id)}
+                disabled={pill.disabled}
+                title={pill.tooltip}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-all disabled:opacity-30 disabled:cursor-not-allowed ${pill.color}`}
+              >
+                <Icon size={13} />
+                <span>{pill.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };
