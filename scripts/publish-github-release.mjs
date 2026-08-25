@@ -130,7 +130,7 @@ async function publishRelease() {
   ];
 
   // Fetch existing assets to delete duplicates before re-uploading
-  const assetsRes = await fetch(`https://api.github.com/repos/${repo}/releases/${releaseData.id}/assets`, {
+  const assetsRes = await fetch(`https://api.github.com/repos/${repo}/releases/${releaseData.id}/assets?per_page=100`, {
     headers: {
       'Authorization': `Bearer ${token}`,
       'Accept': 'application/vnd.github+json',
@@ -138,10 +138,12 @@ async function publishRelease() {
     },
   });
   const existingAssets = await assetsRes.json();
+  const normalize = (s) => (s || '').toLowerCase().replace(/[\s.-]+/g, '.');
   const assetMap = new Map();
   if (Array.isArray(existingAssets)) {
     for (const asset of existingAssets) {
       assetMap.set(asset.name, asset.id);
+      assetMap.set(normalize(asset.name), asset.id);
     }
   }
 
@@ -152,10 +154,11 @@ async function publishRelease() {
       continue;
     }
 
-    if (assetMap.has(filename)) {
-      const assetId = assetMap.get(filename);
-      console.log(`Replacing existing asset ${filename} (ID: ${assetId})...`);
-      await fetch(`https://api.github.com/repos/${repo}/releases/assets/${assetId}`, {
+    const normName = normalize(filename);
+    const existingAssetId = assetMap.get(filename) || assetMap.get(normName);
+    if (existingAssetId) {
+      console.log(`Replacing existing asset ${filename} (ID: ${existingAssetId})...`);
+      await fetch(`https://api.github.com/repos/${repo}/releases/assets/${existingAssetId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
