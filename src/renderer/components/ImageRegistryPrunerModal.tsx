@@ -43,13 +43,24 @@ export const ImageRegistryPrunerModal: React.FC<ImageRegistryPrunerModalProps> =
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [copied, setCopied] = useState<boolean>(false);
 
+  const sanitizeUrl = (raw: string) => {
+    let clean = (raw || '').trim();
+    while (/^['"`]/.test(clean) || /['"`]$/.test(clean)) {
+      clean = clean.replace(/^['"`]+/, '').replace(/['"`]+$/, '').trim();
+    }
+    clean = clean.replace(/^https?:\/\//i, '');
+    clean = clean.split('/')[0].trim();
+    clean = clean.replace(/['"`]/g, '').trim();
+    return clean;
+  };
+
   // Auto-detect OpenShift Registry External Route / URL
   const fetchRegistryUrl = async () => {
     try {
       setIsDetectingUrl(true);
       const url = await (window as any).electronAPI.getRegistryUrl();
       if (url) {
-        setRegistryUrl(url);
+        setRegistryUrl(sanitizeUrl(url));
       }
     } catch {
       // ignore
@@ -64,8 +75,9 @@ export const ImageRegistryPrunerModal: React.FC<ImageRegistryPrunerModalProps> =
 
   // Execute Prune (Dry-run or Confirm)
   const handleExecutePrune = async (confirm: boolean) => {
+    const cleanRegUrl = sanitizeUrl(registryUrl);
     if (confirm) {
-      const confirmText = `⚠️ WARNING: You are about to permanently DELETE unreferenced image objects and free storage blobs from the OpenShift registry.\n\nSettings:\n• Registry URL: ${registryUrl || 'auto-detect'}\n• Preserve latest ${keepTagRevisions} revisions per tag\n• Keep images younger than: ${keepYoungerThan}\n• Include imported images: ${includeAll ? 'YES' : 'NO'}\n\nProceed with confirmed blob deletion?`;
+      const confirmText = `⚠️ WARNING: You are about to permanently DELETE unreferenced image objects and free storage blobs from the OpenShift registry.\n\nSettings:\n• Registry URL: ${cleanRegUrl || 'auto-detect'}\n• Preserve latest ${keepTagRevisions} revisions per tag\n• Keep images younger than: ${keepYoungerThan}\n• Include imported images: ${includeAll ? 'YES' : 'NO'}\n\nProceed with confirmed blob deletion?`;
       if (!window.confirm(confirmText)) return;
     }
 
@@ -75,8 +87,8 @@ export const ImageRegistryPrunerModal: React.FC<ImageRegistryPrunerModalProps> =
         text: confirm ? 'Executing registry blob pruning (--confirm)...' : 'Running dry-run simulation...',
         type: 'info',
       });
-      const regFlag = registryUrl ? `--registry-url="${registryUrl.trim()}"` : '';
-      setLogOutput(`$ oc adm prune images --keep-tag-revisions=${keepTagRevisions} --keep-younger-than=${keepYoungerThan} ${includeAll ? '--all=true' : '--all=false'} ${ignoreInvalidRefs ? '--ignore-invalid-refs=true' : ''} ${regFlag} ${confirm ? '--confirm' : ''}\n\n[Connecting to registry at ${registryUrl || 'cluster endpoint'} & analyzing image storage blobs...]\n`);
+      const regFlag = cleanRegUrl ? `--registry-url="${cleanRegUrl}"` : '';
+      setLogOutput(`$ oc adm prune images --keep-tag-revisions=${keepTagRevisions} --keep-younger-than=${keepYoungerThan} ${includeAll ? '--all=true' : '--all=false'} ${ignoreInvalidRefs ? '--ignore-invalid-refs=true' : ''} ${regFlag} ${confirm ? '--confirm' : ''}\n\n[Connecting to registry at ${cleanRegUrl || 'cluster endpoint'} & analyzing image storage blobs...]\n`);
 
       const res = await (window as any).electronAPI.pruneImages({
         keepTagRevisions,
@@ -84,7 +96,7 @@ export const ImageRegistryPrunerModal: React.FC<ImageRegistryPrunerModalProps> =
         confirm,
         all: includeAll,
         ignoreInvalidRefs,
-        registryUrl: registryUrl.trim() || undefined,
+        registryUrl: cleanRegUrl || undefined,
       });
 
       const outputCombined = (res.stdout || '') + (res.stderr ? `\n${res.stderr}` : '');
@@ -107,12 +119,13 @@ export const ImageRegistryPrunerModal: React.FC<ImageRegistryPrunerModalProps> =
   // Generate CronJob YAML
   const handleGenerateCronJob = async () => {
     try {
+      const cleanRegUrl = sanitizeUrl(registryUrl);
       const yaml = await (window as any).electronAPI.getImagePrunerCronJobYaml({
         schedule: cronSchedule,
         keepTagRevisions,
         keepYoungerThan,
         namespace: 'openshift-image-registry',
-        registryUrl: registryUrl.trim() || undefined,
+        registryUrl: cleanRegUrl || undefined,
       });
       setCronJobYaml(yaml);
     } catch (e: any) {

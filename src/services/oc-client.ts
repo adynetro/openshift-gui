@@ -775,6 +775,21 @@ export class OcClient {
   }
 
   /**
+   * Sanitizes registry URL by stripping single/double quotes, protocol prefixes (https://), and trailing slashes.
+   */
+  static sanitizeRegistryUrl(url?: string): string {
+    if (!url) return '';
+    let clean = url.trim();
+    while (/^['"`]/.test(clean) || /['"`]$/.test(clean)) {
+      clean = clean.replace(/^['"`]+/, '').replace(/['"`]+$/, '').trim();
+    }
+    clean = clean.replace(/^https?:\/\//i, '');
+    clean = clean.split('/')[0].trim();
+    clean = clean.replace(/['"`]/g, '').trim();
+    return clean;
+  }
+
+  /**
    * Discovers the external OpenShift integrated registry URL / route host.
    */
   static async getRegistryUrl(): Promise<string> {
@@ -782,22 +797,25 @@ export class OcClient {
       // 1. Try finding routes in openshift-image-registry namespace
       const routeCmd = `oc get route -n openshift-image-registry -o jsonpath='{.items[0].spec.host}'`;
       const { stdout: routeHost } = await this.runCommand(routeCmd, 15000);
-      if (routeHost && routeHost.trim()) {
-        return routeHost.trim();
+      const cleanRoute = this.sanitizeRegistryUrl(routeHost);
+      if (cleanRoute) {
+        return cleanRoute;
       }
 
       // 2. Try default-route or registry-route specifically
       const defRouteCmd = `oc get route default-route -n openshift-image-registry -o jsonpath='{.spec.host}'`;
       const { stdout: defHost } = await this.runCommand(defRouteCmd, 15000);
-      if (defHost && defHost.trim()) {
-        return defHost.trim();
+      const cleanDef = this.sanitizeRegistryUrl(defHost);
+      if (cleanDef) {
+        return cleanDef;
       }
 
       // 3. Try cluster image config public repository
       const configCmd = `oc get image.config.openshift.io/cluster -o jsonpath='{.status.publicDockerImageRepository}'`;
       const { stdout: configHost } = await this.runCommand(configCmd, 15000);
-      if (configHost && configHost.trim()) {
-        return configHost.trim();
+      const cleanConfig = this.sanitizeRegistryUrl(configHost);
+      if (cleanConfig) {
+        return cleanConfig;
       }
 
       // 4. Try any imagestream dockerImageRepository
@@ -805,7 +823,10 @@ export class OcClient {
       const { stdout: isRepo } = await this.runCommand(isCmd, 15000);
       if (isRepo && isRepo.trim()) {
         const parts = isRepo.trim().split('/');
-        if (parts.length > 1) return parts[0];
+        if (parts.length > 1) {
+          const cleanIs = this.sanitizeRegistryUrl(parts[0]);
+          if (cleanIs) return cleanIs;
+        }
       }
 
       return 'image-registry.openshift-image-registry.svc:5000';
@@ -833,9 +854,9 @@ export class OcClient {
       const ignoreRefs = options.ignoreInvalidRefs ? '--ignore-invalid-refs=true' : '';
       const confirmFlag = options.confirm ? '--confirm' : '';
 
-      let regUrlStr = (options.registryUrl || '').trim();
+      let regUrlStr = this.sanitizeRegistryUrl(options.registryUrl);
       if (!regUrlStr) {
-        regUrlStr = await this.getRegistryUrl();
+        regUrlStr = this.sanitizeRegistryUrl(await this.getRegistryUrl());
       }
       const regUrlFlag = regUrlStr ? `--registry-url="${regUrlStr}"` : '';
 
@@ -880,7 +901,7 @@ export class OcClient {
     const keepRevs = options.keepTagRevisions ?? 3;
     const keepAge = options.keepYoungerThan || '60m';
     const ns = options.namespace || 'openshift-image-registry';
-    const regUrl = (options.registryUrl || '').trim();
+    const regUrl = this.sanitizeRegistryUrl(options.registryUrl);
     const regUrlFlag = regUrl ? `\n            - --registry-url=${regUrl}` : '';
 
     return `apiVersion: v1
@@ -927,7 +948,7 @@ spec:
             - prune
             - images
             - --keep-tag-revisions=${keepRevs}
-            - --keep-younger-than=${keepAge}
+            - --keep-younger-than=${keepAge}${regUrlFlag}
             - --confirm
             resources:
               requests:

@@ -1443,17 +1443,21 @@ export const NetworkPolicyDesignerModal: React.FC<NetworkPolicyDesignerModalProp
                     </span>
                   </div>
 
-                  <div className="p-3 flex-1 overflow-y-auto space-y-4">
-                    {/* Target Scope Selection */}
+                  <div className="p-3 flex-1 overflow-y-auto space-y-3">
+                    {/* Target Scope Selection Card */}
                     <div
-                      className="p-3 rounded-lg border space-y-2 font-mono text-xs"
+                      className="p-3 rounded-lg border space-y-2.5 font-mono text-xs shadow-sm"
                       style={{
                         backgroundColor: 'var(--bg-input, #0f172a)',
                         borderColor: 'var(--border-subtle, #334155)',
                       }}
                     >
-                      <div className="flex items-center gap-4">
-                        <label className="flex items-center gap-1.5 cursor-pointer">
+                      <div className="flex items-center justify-between border-b pb-1.5" style={{ borderColor: 'var(--border-subtle, #334155)' }}>
+                        <span className="font-bold text-purple-300 text-[11px]">Pod Selector Scope</span>
+                      </div>
+
+                      <div className="flex items-center gap-4 text-xs">
+                        <label className="flex items-center gap-1.5 cursor-pointer text-slate-200">
                           <input
                             type="radio"
                             name="targetType"
@@ -1463,7 +1467,7 @@ export const NetworkPolicyDesignerModal: React.FC<NetworkPolicyDesignerModalProp
                           />
                           <span>Specific Pod Labels</span>
                         </label>
-                        <label className="flex items-center gap-1.5 cursor-pointer">
+                        <label className="flex items-center gap-1.5 cursor-pointer text-slate-200">
                           <input
                             type="radio"
                             name="targetType"
@@ -1475,38 +1479,52 @@ export const NetworkPolicyDesignerModal: React.FC<NetworkPolicyDesignerModalProp
                         </label>
                       </div>
 
-                      {/* Label Tags */}
-                      {!model.targetAllPods && (
-                        <div className="space-y-2 pt-2 border-t" style={{ borderColor: 'var(--border-subtle, #334155)' }}>
-                          <span className="text-[10px] text-slate-400 uppercase font-bold">Target Match Labels:</span>
-                          <div className="flex flex-wrap gap-1.5">
-                            {Object.entries(model.targetPodLabels).map(([k, v]) => (
-                              <span
-                                key={k}
-                                className="px-2 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-800 text-[11px] flex items-center gap-1.5"
-                              >
-                                <span>{k}={v}</span>
-                                <button
-                                  onClick={() => handleRemoveTargetLabel(k)}
-                                  className="text-purple-400 hover:text-rose-400 font-bold cursor-pointer"
-                                >
-                                  ×
-                                </button>
-                              </span>
-                            ))}
+                      {/* Label Tags and Inline Add Form */}
+                      {!model.targetAllPods ? (
+                        <div className="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-2 text-xs font-mono shadow-inner">
+                          <div className="flex items-center justify-between pb-1 border-b border-slate-800 text-[11px]">
+                            <div className="flex items-center gap-1.5 font-bold text-purple-300">
+                              <Box size={12} className="text-purple-400" />
+                              <span>Target Pod Match Labels ({Object.keys(model.targetPodLabels).length}):</span>
+                            </div>
                           </div>
 
-                          {/* Add Label Row */}
+                          {/* Chips */}
+                          <div className="flex flex-wrap gap-1 min-h-[22px]">
+                            {Object.keys(model.targetPodLabels).length > 0 ? (
+                              Object.entries(model.targetPodLabels).map(([k, v]) => (
+                                <span
+                                  key={k}
+                                  className="px-2 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-800 text-[11px] flex items-center gap-1.5 shadow-sm"
+                                >
+                                  <span>{k}={v}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveTargetLabel(k)}
+                                    className="text-purple-400 hover:text-rose-400 font-bold px-0.5 cursor-pointer"
+                                    title="Remove label"
+                                  >
+                                    ×
+                                  </button>
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-[10px] text-slate-400 italic">
+                                No labels selected yet (add below or pick preset)
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Add Match Label Input Form - Clean responsive layout */}
                           <div className="flex items-center gap-1.5 pt-1">
                             <input
                               type="text"
                               value={newLabelKey}
                               onChange={(e) => setNewLabelKey(e.target.value)}
                               placeholder="key (e.g. app)"
-                              className="px-2 py-1 rounded text-[11px] font-mono border bg-transparent flex-1 focus:border-purple-500 outline-none"
-                              style={{ borderColor: 'var(--border-subtle, #334155)' }}
+                              className="min-w-0 flex-1 px-2 py-1 rounded bg-slate-800 border border-slate-700 text-[11px] font-mono text-slate-200 outline-none focus:border-purple-500"
                             />
-                            <span className="text-slate-400">=</span>
+                            <span className="text-slate-400 font-bold">=</span>
                             <input
                               type="text"
                               value={newLabelVal}
@@ -1517,20 +1535,21 @@ export const NetworkPolicyDesignerModal: React.FC<NetworkPolicyDesignerModalProp
                                   handleAddTargetLabel();
                                 }
                               }}
-                              placeholder="value (e.g. backend)"
-                              className="px-2 py-1 rounded text-[11px] font-mono border bg-transparent flex-1 focus:border-purple-500 outline-none"
-                              style={{ borderColor: 'var(--border-subtle, #334155)' }}
+                              placeholder="val (e.g. frontend)"
+                              className="min-w-0 flex-1 px-2 py-1 rounded bg-slate-800 border border-slate-700 text-[11px] font-mono text-slate-200 outline-none focus:border-purple-500"
                             />
                             <button
+                              type="button"
                               onClick={handleAddTargetLabel}
-                              className="px-2.5 py-1 rounded bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold cursor-pointer transition-colors"
+                              className="shrink-0 px-2.5 py-1 rounded bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-colors cursor-pointer"
                             >
-                              + Add
+                              + Add Label
                             </button>
                           </div>
 
                           {/* Quick Target Label Presets */}
-                          <div className="flex flex-wrap gap-1 pt-1">
+                          <div className="flex flex-wrap gap-1 pt-1 border-t border-slate-800/80">
+                            <span className="text-[10px] text-slate-400 self-center pr-1">Presets:</span>
                             <button
                               type="button"
                               onClick={() =>
@@ -1570,30 +1589,47 @@ export const NetworkPolicyDesignerModal: React.FC<NetworkPolicyDesignerModalProp
                             >
                               + tier=api
                             </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                updateModel((m) => ({
+                                  ...m,
+                                  targetAllPods: false,
+                                  targetPodLabels: { ...m.targetPodLabels, role: 'worker' },
+                                }))
+                              }
+                              className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-purple-300 border border-slate-700 cursor-pointer"
+                            >
+                              + role=worker
+                            </button>
                           </div>
+                        </div>
+                      ) : (
+                        <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800 text-[11px] text-slate-400 italic">
+                          Applies policy to all pods running within the "{model.namespace}" namespace.
                         </div>
                       )}
                     </div>
 
                     {/* Visual Target Pod Centerpiece Representation */}
                     <div
-                      className="p-5 rounded-xl border text-center space-y-2 shadow-inner"
+                      className="p-4 rounded-xl border text-center space-y-2 shadow-inner"
                       style={{
                         backgroundColor: 'rgba(168, 85, 247, 0.06)',
                         borderColor: 'rgba(168, 85, 247, 0.3)',
                       }}
                     >
-                      <div className="w-12 h-12 rounded-2xl bg-purple-600/20 text-purple-400 flex items-center justify-center mx-auto border border-purple-500/40 shadow-lg">
-                        <Shield size={24} />
+                      <div className="w-10 h-10 rounded-xl bg-purple-600/20 text-purple-400 flex items-center justify-center mx-auto border border-purple-500/40 shadow-lg">
+                        <Shield size={20} />
                       </div>
-                      <h4 className="text-sm font-bold text-purple-300 font-mono">
+                      <h4 className="text-xs font-bold text-purple-300 font-mono">
                         {model.targetAllPods
                           ? `All Pods in [${model.namespace}]`
                           : Object.entries(model.targetPodLabels)
                               .map(([k, v]) => `${k}=${v}`)
                               .join(', ') || 'Select Target Labels'}
                       </h4>
-                      <p className="text-[11px] text-slate-400 font-mono">
+                      <p className="text-[10px] text-slate-400 font-mono">
                         {model.policyTypes.ingress && model.policyTypes.egress
                           ? '🔒 Isolated for Inbound & Outbound'
                           : model.policyTypes.ingress

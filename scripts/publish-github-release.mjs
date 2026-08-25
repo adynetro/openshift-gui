@@ -55,9 +55,11 @@ const releaseBody = `## 🚀 What's New in OpenShift GUI v${VERSION}
 Refer to \`SHA256SUMS.txt\` for SHA-256 verification hashes.`;
 
 async function publishRelease() {
-  console.log(`Creating GitHub release for ${tagName}...`);
+  console.log(`Checking / creating GitHub release for ${tagName}...`);
 
-  // 1. Create Release
+  let releaseData;
+
+  // 1. Try Create Release
   const createRes = await fetch(`https://api.github.com/repos/${repo}/releases`, {
     method: 'POST',
     headers: {
@@ -75,12 +77,40 @@ async function publishRelease() {
     }),
   });
 
-  const releaseData = await createRes.json();
-  if (!releaseData.id) {
-    throw new Error('Failed to create release: ' + JSON.stringify(releaseData));
-  }
+  const createJson = await createRes.json();
+  if (createJson.id) {
+    releaseData = createJson;
+    console.log(`Release created successfully! ID: ${releaseData.id}, URL: ${releaseData.html_url}`);
+  } else {
+    // Check if release exists
+    const getRes = await fetch(`https://api.github.com/repos/${repo}/releases/tags/${tagName}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': 'openshift-gui-builder',
+      },
+    });
+    releaseData = await getRes.json();
+    if (!releaseData.id) {
+      throw new Error('Failed to create or find release: ' + JSON.stringify(createJson));
+    }
+    console.log(`Found existing release ID: ${releaseData.id}, URL: ${releaseData.html_url}`);
 
-  console.log(`Release created successfully! ID: ${releaseData.id}, URL: ${releaseData.html_url}`);
+    // Update release title & body
+    await fetch(`https://api.github.com/repos/${repo}/releases/${releaseData.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.github+json',
+        'Content-Type': 'application/json',
+        'User-Agent': 'openshift-gui-builder',
+      },
+      body: JSON.stringify({
+        name: releaseName,
+        body: releaseBody,
+      }),
+    });
+  }
 
   // 2. Upload Assets
   const uploadUrlTemplate = releaseData.upload_url.replace(/\{(\?.*)?\}/, '');
@@ -99,11 +129,40 @@ async function publishRelease() {
     'SHA256SUMS.txt',
   ];
 
+  // Fetch existing assets to delete duplicates before re-uploading
+  const assetsRes = await fetch(`https://api.github.com/repos/${repo}/releases/${releaseData.id}/assets`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/vnd.github+json',
+      'User-Agent': 'openshift-gui-builder',
+    },
+  });
+  const existingAssets = await assetsRes.json();
+  const assetMap = new Map();
+  if (Array.isArray(existingAssets)) {
+    for (const asset of existingAssets) {
+      assetMap.set(asset.name, asset.id);
+    }
+  }
+
   for (const filename of filesToUpload) {
     const filePath = path.join(releaseDir, filename);
     if (!fs.existsSync(filePath)) {
       console.warn('Skipping missing file: ' + filename);
       continue;
+    }
+
+    if (assetMap.has(filename)) {
+      const assetId = assetMap.get(filename);
+      console.log(`Replacing existing asset ${filename} (ID: ${assetId})...`);
+      await fetch(`https://api.github.com/repos/${repo}/releases/assets/${assetId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/vnd.github+json',
+          'User-Agent': 'openshift-gui-builder',
+        },
+      });
     }
 
     const fileBuffer = fs.readFileSync(filePath);
