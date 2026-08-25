@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { X, Sparkles, Trash2, CheckCircle2, AlertTriangle, ShieldCheck, Tag, Info, ArrowDownAZ } from 'lucide-react';
+import { X, Sparkles, Trash2, CheckCircle2, AlertTriangle, ShieldCheck, Tag, Info, ArrowDownAZ, Layers } from 'lucide-react';
 import { ImageStreamResource, ImageStreamTagInfo } from '../../types/k8s.js';
 import { SemverSorter } from '../../services/semver-sorter.js';
 
@@ -16,7 +16,8 @@ export const ImageStreamModal: React.FC<ImageStreamModalProps> = ({
   onClose,
   onRefresh,
 }) => {
-  const [keepSemverCount, setKeepSemverCount] = useState<number>(3);
+  const [cleanupStrategy, setCleanupStrategy] = useState<'semver' | 'generation'>('semver');
+  const [keepCount, setKeepCount] = useState<number>(3);
   const [keepNonSemver, setKeepNonSemver] = useState<boolean>(true);
   const [protectCommon, setProtectCommon] = useState<boolean>(true);
   const [sortBy, setSortBy] = useState<'semver' | 'generation' | 'date' | 'name'>('semver');
@@ -54,11 +55,12 @@ export const ImageStreamModal: React.FC<ImageStreamModalProps> = ({
   const autoPlan = useMemo(() => {
     const protectedNames = protectCommon ? ['latest', 'stable', 'main', 'master', 'prod'] : [];
     return SemverSorter.planCleanup(sortedTags, {
-      keepSemverCount,
+      strategy: cleanupStrategy,
+      keepCount,
       keepNonSemver,
       keepTagsNamed: protectedNames,
     });
-  }, [sortedTags, keepSemverCount, keepNonSemver, protectCommon]);
+  }, [sortedTags, cleanupStrategy, keepCount, keepNonSemver, protectCommon]);
 
   // Merge with manual overrides
   const effectiveTags = useMemo(() => {
@@ -187,22 +189,53 @@ export const ImageStreamModal: React.FC<ImageStreamModalProps> = ({
         {/* Cleanup Controls Configuration Card */}
         <div className="p-4 border-b space-y-3" style={{ backgroundColor: "var(--bg-card-header, #0f172a)", borderColor: "var(--border-color, #334155)" }}>
           <div className="flex items-center justify-between flex-wrap gap-3">
-            <div className="flex items-center gap-4 flex-wrap">
-              {/* Keep N SemVer Count */}
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Cleanup Strategy Selector */}
+              <div className="flex items-center gap-1 p-1 rounded-lg border bg-slate-900/90 border-slate-700 text-xs">
+                <span className="text-[11px] font-semibold text-slate-400 px-1.5">Strategy:</span>
+                <button
+                  type="button"
+                  onClick={() => setCleanupStrategy('semver')}
+                  className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                    cleanupStrategy === 'semver'
+                      ? 'bg-purple-600 text-white font-bold shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Sparkles size={13} />
+                  <span>SemVer Releases</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCleanupStrategy('generation')}
+                  className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                    cleanupStrategy === 'generation'
+                      ? 'bg-cyan-600 text-white font-bold shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Layers size={13} />
+                  <span>Tag Generations</span>
+                </button>
+              </div>
+
+              {/* Keep N Count */}
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border" style={{ backgroundColor: "var(--bg-input, #0f172a)", borderColor: "var(--border-subtle, #334155)" }}>
-                <span className="text-xs font-medium text-slate-300">Keep Latest SemVer Releases:</span>
+                <span className="text-xs font-medium text-slate-300">
+                  Keep Latest {cleanupStrategy === 'generation' ? 'Generations' : 'Releases'}:
+                </span>
                 <div className="flex items-center gap-1">
                   <button
-                    onClick={() => setKeepSemverCount((prev) => Math.max(1, prev - 1))}
+                    onClick={() => setKeepCount((prev) => Math.max(1, prev - 1))}
                     className="w-6 h-6 rounded bg-slate-700 hover:bg-slate-600 text-white font-bold flex items-center justify-center text-xs"
                   >
                     -
                   </button>
                   <span className="w-8 text-center font-mono font-bold text-cyan-300 text-sm">
-                    {keepSemverCount}
+                    {keepCount}
                   </span>
                   <button
-                    onClick={() => setKeepSemverCount((prev) => prev + 1)}
+                    onClick={() => setKeepCount((prev) => prev + 1)}
                     className="w-6 h-6 rounded bg-slate-700 hover:bg-slate-600 text-white font-bold flex items-center justify-center text-xs"
                   >
                     +
@@ -222,17 +255,19 @@ export const ImageStreamModal: React.FC<ImageStreamModalProps> = ({
                 <span>Protect common tags (latest, stable, main)</span>
               </label>
 
-              {/* Keep Non-SemVer toggle */}
-              <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={keepNonSemver}
-                  onChange={(e) => setKeepNonSemver(e.target.checked)}
-                  className="rounded border-slate-700 text-purple-600 focus:ring-0"
-                />
-                <Tag size={14} className="text-amber-400" />
-                <span>Keep other Non-SemVer tags</span>
-              </label>
+              {/* Keep Non-SemVer toggle (Only in SemVer mode) */}
+              {cleanupStrategy === 'semver' && (
+                <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={keepNonSemver}
+                    onChange={(e) => setKeepNonSemver(e.target.checked)}
+                    className="rounded border-slate-700 text-purple-600 focus:ring-0"
+                  />
+                  <Tag size={14} className="text-amber-400" />
+                  <span>Keep other Non-SemVer tags</span>
+                </label>
+              )}
 
               {/* Sort By Selector */}
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border bg-slate-900/80 border-slate-700 text-xs">
@@ -280,7 +315,7 @@ export const ImageStreamModal: React.FC<ImageStreamModalProps> = ({
             </span>
             <span className="text-slate-400 flex items-center gap-1 text-[11px]">
               <ArrowDownAZ size={13} />
-              Tags sorted by {sortBy === 'semver' ? 'SemVer (embedded versions identified)' : sortBy}.
+              Planning by <strong>{cleanupStrategy === 'generation' ? `Tag Generations (keep newest ${keepCount})` : `SemVer Releases (keep newest ${keepCount})`}</strong> • Sorted by {sortBy}.
             </span>
           </div>
         </div>

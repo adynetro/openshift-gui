@@ -16,6 +16,8 @@ import {
   SquareTerminal,
   ScrollText,
   Bug,
+  Flame,
+  Tag,
 } from 'lucide-react';
 import { ResourceKind, ResourceItem } from '../../types/k8s.js';
 
@@ -24,6 +26,8 @@ interface SearchBarProps {
   onChangeQuery: (val: string) => void;
   statusFilter: string;
   onChangeStatusFilter: (status: string) => void;
+  tagCountFilter?: string;
+  onChangeTagCountFilter?: (filter: string) => void;
   availableStatuses: string[];
   currentKind: ResourceKind;
   currentProject?: string;
@@ -40,6 +44,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   onChangeQuery,
   statusFilter,
   onChangeStatusFilter,
+  tagCountFilter = 'ALL',
+  onChangeTagCountFilter,
   availableStatuses,
   currentKind,
   currentProject,
@@ -108,11 +114,19 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     if (currentKind === 'imagestreams') {
       pills.push({
         id: 'clean-is',
-        label: 'SemVer Clean',
-        tooltip: 'Open SemVer Tag Cleanup Wizard',
+        label: 'Tag Manager & Clean',
+        tooltip: 'Open ImageStream Tag Manager & SemVer/Generation Cleanup Planner',
         icon: Sparkles,
         color: 'hover:border-purple-500 hover:text-purple-300 hover:bg-purple-950/40 text-purple-400 border-purple-900/50 bg-purple-950/20',
         disabled: !selectedItem,
+      });
+      pills.push({
+        id: 'prune-image-blobs',
+        label: 'Prune Registry Blobs',
+        tooltip: 'Open OpenShift Image & Blob Pruner (oc adm prune images)',
+        icon: Flame,
+        color: 'hover:border-rose-500 hover:text-rose-300 hover:bg-rose-950/40 text-rose-400 border-rose-900/50 bg-rose-950/20',
+        disabled: false,
       });
     }
 
@@ -253,6 +267,55 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             </button>
           )}
         </div>
+
+        {/* Tag Count Filter (on ImageStreams tab) */}
+        {currentKind === 'imagestreams' && onChangeTagCountFilter && (
+          <div
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs"
+            style={{
+              backgroundColor: 'var(--bg-input, #0f172a)',
+              borderColor: 'var(--border-subtle, #334155)',
+            }}
+          >
+            <Tag size={13} className="text-purple-400" />
+            <span className="text-[11px] font-semibold opacity-70">Tag Count:</span>
+            <select
+              value={tagCountFilter}
+              onChange={(e) => onChangeTagCountFilter(e.target.value)}
+              className="bg-transparent text-xs font-mono outline-none cursor-pointer"
+              style={{ color: 'var(--text-main, #f8fafc)' }}
+            >
+              <option value="ALL" className="bg-slate-900 text-slate-200">All Tag Counts</option>
+              <option value="gte1" className="bg-slate-900 text-emerald-300">≥ 1 Tag (Active)</option>
+              <option value="gte5" className="bg-slate-900 text-cyan-300">≥ 5 Tags</option>
+              <option value="gte10" className="bg-slate-900 text-purple-300">≥ 10 Tags (Heavy)</option>
+              <option value="gte20" className="bg-slate-900 text-amber-300">≥ 20 Tags (Bloated)</option>
+              <option value="gte50" className="bg-slate-900 text-rose-300">≥ 50 Tags (Critical)</option>
+              <option value="empty" className="bg-slate-900 text-slate-400">0 Tags (Empty)</option>
+            </select>
+            {tagCountFilter !== 'ALL' && (
+              <button
+                onClick={() => onChangeTagCountFilter('ALL')}
+                className="text-slate-400 hover:text-white"
+                title="Reset tag count filter"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Quick Prune Registry Blobs Button (on ImageStreams tab) */}
+        {currentKind === 'imagestreams' && (
+          <button
+            onClick={() => onAction('prune-image-blobs')}
+            className="px-3 py-1.5 rounded-lg bg-rose-950/70 hover:bg-rose-900 text-rose-300 border border-rose-800/80 text-xs font-bold flex items-center gap-1.5 transition-all shadow shadow-rose-950"
+            title="Open OpenShift Registry Image and Blob Pruner (oc adm prune images)"
+          >
+            <Flame size={13} className="text-rose-400" />
+            <span>Prune Registry Blobs</span>
+          </button>
+        )}
 
         {/* Clear Completed & Failed Pods Button (on Pods tab) */}
         {currentKind === 'pods' && onClearCompletedFailed && (

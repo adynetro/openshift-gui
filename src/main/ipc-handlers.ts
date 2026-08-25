@@ -185,4 +185,13 @@ export function registerIpcHandlers(mainWindow: electron.BrowserWindow): void {
   ipcMain.handle('terminal:stop', async (_event, sessionId: string) => {
     TerminalService.stopSession(sessionId);
   });
+
+  // Image Registry Pruner Handlers
+  ipcMain.handle('kube:pruneImages', async (_event, options: any) => {
+    return await OcClient.pruneImages(options || {});
+  });
+
+  ipcMain.handle('kube:getImagePrunerCronJobYaml', async (_event, options: any) => {
+    return OcClient.getImagePrunerCronJobYaml(options || {});
+  });
 }

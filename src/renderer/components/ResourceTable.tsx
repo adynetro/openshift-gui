@@ -475,6 +475,19 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                       <Workflow size={12} className="text-cyan-400 shrink-0" />
                       <span className="truncate">{item.name}</span>
                     </button>
+                  ) : kind === 'imagestreams' ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectItem(item);
+                        onRowAction('clean-is', item);
+                      }}
+                      className="text-left font-bold text-slate-100 hover:text-purple-300 hover:underline truncate max-w-[280px] transition-colors cursor-pointer flex items-center gap-1.5"
+                      title={`Click to open ImageStream Tag Manager & SemVer/Generation Cleanup for ${item.name}`}
+                    >
+                      <Sparkles size={12} className="text-purple-400 shrink-0" />
+                      <span className="truncate">{item.name}</span>
+                    </button>
                   ) : kind === 'nodes' ? (
                     <button
                       onClick={(e) => {

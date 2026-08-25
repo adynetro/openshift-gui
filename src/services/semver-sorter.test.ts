@@ -91,4 +91,30 @@ describe('SemverSorter', () => {
     assert.equal(pruned.includes('old-scratch'), true); // pruned
     assert.equal(plan.totalSizeToReclaim, 350);
   });
+
+  it('should plan cleanup retaining latest N generations regardless of semver', () => {
+    const rawTags: ImageStreamTagInfo[] = [
+      { tag: 'v1.0.0', generation: 50, created: '2026-03-01T00:00:00Z', imageSize: 100, isSemver: true },
+      { tag: 'release-stage-v1.6.6', generation: 40, created: '2026-02-10T00:00:00Z', imageSize: 100, isSemver: true },
+      { tag: 'v9.9.9', generation: 10, created: '2026-01-01T00:00:00Z', imageSize: 100, isSemver: true },
+      { tag: 'custom-build', generation: 30, created: '2026-02-01T00:00:00Z', imageSize: 100, isSemver: false },
+      { tag: 'latest', generation: 60, created: '2026-03-05T00:00:00Z', imageSize: 100, isSemver: false },
+    ];
+
+    const plan = SemverSorter.planCleanup(rawTags, {
+      strategy: 'generation',
+      keepCount: 2,
+      keepTagsNamed: ['latest'],
+    });
+
+    const kept = plan.tagsToKeep.map((t) => t.tag);
+    const pruned = plan.tagsToPrune.map((t) => t.tag);
+
+    assert.equal(kept.includes('latest'), true); // protected (gen 60)
+    assert.equal(kept.includes('v1.0.0'), true); // highest gen #1 (gen 50)
+    assert.equal(kept.includes('release-stage-v1.6.6'), true); // highest gen #2 (gen 40)
+    assert.equal(pruned.includes('custom-build'), true); // gen 30 pruned
+    assert.equal(pruned.includes('v9.9.9'), true); // gen 10 pruned even though semver is 9.9.9
+    assert.equal(plan.totalSizeToReclaim, 200);
+  });
 });

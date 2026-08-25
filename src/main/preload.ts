@@ -40,6 +40,20 @@ export interface IpcApi {
   onTerminalData: (callback: (data: { sessionId: string; data: string }) => void) => () => void;
   getPodDebugInfo: (podName: string, namespace: string) => Promise<{ diagnostics?: any; error?: string }>;
   getNodeDebugInfo: (nodeName: string) => Promise<{ diagnostics?: any; error?: string }>;
+  pruneImages: (options: {
+    keepTagRevisions?: number;
+    keepYoungerThan?: string;
+    confirm?: boolean;
+    all?: boolean;
+    ignoreInvalidRefs?: boolean;
+    registryUrl?: string;
+  }) => Promise<{ success: boolean; stdout: string; stderr: string; message: string; isDryRun: boolean }>;
+  getImagePrunerCronJobYaml: (options: {
+    schedule?: string;
+    keepTagRevisions?: number;
+    keepYoungerThan?: string;
+    namespace?: string;
+  }) => Promise<string>;
 }
 
 const api: IpcApi = {
@@ -90,6 +104,8 @@ const api: IpcApi = {
   },
   getPodDebugInfo: (podName, ns) => ipcRenderer.invoke('debug:getPodInfo', podName, ns),
   getNodeDebugInfo: (nodeName) => ipcRenderer.invoke('debug:getNodeInfo', nodeName),
+  pruneImages: (options) => ipcRenderer.invoke('kube:pruneImages', options),
+  getImagePrunerCronJobYaml: (options) => ipcRenderer.invoke('kube:getImagePrunerCronJobYaml', options),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', api);

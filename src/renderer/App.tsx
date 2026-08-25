@@ -23,6 +23,7 @@ import { NodeDebugModal } from './components/NodeDebugModal.js';
 import { ClusterOperatorEventsModal } from './components/ClusterOperatorEventsModal.js';
 import { HelpModal } from './components/HelpModal.js';
 import { BatchDeleteModal } from './components/BatchDeleteModal.js';
+import { ImageRegistryPrunerModal } from './components/ImageRegistryPrunerModal.js';
 import { ResourceKind, ResourceItem, KubeContext, ProjectInfo, ImageStreamResource } from '../types/k8s.js';
 import { FuzzyMatcher } from '../utils/fuzzy.js';
 import { CheckCircle2, AlertTriangle } from 'lucide-react';
@@ -49,6 +50,7 @@ type ModalMode =
   | 'restart'
   | 'delete'
   | 'clean-is'
+  | 'prune-image-blobs'
   | 'helm'
   | 'help';
 
@@ -74,6 +76,7 @@ export const App: React.FC = () => {
   const [selectedItem, setSelectedItem] = useState<ResourceItem | null>(null);
   const [query, setQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [tagCountFilter, setTagCountFilter] = useState<string>('ALL');
   const [loading, setLoading] = useState<boolean>(true);
   const [statusNotification, setStatusNotification] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [selectedPodIds, setSelectedPodIds] = useState<Set<string>>(new Set());
@@ -217,6 +220,20 @@ export const App: React.FC = () => {
       }
     }
 
+    // Filter by tag count for ImageStreams
+    if (currentKind === 'imagestreams' && tagCountFilter !== 'ALL') {
+      items = items.filter((item) => {
+        const count = (item as ImageStreamResource).tags?.length ?? item.extra?.tagCount ?? (item as any).tagCount ?? 0;
+        if (tagCountFilter === 'gte1') return count >= 1;
+        if (tagCountFilter === 'gte5') return count >= 5;
+        if (tagCountFilter === 'gte10') return count >= 10;
+        if (tagCountFilter === 'gte20') return count >= 20;
+        if (tagCountFilter === 'gte50') return count >= 50;
+        if (tagCountFilter === 'empty') return count === 0;
+        return true;
+      });
+    }
+
     // Filter by search query
     if (query.trim()) {
       const matcher = new FuzzyMatcher(items, ['name', 'status', 'namespace', 'ip', 'node', 'age', 'extra.message', 'extra.reason', 'extra.volume', 'extra.capacity', 'extra.group']);
@@ -224,7 +241,7 @@ export const App: React.FC = () => {
     }
 
     return items;
-  }, [resources, statusFilter, query, currentKind]);
+  }, [resources, statusFilter, tagCountFilter, query, currentKind]);
 
   // Handle Clear Completed & Failed Pods
   const handleClearCompletedFailedPods = async () => {
@@ -298,11 +315,21 @@ export const App: React.FC = () => {
   // Action Dispatcher with Modal Stack preservation
   const handleAction = (actionType: string, targetItem?: ResourceItem) => {
     const item = targetItem || selectedItem;
-    if (!item && actionType !== 'help' && actionType !== 'netpol-designer' && actionType !== 'add-app') return;
+    if (
+      !item &&
+      actionType !== 'help' &&
+      actionType !== 'netpol-designer' &&
+      actionType !== 'add-app' &&
+      actionType !== 'prune-image-blobs'
+    )
+      return;
 
     switch (actionType) {
       case 'add-app':
         openModal('add-app');
+        break;
+      case 'prune-image-blobs':
+        openModal('prune-image-blobs');
         break;
       case 'workload-details':
         openModal('workload-details', item);
@@ -511,6 +538,8 @@ export const App: React.FC = () => {
                 onChangeQuery={setQuery}
                 statusFilter={statusFilter}
                 onChangeStatusFilter={setStatusFilter}
+                tagCountFilter={tagCountFilter}
+                onChangeTagCountFilter={setTagCountFilter}
                 availableStatuses={availableStatuses}
                 currentKind={currentKind}
                 currentProject={currentProject}
@@ -814,6 +843,14 @@ export const App: React.FC = () => {
         <ImageStreamModal
           imageStream={selectedItem as ImageStreamResource}
           namespace={selectedItem.namespace || currentProject}
+          onClose={closeModal}
+          onRefresh={() => fetchResources(false)}
+        />
+      )}
+
+      {/* OpenShift Integrated Registry Image & Blob Pruner Modal */}
+      {modalMode === 'prune-image-blobs' && (
+        <ImageRegistryPrunerModal
           onClose={closeModal}
           onRefresh={() => fetchResources(false)}
         />

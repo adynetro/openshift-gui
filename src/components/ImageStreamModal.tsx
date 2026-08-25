@@ -24,14 +24,16 @@ export const ImageStreamModal: React.FC<ImageStreamModalProps> = ({
   });
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isCleanupWizard, setIsCleanupWizard] = useState(false);
-  const [keepSemverCount, setKeepSemverCount] = useState(3);
+  const [cleanupStrategy, setCleanupStrategy] = useState<'semver' | 'generation'>('semver');
+  const [keepCount, setKeepCount] = useState(3);
   const [keepNonSemver, setKeepNonSemver] = useState(true);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Compute cleanup plan
   const cleanupPlan = SemverSorter.planCleanup(tags, {
-    keepSemverCount,
+    strategy: cleanupStrategy,
+    keepCount,
     keepNonSemver,
     keepTagsNamed: ['latest', 'stable', 'main', 'master', 'prod'],
   });
@@ -45,12 +47,16 @@ export const ImageStreamModal: React.FC<ImageStreamModalProps> = ({
     }
 
     if (isCleanupWizard) {
+      if (input === 's') {
+        setCleanupStrategy((prev) => (prev === 'semver' ? 'generation' : 'semver'));
+        return;
+      }
       if (input === '+' || input === '=') {
-        setKeepSemverCount((prev) => prev + 1);
+        setKeepCount((prev) => prev + 1);
         return;
       }
       if (input === '-' || input === '_') {
-        setKeepSemverCount((prev) => Math.max(1, prev - 1));
+        setKeepCount((prev) => Math.max(1, prev - 1));
         return;
       }
       if (input === 't') {
@@ -160,12 +166,17 @@ export const ImageStreamModal: React.FC<ImageStreamModalProps> = ({
           marginY={1}
         >
           <Text color="yellow" bold>
-            {theme.icons.star} Semantic Versioning Cleanup Planner
+            {theme.icons.star} ImageStream Tag Cleanup Planner (Strategy: [s] {cleanupStrategy === 'generation' ? 'TAG GENERATIONS' : 'SEMVER RELEASES'})
           </Text>
           <Box marginY={1}>
             <Text color="white">
-              Keep Latest SemVer Releases: <Text color="cyan" bold>[+/-] {keepSemverCount}</Text> |{' '}
-              Keep Non-SemVer Tags: <Text color="magenta" bold>[t] {keepNonSemver ? 'YES' : 'NO'}</Text>
+              Strategy: <Text color="yellow" bold>[s] {cleanupStrategy === 'generation' ? 'Tag Generations' : 'SemVer Releases'}</Text> |{' '}
+              Keep Latest: <Text color="cyan" bold>[+/-] {keepCount}</Text>{' '}
+              {cleanupStrategy === 'semver' && (
+                <>
+                  | Keep Non-SemVer: <Text color="magenta" bold>[t] {keepNonSemver ? 'YES' : 'NO'}</Text>
+                </>
+              )}
             </Text>
           </Box>
           <Box flexDirection="column" marginY={1}>

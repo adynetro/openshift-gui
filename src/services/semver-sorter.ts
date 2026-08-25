@@ -226,14 +226,18 @@ export class SemverSorter {
   }
 
   /**
-   * Generates a cleanup plan to keep only the newest `keepCount` semver tags,
-   * with options to keep/prune non-semver tags (e.g. 'latest').
+   * Generates a cleanup plan to keep only the newest `keepCount` tags,
+   * by either:
+   * - 'semver': Retaining newest N semantic versions (plus common protected tags).
+   * - 'generation': Retaining newest N OpenShift tag generations (plus common protected tags).
    */
   static planCleanup(
     tags: ImageStreamTagInfo[],
     options: {
-      keepSemverCount: number;
-      keepNonSemver: boolean;
+      strategy?: 'semver' | 'generation';
+      keepCount?: number;
+      keepSemverCount?: number; // backwards compatibility
+      keepNonSemver?: boolean;
       keepTagsNamed?: string[]; // e.g. ['latest', 'stable', 'main', 'master']
     }
   ): {
@@ -241,34 +245,59 @@ export class SemverSorter {
     tagsToPrune: ImageStreamTagInfo[];
     totalSizeToReclaim: number;
   } {
-    const sorted = this.sortTags(tags);
-    const protectedNames = new Set((options.keepTagsNamed || ['latest', 'stable']).map((s) => s.toLowerCase()));
+    const strategy = options.strategy || 'semver';
+    const keepLimit = options.keepCount ?? options.keepSemverCount ?? 3;
+    const protectedNames = new Set((options.keepTagsNamed || ['latest', 'stable', 'main', 'master', 'prod']).map((s) => s.toLowerCase()));
 
     const tagsToKeep: ImageStreamTagInfo[] = [];
     const tagsToPrune: ImageStreamTagInfo[] = [];
-    let semverCount = 0;
 
-    for (const tag of sorted) {
-      const isProtected = protectedNames.has(tag.tag.toLowerCase());
+    if (strategy === 'generation') {
+      // Sort strictly by tag generation descending
+      const sortedByGen = this.sortTags(tags, 'generation');
+      let retainedCount = 0;
 
-      if (isProtected) {
-        tagsToKeep.push(tag);
-        continue;
-      }
-
-      if (tag.isSemver) {
-        if (semverCount < options.keepSemverCount) {
+      for (const tag of sortedByGen) {
+        const isProtected = protectedNames.has(tag.tag.toLowerCase());
+        if (isProtected) {
           tagsToKeep.push(tag);
-          semverCount++;
+          continue;
+        }
+
+        if (retainedCount < keepLimit) {
+          tagsToKeep.push(tag);
+          retainedCount++;
         } else {
           tagsToPrune.push({ ...tag, pruneSelected: true });
         }
-      } else {
-        // Non-semver tag
-        if (options.keepNonSemver) {
+      }
+    } else {
+      // SemVer strategy
+      const sorted = this.sortTags(tags, 'semver');
+      let semverCount = 0;
+
+      for (const tag of sorted) {
+        const isProtected = protectedNames.has(tag.tag.toLowerCase());
+
+        if (isProtected) {
           tagsToKeep.push(tag);
+          continue;
+        }
+
+        if (tag.isSemver) {
+          if (semverCount < keepLimit) {
+            tagsToKeep.push(tag);
+            semverCount++;
+          } else {
+            tagsToPrune.push({ ...tag, pruneSelected: true });
+          }
         } else {
-          tagsToPrune.push({ ...tag, pruneSelected: true });
+          // Non-semver tag
+          if (options.keepNonSemver ?? true) {
+            tagsToKeep.push(tag);
+          } else {
+            tagsToPrune.push({ ...tag, pruneSelected: true });
+          }
         }
       }
     }

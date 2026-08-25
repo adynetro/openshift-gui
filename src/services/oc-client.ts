@@ -743,6 +743,123 @@ export class OcClient {
   }
 
   /**
+   * Runs OpenShift integrated registry image and blob pruner (`oc adm prune images`).
+   * Can run in dry-run mode (simulation) or with `--confirm` to delete unreferenced blobs and free storage.
+   */
+  static async pruneImages(options: {
+    keepTagRevisions?: number;
+    keepYoungerThan?: string;
+    confirm?: boolean;
+    all?: boolean;
+    ignoreInvalidRefs?: boolean;
+    registryUrl?: string;
+  }): Promise<{ success: boolean; stdout: string; stderr: string; message: string; isDryRun: boolean }> {
+    try {
+      const keepRevs = options.keepTagRevisions ?? 3;
+      const keepAge = options.keepYoungerThan || '60m';
+      const allFlag = options.all !== false ? '--all=true' : '--all=false';
+      const ignoreRefs = options.ignoreInvalidRefs ? '--ignore-invalid-refs=true' : '';
+      const confirmFlag = options.confirm ? '--confirm' : '';
+      const regUrl = options.registryUrl ? `--registry-url="${options.registryUrl}"` : '';
+
+      const cmd = `oc adm prune images --keep-tag-revisions=${keepRevs} --keep-younger-than=${keepAge} ${allFlag} ${ignoreRefs} ${regUrl} ${confirmFlag}`.trim().replace(/\s+/g, ' ');
+
+      const { stdout, stderr } = await this.runCommand(cmd, 120000);
+
+      const fullOutput = (stdout || '') + (stderr ? `\n${stderr}` : '');
+      const isSuccess = !stderr || fullOutput.toLowerCase().includes('summary:') || fullOutput.toLowerCase().includes('dry run enabled');
+
+      return {
+        success: isSuccess,
+        stdout: stdout || '',
+        stderr: stderr || '',
+        message: isSuccess
+          ? (options.confirm ? 'Image and blob pruning completed successfully.' : 'Dry run simulation completed.')
+          : (stderr || 'Image prune failed.'),
+        isDryRun: !options.confirm,
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        stdout: '',
+        stderr: err.message || '',
+        message: err.message || 'Failed to execute image prune command.',
+        isDryRun: !options.confirm,
+      };
+    }
+  }
+
+  /**
+   * Generates OpenShift native CronJob & RBAC manifest for automated registry blob cleanup.
+   */
+  static getImagePrunerCronJobYaml(options: {
+    schedule?: string;
+    keepTagRevisions?: number;
+    keepYoungerThan?: string;
+    namespace?: string;
+  }): string {
+    const schedule = options.schedule || '0 0 * * 0'; // Weekly Sunday at midnight
+    const keepRevs = options.keepTagRevisions ?? 3;
+    const keepAge = options.keepYoungerThan || '60m';
+    const ns = options.namespace || 'openshift-image-registry';
+
+    return `apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: image-pruner
+  namespace: ${ns}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: image-pruner
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:image-pruner
+subjects:
+- kind: ServiceAccount
+  name: image-pruner
+  namespace: ${ns}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: image-pruner
+  namespace: ${ns}
+spec:
+  schedule: "${schedule}"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: image-pruner
+          restartPolicy: OnFailure
+          containers:
+          - name: image-pruner
+            image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
+            command:
+            - oc
+            - adm
+            - prune
+            - images
+            - --keep-tag-revisions=${keepRevs}
+            - --keep-younger-than=${keepAge}
+            - --confirm
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+`;
+  }
+
+  /**
    * Scales a deployment, deploymentconfig, or statefulset.
    */
   static async scale(kind: string, name: string, namespace: string, replicas: number): Promise<{ success: boolean; message: string }> {
@@ -751,7 +868,7 @@ export class OcClient {
     if (kind === 'statefulsets') cmdKind = 'sts';
 
     const nsFlag = namespace && namespace !== 'all-projects' ? `-n "${namespace}"` : '';
-    const cmd = `oc scale ${cmdKind} "${name}" --replicas=${replicas} ${nsFlag}"${name}" --replicas=${replicas} ${nsFlag}`;
+    const cmd = `oc scale ${cmdKind} "${name}" --replicas=${replicas} ${nsFlag}`;
     const { stdout, stderr } = await this.runCommand(cmd);
     if (stderr && !stdout) {
       return { success: false, message: stderr };
