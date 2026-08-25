@@ -6,40 +6,37 @@ const ROOT_DIR = path.resolve(import.meta.dirname, '..');
 const token = execSync('printf "protocol=https\\nhost=github.com\\n" | git credential fill | grep "password=" | cut -d= -f2', { encoding: 'utf8' }).trim();
 
 const repo = 'adynetro/openshift-gui';
-const tagName = 'v1.2.0';
-const releaseName = 'OpenShift GUI v1.2.0 - Workload Wizard, NetPol Designer, Diagnostics & Windows (x86/x64) / macOS';
+const tagName = 'v1.2.1';
+const releaseName = 'OpenShift GUI v1.2.1 - Embedded SemVer Identification & Generation Sorting';
 
-const releaseBody = `## 🚀 What's New in OpenShift GUI v1.2.0
+const releaseBody = `## 🚀 What's New in OpenShift GUI v1.2.1
 
-### 🪄 Workload Creation Wizard ("+ Add App")
-- **Visual K8s/OpenShift Workload Wizard**: Full visual generator inspired by \`k8syaml.com\` for **Deployments**, **StatefulSets**, **CronJobs**, and **DeploymentConfigs**.
-- **Cluster-Wide ImageStream Discovery**: Real-time searchable autocompletion for all core runtime images from project \`openshift\` (\`nodejs\`, \`python\`, \`dotnet\`, \`golang\`, \`java\`, \`postgresql\`, \`mysql\`, \`nginx\`, \`redis\`, \`ubi8/ubi9\`, etc.) and project-local ImageStreams.
-- **Starter Templates**: 1-click starter blueprints for Node.js, Spring Boot API, Python FastAPI, PostgreSQL DB, Nightly Backup CronJob, and Nginx.
-- **Live Bidirectional Split-View YAML Editor**: Synchronized real-time form editing and CodeMirror YAML manipulation.
+### 🏷️ Embedded SemVer Tag Identification
+- **Complex Tag Version Extraction**: Recognizes embedded semantic versions inside tags with stage, branch, and build prefixes (e.g. \`release-stage-v1.6.6\`, \`stage-app-1.2.3\`, \`app-v2.10.4-rc.1\`, \`10.0-ubi9\`, \`8.0-ubi8\`).
+- **SemVer Tag Classifier**: Automatically extracts and parses the underlying version so complex tags are properly ranked, displayed, and protected during automated ImageStream pruning.
 
-### 🛡️ Interactive NetworkPolicy Designer
-- **Visual 3-Column Policy Modeler**: Ingress sources, Target Pod Selectors, and Egress destinations.
-- **Port & Protocol Rules**: Multi-port TCP/UDP rules, namespace selectors, and CIDR blocks with live YAML compilation and apply.
-
-### 🩺 Deep Pod & Node Diagnostics
-- **Pod Failure Diagnostics & Debug Shell**: Detailed exit code analysis, termination reasons, OOMKilled hints, and interactive \`oc debug pod\` terminal.
-- **Node Diagnostics & Privileged Host Shell**: Capacity/allocatable resource meters, condition monitor (MemoryPressure, DiskPressure, PIDPressure), and \`oc debug node/<node-name>\` privileged shell.
-
-### 🧼 Streamlined Resource Table & Top Toolbar Action Bar
-- Cleaned table rows for Pods with unified, prominent action pills (**Terminal**, **Logs**, **Debug Pod**, **Describe**, **YAML**, **Delete**) in the top toolbar upon row selection.
+### 🔢 OpenShift Tag Generation Tracking & Multi-Mode Sorting
+- **Sort by OpenShift Tag Generation**: Added full support for sorting ImageStream tags by OpenShift creation generation (\`generation\` / \`gen:#\`), allowing users to sort by the newest tag revisions regardless of naming.
+- **Interactive Sort Selector**: Added 4-way sorting toggle in ImageStream & SemVer Tag Manager:
+  - **SemVer** (Highest semantic version first, tie-broken by generation)
+  - **Generation** (Newest OpenShift tag generation first)
+  - **Date** (Newest creation timestamp first)
+  - **Name** (Alphabetical tag sorting)
+### 🧹 Clear Completed & Failed Pods Across All Namespaces
+- **Cluster-Wide Pod Cleanup**: Fixed batch pruning when viewing "All Projects" / all namespaces. Pods are now automatically grouped and targeted by their respective namespaces (\`oc delete pod <names> -n <namespace>\`), allowing 1-click cleanup across the entire cluster.
 
 ---
 
 ### 📦 Release Binaries & Packages
 
 #### 🪟 Windows Packages (x86 & x64)
-- **\`OpenShift GUI-1.2.0-win.zip\`** (Windows x64 64-bit Standalone Portable App)
-- **\`OpenShift GUI-1.2.0-ia32-win.zip\`** (Windows x86 32-bit Standalone Portable App)
+- **\`OpenShift GUI-1.2.1-win.zip\`** (Windows x64 64-bit Standalone Portable App)
+- **\`OpenShift GUI-1.2.1-ia32-win.zip\`** (Windows x86 32-bit Standalone Portable App)
 
 #### 🍏 macOS Packages (Apple Silicon)
-- **\`OpenShift GUI-1.2.0-arm64-mac.zip\`** (macOS Apple Silicon Desktop App)
+- **\`OpenShift GUI-1.2.1-arm64-mac.zip\`** (macOS Apple Silicon Desktop App)
 - **\`openshift-gui-darwin-arm64\`** (Native Mach-O 64-bit CLI / TUI Executable)
-- **\`openshift-gui-v1.2.0-darwin-arm64.zip\`** / **\`.tar.gz\`**
+- **\`openshift-gui-v1.2.1-darwin-arm64.zip\`** / **\`.tar.gz\`**
 
 #### 🔐 Checksums
 Refer to \`SHA256SUMS.txt\` for binary validation hashes.`;
@@ -76,12 +73,12 @@ async function publishRelease() {
   const uploadUrlTemplate = releaseData.upload_url.replace(/\{(\?.*)?\}/, '');
   const releaseDir = path.join(ROOT_DIR, 'release');
   const filesToUpload = [
-    'OpenShift GUI-1.2.0-win.zip',
-    'OpenShift GUI-1.2.0-ia32-win.zip',
-    'OpenShift GUI-1.2.0-arm64-mac.zip',
+    'OpenShift GUI-1.2.1-win.zip',
+    'OpenShift GUI-1.2.1-ia32-win.zip',
+    'OpenShift GUI-1.2.1-arm64-mac.zip',
     'openshift-gui-darwin-arm64',
-    'openshift-gui-v1.2.0-darwin-arm64.zip',
-    'openshift-gui-v1.2.0-darwin-arm64.tar.gz',
+    'openshift-gui-v1.2.1-darwin-arm64.zip',
+    'openshift-gui-v1.2.1-darwin-arm64.tar.gz',
     'SHA256SUMS.txt',
   ];
 

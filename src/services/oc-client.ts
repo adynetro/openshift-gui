@@ -355,12 +355,14 @@ export class OcClient {
           const tagsList = rawTags.map((t: any) => {
             const tagName = t.tag || t.name || '';
             const created = t.items?.[0]?.created || raw.metadata?.creationTimestamp || '';
+            const generation = t.items?.[0]?.generation ?? t.generation ?? 0;
             const dockerImageReference = t.items?.[0]?.dockerImageReference || t.from?.name || '';
             const imageSize = t.items?.[0]?.image ? 100 * 1024 * 1024 : undefined;
 
             return {
               tag: tagName,
               created,
+              generation,
               dockerImageReference,
               imageSize,
               isSemver: false,
@@ -678,7 +680,7 @@ export class OcClient {
   }
 
   /**
-   * Batch deletes Completed, Failed, and Error pods in a project.
+   * Batch deletes Completed, Failed, and Error pods in a project or across all namespaces.
    */
   static async prunePods(
     namespace: string,
@@ -699,20 +701,41 @@ export class OcClient {
         return { success: true, count: 0, deleted: [], message: 'No completed or failed pods found to clean.' };
       }
 
-      const podNames = matchingPods.map((p) => p.name);
-      const nsFlag = namespace && namespace !== 'all-projects' ? `-n "${namespace}"` : '';
-      const cmd = `oc delete pod ${podNames.map((n) => `"${n}"`).join(' ')} ${nsFlag}`;
-      const { stdout, stderr } = await this.runCommand(cmd, 30000);
+      // Group pods by their respective namespace so multi-namespace pruning works seamlessly
+      const podsByNs: Record<string, string[]> = {};
+      matchingPods.forEach((p) => {
+        const ns = p.namespace || (namespace && namespace !== 'all-projects' ? namespace : 'default');
+        if (!podsByNs[ns]) podsByNs[ns] = [];
+        podsByNs[ns].push(p.name);
+      });
 
-      if (stderr && !stdout) {
-        return { success: false, count: 0, deleted: [], message: stderr };
+      const deletedList: string[] = [];
+      const errorList: string[] = [];
+
+      for (const [ns, names] of Object.entries(podsByNs)) {
+        if (names.length === 0) continue;
+        const chunkSize = 50;
+        for (let i = 0; i < names.length; i += chunkSize) {
+          const chunk = names.slice(i, i + chunkSize);
+          const cmd = `oc delete pod ${chunk.map((n) => `"${n}"`).join(' ')} -n "${ns}"`;
+          const { stdout, stderr } = await this.runCommand(cmd, 45000);
+          if (stderr && !stdout && stderr.toLowerCase().includes('error')) {
+            errorList.push(`[${ns}]: ${stderr.trim()}`);
+          } else {
+            deletedList.push(...chunk.map((n) => `${ns}/${n}`));
+          }
+        }
+      }
+
+      if (deletedList.length === 0 && errorList.length > 0) {
+        return { success: false, count: 0, deleted: [], message: errorList.join('; ') };
       }
 
       return {
         success: true,
-        count: podNames.length,
-        deleted: podNames,
-        message: `Successfully cleared ${podNames.length} completed/failed pods: ${podNames.join(', ')}`,
+        count: deletedList.length,
+        deleted: deletedList,
+        message: `Successfully cleared ${deletedList.length} completed/failed pods across ${Object.keys(podsByNs).length} project(s).`,
       };
     } catch (err: any) {
       return { success: false, count: 0, deleted: [], message: err.message || 'Failed to prune pods' };

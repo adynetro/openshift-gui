@@ -110,6 +110,7 @@ export interface WorkloadDetails {
 export interface ImageStreamTagInfo {
   tag: string;
   created: string;
+  generation?: number;
   dockerImageReference?: string;
   imageSize?: number;
   isSemver: boolean;

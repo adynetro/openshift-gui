@@ -259,7 +259,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           <button
             onClick={onClearCompletedFailed}
             className="px-3 py-1.5 rounded-lg bg-amber-950/70 hover:bg-amber-900 text-amber-300 border border-amber-800/80 text-xs font-bold flex items-center gap-1.5 transition-all shadow shadow-amber-950"
-            title="Clean all completed, error, and failed pods in this project"
+            title={isAllProjects ? "Clean all completed, error, and failed pods across all projects" : "Clean all completed, error, and failed pods in this project"}
           >
             <Eraser size={13} />
             <span>Clear Completed & Failed {clearablePodsCount > 0 ? `(${clearablePodsCount})` : ''}</span>

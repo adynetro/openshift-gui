@@ -19,25 +19,36 @@ export const ImageStreamModal: React.FC<ImageStreamModalProps> = ({
   const [keepSemverCount, setKeepSemverCount] = useState<number>(3);
   const [keepNonSemver, setKeepNonSemver] = useState<boolean>(true);
   const [protectCommon, setProtectCommon] = useState<boolean>(true);
+  const [sortBy, setSortBy] = useState<'semver' | 'generation' | 'date' | 'name'>('semver');
   const [manualPruneOverrides, setManualPruneOverrides] = useState<Record<string, boolean>>({});
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   // Raw tags list
   const rawTags: ImageStreamTagInfo[] = useMemo(() => {
-    return (imageStream.tags || imageStream.extra?.tags || []).map((t: any) => ({
-      tag: t.tag || t.name || '',
-      created: t.created || '',
-      dockerImageReference: t.dockerImageReference || '',
-      imageSize: t.imageSize || (100 * 1024 * 1024), // ~100MB approx
-      isSemver: false,
-    }));
+    const rawList = imageStream.tags || imageStream.extra?.tags || imageStream.raw?.status?.tags || imageStream.raw?.spec?.tags || [];
+    return rawList.map((t: any) => {
+      const tagName = t.tag || t.name || '';
+      const generation = t.generation ?? t.items?.[0]?.generation ?? 1;
+      const created = t.created || t.items?.[0]?.created || '';
+      const dockerImageReference = t.dockerImageReference || t.items?.[0]?.dockerImageReference || t.from?.name || '';
+      const imageSize = t.imageSize || (100 * 1024 * 1024);
+
+      return {
+        tag: tagName,
+        created,
+        generation,
+        dockerImageReference,
+        imageSize,
+        isSemver: false,
+      };
+    });
   }, [imageStream]);
 
   // Sort and classify with SemverSorter
   const sortedTags = useMemo(() => {
-    return SemverSorter.sortTags(rawTags);
-  }, [rawTags]);
+    return SemverSorter.sortTags(rawTags, sortBy);
+  }, [rawTags, sortBy]);
 
   // Automatic cleanup plan
   const autoPlan = useMemo(() => {
@@ -222,6 +233,28 @@ export const ImageStreamModal: React.FC<ImageStreamModalProps> = ({
                 <Tag size={14} className="text-amber-400" />
                 <span>Keep other Non-SemVer tags</span>
               </label>
+
+              {/* Sort By Selector */}
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border bg-slate-900/80 border-slate-700 text-xs">
+                <ArrowDownAZ size={13} className="text-cyan-400" />
+                <span className="text-slate-400 text-[11px] font-semibold">Sort By:</span>
+                <div className="flex items-center gap-1">
+                  {(['semver', 'generation', 'date', 'name'] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setSortBy(mode)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-mono capitalize transition-colors ${
+                        sortBy === mode
+                          ? 'bg-cyan-600 text-white font-bold shadow-sm'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                      }`}
+                    >
+                      {mode === 'semver' ? 'SemVer' : mode === 'generation' ? 'Generation' : mode === 'date' ? 'Date' : 'Name'}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             {/* Execute Batch Cleanup Button */}
@@ -247,7 +280,7 @@ export const ImageStreamModal: React.FC<ImageStreamModalProps> = ({
             </span>
             <span className="text-slate-400 flex items-center gap-1 text-[11px]">
               <ArrowDownAZ size={13} />
-              Tags sorted by SemVer (newest first). Check/uncheck boxes below for custom pruning.
+              Tags sorted by {sortBy === 'semver' ? 'SemVer (embedded versions identified)' : sortBy}.
             </span>
           </div>
         </div>
@@ -259,6 +292,7 @@ export const ImageStreamModal: React.FC<ImageStreamModalProps> = ({
               <tr>
                 <th className="py-2.5 px-3">Prune?</th>
                 <th className="py-2.5 px-3">Tag Name</th>
+                <th className="py-2.5 px-3">Gen #</th>
                 <th className="py-2.5 px-3">Classification</th>
                 <th className="py-2.5 px-3">Clean SemVer</th>
                 <th className="py-2.5 px-3">Docker Reference</th>
@@ -295,6 +329,13 @@ export const ImageStreamModal: React.FC<ImageStreamModalProps> = ({
                       <span>{t.tag}</span>
                     </td>
 
+                    {/* Generation */}
+                    <td className="py-2 px-3">
+                      <span className="px-1.5 py-0.5 rounded bg-slate-800/90 text-cyan-300 font-mono border border-slate-700 text-[10px]">
+                        gen:{t.generation ?? 1}
+                      </span>
+                    </td>
+
                     {/* Classification */}
                     <td className="py-2 px-3">
                       {t.isSemver ? (
@@ -309,7 +350,7 @@ export const ImageStreamModal: React.FC<ImageStreamModalProps> = ({
                     </td>
 
                     {/* Parsed Semver */}
-                    <td className="py-2 px-3 text-cyan-300">{t.semverParsed || '-'}</td>
+                    <td className="py-2 px-3 text-cyan-300 font-bold">{t.semverParsed || '-'}</td>
 
                     {/* Docker Reference */}
                     <td className="py-2 px-3 text-slate-400 text-[11px] truncate max-w-[250px]" title={t.dockerImageReference}>

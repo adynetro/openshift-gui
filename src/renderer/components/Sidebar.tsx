@@ -210,7 +210,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         <div className="px-3 text-[10px] opacity-60 font-mono flex items-center justify-between">
           <span>OpenShift GUI</span>
-          <span className="text-emerald-400 font-bold">v1.2.0</span>
+          <span className="text-emerald-400 font-bold">v1.2.1</span>
         </div>
       </div>
     </aside>
