@@ -284,9 +284,10 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
             {kind === 'networkpolicies' && (
               <>
                 <th className="py-3 px-3">Policy Types</th>
-                <th className="py-3 px-3">Pod Selector</th>
-                <th className="py-3 px-3">Ingress</th>
-                <th className="py-3 px-3">Egress</th>
+                <th className="py-3 px-3">Target Pods</th>
+                <th className="py-3 px-3">Ingress (Rules & Ports)</th>
+                <th className="py-3 px-3">Egress (Rules & Ports)</th>
+                <th className="py-3 px-3">Labels</th>
               </>
             )}
             {kind === 'imagestreams' && (
@@ -698,13 +699,93 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                         {item.extra?.types || 'Ingress'}
                       </span>
                     </td>
-                    <td className="py-2.5 px-3 font-mono text-slate-300 truncate max-w-[280px]" title={item.extra?.podSelector}>
-                      <span className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-xs">
-                        {item.extra?.podSelector || 'All Pods ({})'}
-                      </span>
+                    <td className="py-2.5 px-3 font-mono text-slate-300 max-w-[260px]" title={item.extra?.podSelector}>
+                      {item.extra?.matchLabels && Object.keys(item.extra.matchLabels).length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {Object.entries(item.extra.matchLabels).map(([k, v]) => (
+                            <span
+                              key={k}
+                              className="px-1.5 py-0.2 rounded bg-purple-950/80 text-purple-300 border border-purple-800 text-[10px]"
+                            >
+                              {k}={v as string}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-xs text-slate-400">
+                          All Pods in Project
+                        </span>
+                      )}
                     </td>
-                    <td className="py-2.5 px-3 font-mono text-emerald-300">{item.extra?.ingressRulesCount ?? 0} rules</td>
-                    <td className="py-2.5 px-3 font-mono text-purple-300">{item.extra?.egressRulesCount ?? 0} rules</td>
+                    <td className="py-2.5 px-3 font-mono text-xs max-w-[240px]">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-emerald-400 font-bold shrink-0">
+                          {item.extra?.ingressRulesCount ?? 0} rules
+                        </span>
+                        {item.extra?.ingressPorts && item.extra.ingressPorts.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {item.extra.ingressPorts.slice(0, 3).map((p: string, idx: number) => (
+                              <span
+                                key={idx}
+                                className="px-1.5 py-0.2 rounded bg-emerald-950/90 text-emerald-300 border border-emerald-800 text-[10px]"
+                              >
+                                {p}
+                              </span>
+                            ))}
+                            {item.extra.ingressPorts.length > 3 && (
+                              <span className="text-[10px] text-slate-400">
+                                +{item.extra.ingressPorts.length - 3}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-3 font-mono text-xs max-w-[240px]">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-purple-400 font-bold shrink-0">
+                          {item.extra?.egressRulesCount ?? 0} rules
+                        </span>
+                        {item.extra?.egressPorts && item.extra.egressPorts.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {item.extra.egressPorts.slice(0, 3).map((p: string, idx: number) => (
+                              <span
+                                key={idx}
+                                className="px-1.5 py-0.2 rounded bg-purple-950/90 text-purple-300 border border-purple-800 text-[10px]"
+                              >
+                                {p}
+                              </span>
+                            ))}
+                            {item.extra.egressPorts.length > 3 && (
+                              <span className="text-[10px] text-slate-400">
+                                +{item.extra.egressPorts.length - 3}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-3 font-mono text-xs max-w-[180px]">
+                      {item.labels && Object.keys(item.labels).length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {Object.entries(item.labels).slice(0, 2).map(([k, v]) => (
+                            <span
+                              key={k}
+                              className="px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 border border-slate-700 text-[10px]"
+                            >
+                              {k}={v as string}
+                            </span>
+                          ))}
+                          {Object.keys(item.labels).length > 2 && (
+                            <span className="text-[10px] text-slate-400">
+                              +{Object.keys(item.labels).length - 2}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-slate-500 text-xs">-</span>
+                      )}
+                    </td>
                   </>
                 )}
 

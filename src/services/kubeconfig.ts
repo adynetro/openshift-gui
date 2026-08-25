@@ -3,7 +3,7 @@ import { promisify } from 'node:util';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { parse as parseYaml } from 'yaml';
+import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { KubeContext, ProjectInfo, ClusterInfo } from '../types/k8s.js';
 import { getExecEnv } from './oc-client.js';
 
@@ -246,5 +246,184 @@ export class KubeConfigService {
       namespace: ns || 'all-projects',
       connected: !!currentContext,
     };
+  }
+
+  /**
+   * Cleans stale contexts, clusters, and users from kubeconfig.
+   * Creates an automatic backup file (config.bak-<timestamp>) before modifying.
+   */
+  static async cleanContexts(options: {
+    keepActiveOnly?: boolean;
+    contextNamesToDelete?: string[];
+    contextNamesToKeep?: string[];
+    pruneDangling?: boolean;
+  }): Promise<{
+    success: boolean;
+    backupPath?: string;
+    deletedContexts: string[];
+    deletedClusters: string[];
+    deletedUsers: string[];
+    remainingContexts: string[];
+    message: string;
+  }> {
+    const kubePath = this.getKubeconfigPath();
+    if (!fs.existsSync(kubePath)) {
+      return {
+        success: false,
+        deletedContexts: [],
+        deletedClusters: [],
+        deletedUsers: [],
+        remainingContexts: [],
+        message: `Kubeconfig file not found at ${kubePath}`,
+      };
+    }
+
+    try {
+      const rawContent = fs.readFileSync(kubePath, 'utf8');
+      const config = parseYaml(rawContent);
+
+      if (!config || !Array.isArray(config.contexts)) {
+        return {
+          success: false,
+          deletedContexts: [],
+          deletedClusters: [],
+          deletedUsers: [],
+          remainingContexts: [],
+          message: 'Invalid kubeconfig format: no contexts array found.',
+        };
+      }
+
+      // 1. Create a safe backup file before making any modifications
+      const backupPath = `${kubePath}.bak-${Date.now()}`;
+      fs.writeFileSync(backupPath, rawContent, { encoding: 'utf8', mode: 0o600 });
+
+      const currentContext = config['current-context'] || null;
+      const allContextNames: string[] = config.contexts.map((c: any) => c.name);
+
+      let targetKeepNames: Set<string>;
+
+      if (options.keepActiveOnly) {
+        if (!currentContext) {
+          throw new Error('No current active context is set in kubeconfig to keep.');
+        }
+        targetKeepNames = new Set([currentContext]);
+      } else if (options.contextNamesToKeep && options.contextNamesToKeep.length > 0) {
+        targetKeepNames = new Set(options.contextNamesToKeep);
+      } else if (options.contextNamesToDelete && options.contextNamesToDelete.length > 0) {
+        const deleteSet = new Set(options.contextNamesToDelete);
+        targetKeepNames = new Set(allContextNames.filter((name) => !deleteSet.has(name)));
+      } else {
+        return {
+          success: false,
+          deletedContexts: [],
+          deletedClusters: [],
+          deletedUsers: [],
+          remainingContexts: allContextNames,
+          message: 'No cleanup criteria specified (keepActiveOnly, contextNamesToDelete, or contextNamesToKeep).',
+        };
+      }
+
+      if (targetKeepNames.size === 0) {
+        throw new Error('Cannot delete all contexts. At least one context must remain.');
+      }
+
+      const deletedContexts: string[] = [];
+      const remainingContextObjects: any[] = [];
+
+      for (const ctx of config.contexts) {
+        if (targetKeepNames.has(ctx.name)) {
+          remainingContextObjects.push(ctx);
+        } else {
+          deletedContexts.push(ctx.name);
+        }
+      }
+
+      config.contexts = remainingContextObjects;
+
+      // Ensure current-context is valid
+      if (currentContext && !targetKeepNames.has(currentContext)) {
+        config['current-context'] = remainingContextObjects[0]?.name || '';
+      }
+
+      // 2. Prune dangling clusters and users (auth-infos) if pruneDangling is enabled (default true)
+      const shouldPruneDangling = options.pruneDangling !== false;
+      const deletedClusters: string[] = [];
+      const deletedUsers: string[] = [];
+
+      if (shouldPruneDangling) {
+        const referencedClusters = new Set(
+          remainingContextObjects.map((c) => c.context?.cluster).filter(Boolean)
+        );
+        const referencedUsers = new Set(
+          remainingContextObjects.map((c) => c.context?.user).filter(Boolean)
+        );
+
+        if (Array.isArray(config.clusters)) {
+          const retainedClusters: any[] = [];
+          for (const cl of config.clusters) {
+            if (referencedClusters.has(cl.name)) {
+              retainedClusters.push(cl);
+            } else {
+              deletedClusters.push(cl.name);
+            }
+          }
+          config.clusters = retainedClusters;
+        }
+
+        if (Array.isArray(config.users)) {
+          const retainedUsers: any[] = [];
+          for (const u of config.users) {
+            if (referencedUsers.has(u.name)) {
+              retainedUsers.push(u);
+            } else {
+              deletedUsers.push(u.name);
+            }
+          }
+          config.users = retainedUsers;
+        }
+      }
+
+      // 3. Write modified kubeconfig back to disk atomically
+      const updatedYaml = stringifyYaml(config);
+      fs.writeFileSync(kubePath, updatedYaml, { encoding: 'utf8', mode: 0o600 });
+
+      const remainingNames = remainingContextObjects.map((c) => c.name);
+
+      let msg = `Successfully removed ${deletedContexts.length} context(s)`;
+      if (deletedClusters.length > 0 || deletedUsers.length > 0) {
+        msg += ` and pruned ${deletedClusters.length} cluster(s), ${deletedUsers.length} user(s)`;
+      }
+      msg += `. Backup saved to ${path.basename(backupPath)}.`;
+
+      return {
+        success: true,
+        backupPath,
+        deletedContexts,
+        deletedClusters,
+        deletedUsers,
+        remainingContexts: remainingNames,
+        message: msg,
+      };
+    } catch (err: any) {
+      console.error('[KubeConfigService] Error cleaning contexts:', err);
+      return {
+        success: false,
+        deletedContexts: [],
+        deletedClusters: [],
+        deletedUsers: [],
+        remainingContexts: [],
+        message: err.message || 'Failed to clean kubeconfig contexts.',
+      };
+    }
+  }
+
+  /**
+   * Deletes a single context and optionally prunes orphaned clusters/users.
+   */
+  static async deleteContext(contextName: string, pruneDangling: boolean = true) {
+    return this.cleanContexts({
+      contextNamesToDelete: [contextName],
+      pruneDangling,
+    });
   }
 }

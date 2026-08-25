@@ -590,6 +590,7 @@ export const App: React.FC = () => {
           currentProject={currentProject}
           onSelectContext={handleSwitchContext}
           onSelectProject={() => {}}
+          onRefreshContexts={loadKubeInfo}
           onClose={closeModal}
         />
       )}

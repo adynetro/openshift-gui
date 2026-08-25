@@ -194,4 +194,17 @@ export function registerIpcHandlers(mainWindow: electron.BrowserWindow): void {
   ipcMain.handle('kube:getImagePrunerCronJobYaml', async (_event, options: any) => {
     return OcClient.getImagePrunerCronJobYaml(options || {});
   });
+
+  ipcMain.handle('kube:getRegistryUrl', async () => {
+    return await OcClient.getRegistryUrl();
+  });
+
+  // KubeContext Cleaning and Management Handlers
+  ipcMain.handle('kube:cleanContexts', async (_event, options: any) => {
+    return await KubeConfigService.cleanContexts(options || {});
+  });
+
+  ipcMain.handle('kube:deleteContext', async (_event, contextName: string, pruneDangling?: boolean) => {
+    return await KubeConfigService.deleteContext(contextName, pruneDangling ?? true);
+  });
 }

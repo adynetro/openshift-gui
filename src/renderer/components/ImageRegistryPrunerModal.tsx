@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Flame,
@@ -14,6 +14,8 @@ import {
   FileCode2,
   Clock,
   Send,
+  Globe,
+  RefreshCw,
 } from 'lucide-react';
 
 interface ImageRegistryPrunerModalProps {
@@ -30,6 +32,7 @@ export const ImageRegistryPrunerModal: React.FC<ImageRegistryPrunerModalProps> =
   const [includeAll, setIncludeAll] = useState<boolean>(true);
   const [ignoreInvalidRefs, setIgnoreInvalidRefs] = useState<boolean>(false);
   const [registryUrl, setRegistryUrl] = useState<string>('');
+  const [isDetectingUrl, setIsDetectingUrl] = useState<boolean>(false);
 
   const [activeTab, setActiveTab] = useState<'run' | 'cronjob'>('run');
   const [cronSchedule, setCronSchedule] = useState<string>('0 0 * * 0'); // Weekly Sunday midnight
@@ -40,10 +43,29 @@ export const ImageRegistryPrunerModal: React.FC<ImageRegistryPrunerModalProps> =
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [copied, setCopied] = useState<boolean>(false);
 
+  // Auto-detect OpenShift Registry External Route / URL
+  const fetchRegistryUrl = async () => {
+    try {
+      setIsDetectingUrl(true);
+      const url = await (window as any).electronAPI.getRegistryUrl();
+      if (url) {
+        setRegistryUrl(url);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setIsDetectingUrl(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRegistryUrl();
+  }, []);
+
   // Execute Prune (Dry-run or Confirm)
   const handleExecutePrune = async (confirm: boolean) => {
     if (confirm) {
-      const confirmText = `⚠️ WARNING: You are about to permanently DELETE unreferenced image objects and free storage blobs from the OpenShift registry.\n\nSettings:\n• Preserve latest ${keepTagRevisions} revisions per tag\n• Keep images younger than: ${keepYoungerThan}\n• Include imported images: ${includeAll ? 'YES' : 'NO'}\n\nProceed with confirmed blob deletion?`;
+      const confirmText = `⚠️ WARNING: You are about to permanently DELETE unreferenced image objects and free storage blobs from the OpenShift registry.\n\nSettings:\n• Registry URL: ${registryUrl || 'auto-detect'}\n• Preserve latest ${keepTagRevisions} revisions per tag\n• Keep images younger than: ${keepYoungerThan}\n• Include imported images: ${includeAll ? 'YES' : 'NO'}\n\nProceed with confirmed blob deletion?`;
       if (!window.confirm(confirmText)) return;
     }
 
@@ -53,7 +75,8 @@ export const ImageRegistryPrunerModal: React.FC<ImageRegistryPrunerModalProps> =
         text: confirm ? 'Executing registry blob pruning (--confirm)...' : 'Running dry-run simulation...',
         type: 'info',
       });
-      setLogOutput(`$ oc adm prune images --keep-tag-revisions=${keepTagRevisions} --keep-younger-than=${keepYoungerThan} ${includeAll ? '--all=true' : '--all=false'} ${ignoreInvalidRefs ? '--ignore-invalid-refs=true' : ''} ${registryUrl ? `--registry-url="${registryUrl}"` : ''} ${confirm ? '--confirm' : ''}\n\n[Analyzing registry image streams and storage blobs...]\n`);
+      const regFlag = registryUrl ? `--registry-url="${registryUrl.trim()}"` : '';
+      setLogOutput(`$ oc adm prune images --keep-tag-revisions=${keepTagRevisions} --keep-younger-than=${keepYoungerThan} ${includeAll ? '--all=true' : '--all=false'} ${ignoreInvalidRefs ? '--ignore-invalid-refs=true' : ''} ${regFlag} ${confirm ? '--confirm' : ''}\n\n[Connecting to registry at ${registryUrl || 'cluster endpoint'} & analyzing image storage blobs...]\n`);
 
       const res = await (window as any).electronAPI.pruneImages({
         keepTagRevisions,
@@ -89,6 +112,7 @@ export const ImageRegistryPrunerModal: React.FC<ImageRegistryPrunerModalProps> =
         keepTagRevisions,
         keepYoungerThan,
         namespace: 'openshift-image-registry',
+        registryUrl: registryUrl.trim() || undefined,
       });
       setCronJobYaml(yaml);
     } catch (e: any) {
@@ -224,6 +248,40 @@ export const ImageRegistryPrunerModal: React.FC<ImageRegistryPrunerModalProps> =
             borderColor: 'var(--border-color, #334155)',
           }}
         >
+          {/* Row 1: Registry External URL */}
+          <div className="p-2.5 rounded-lg bg-slate-900/90 border border-slate-700 flex flex-col md:flex-row items-start md:items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2 text-xs">
+              <Globe size={15} className="text-cyan-400 shrink-0" />
+              <div>
+                <span className="font-semibold text-slate-200">Registry External Route / URL:</span>
+                <span className="text-[10px] text-slate-400 block">
+                  Required by OpenShift CLI to communicate with registry API and free storage blobs.
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 w-full md:w-auto flex-1 max-w-md">
+              <input
+                type="text"
+                value={registryUrl}
+                onChange={(e) => setRegistryUrl(e.target.value)}
+                placeholder="e.g. registry.apps.okd.example.com"
+                className="flex-1 px-2.5 py-1 rounded bg-slate-800 border border-slate-600 text-xs font-mono text-cyan-300 outline-none focus:border-cyan-500"
+              />
+              <button
+                type="button"
+                onClick={fetchRegistryUrl}
+                disabled={isDetectingUrl}
+                className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 text-xs flex items-center gap-1 transition-colors"
+                title="Auto-detect OpenShift registry route from cluster"
+              >
+                <RefreshCw size={12} className={isDetectingUrl ? 'animate-spin' : ''} />
+                <span>Auto-Detect</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Row 2: Parameters Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
             {/* Keep Tag Revisions */}
             <div className="p-2.5 rounded-lg bg-slate-900/90 border border-slate-700 flex flex-col justify-between gap-1.5">

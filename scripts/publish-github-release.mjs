@@ -3,44 +3,56 @@ import path from 'node:path';
 import { execSync } from 'node:child_process';
 
 const ROOT_DIR = path.resolve(import.meta.dirname, '..');
+const pkgJson = JSON.parse(fs.readFileSync(path.join(ROOT_DIR, 'package.json'), 'utf8'));
+const VERSION = pkgJson.version;
+
 const token = execSync('printf "protocol=https\\nhost=github.com\\n" | git credential fill | grep "password=" | cut -d= -f2', { encoding: 'utf8' }).trim();
 
 const repo = 'adynetro/openshift-gui';
-const tagName = 'v1.2.2';
-const releaseName = 'OpenShift GUI v1.2.2 - ImageStream Tag Count Filter, Registry Blob Pruner & Generation Cleanup';
+const tagName = `v${VERSION}`;
+const releaseName = `OpenShift GUI v${VERSION} - Kubeconfig Context Cleaner, Self-Contained Windows Executable & NetworkPolicy Designer`;
 
-const releaseBody = `## 🚀 What's New in OpenShift GUI v1.2.2
+const releaseBody = `## 🚀 What's New in OpenShift GUI v${VERSION}
 
-### 🏷️ ImageStream Tag Count Filtering & Quick Tag Manager
-- **Filter by Tag Count**: Added a dedicated Tag Count filter dropdown on the ImageStreams tab with preset thresholds (\`All\`, \`≥ 1 Tag\`, \`≥ 5 Tags\`, \`≥ 10 Tags\`, \`≥ 20 Tags\`, \`≥ 50 Tags\`, \`0 Tags (Empty)\`) to quickly spot bloated or unreferenced image streams.
-- **1-Click Tag Manager**: Clicking ImageStream names in the resource table now directly opens the Tag Manager and Cleanup Wizard.
+### 🧹 Kubeconfig Context Cleaner & Pruner (Keep Active Context)
+- **Keep Active Context Only**: 1-click action to purge all stale/inactive contexts from \`~/.kube/config\` and retain only the currently active cluster context.
+- **Selective Batch Cleanup**: Select specific stale contexts with checkboxes to delete in bulk.
+- **Individual Context Deletion**: Instant trash action per context card in the Context Management view.
+- **Orphaned Cluster & User Pruning**: Automatically prunes dangling \`clusters\` and \`users\` (auth-infos) that are no longer referenced by any remaining context.
+- **Safe Automatic Backups**: Automatically creates a timestamped backup at \`~/.kube/config.bak-<timestamp>\` before writing any changes.
 
-### 🔥 OpenShift Integrated Registry Image & Storage Blob Pruner
-- **Interactive Registry Pruner Wizard**: Added a dedicated tool (\`oc adm prune images\`) to purge unreferenced image layers, orphaned storage blobs, and historical tag revisions from registry persistent storage.
-- **Dry-Run Simulation**: Run simulated pruning without deleting data to preview candidate images and blobs.
-- **Confirmed Blob Deletion (\`--confirm\`)**: Permanently purge orphaned blobs and free physical disk space on registry storage.
-- **Configurable Pruning Parameters**: Configure \`--keep-tag-revisions\`, \`--keep-younger-than\`, \`--all=true\`, and \`--ignore-invalid-refs\`.
-- **Automated OpenShift CronJob Generator**: Generate and 1-click apply a native OpenShift \`batch/v1 CronJob\` and RBAC (\`system:image-pruner\` ServiceAccount and ClusterRoleBinding) for automated registry pruning.
+### 🪟 Self-Contained Standalone Windows Executables
+- **Portable Single-File Executable**: Released **\`OpenShift GUI ${VERSION}.exe\`** (100% self-contained single-file portable executable requiring no installer, administrative privileges, or Node.js runtime).
+- **Windows Setup Installer**: **\`OpenShift GUI Setup ${VERSION}.exe\`** for standard desktop installation.
+- **x64 and ia32 (x86) Support**: Both 64-bit and 32-bit standalone ZIP archives and executables.
 
-### 🔢 Keep Latest N Tag Generations (Not Only SemVer)
-- **Generation-Based Cleanup Strategy**: Added a strategy toggle in the ImageStream Cleanup Planner allowing users to prune by **Tag Generation** (\`gen:#\`) or **SemVer Releases**, retaining the newest $N$ revisions regardless of naming conventions.
-- **Multi-Interface Support**: Strategy switching supported across both Desktop GUI and CLI/TUI modes.
+### 🌐 NetworkPolicy Designer & Interactive Visualizer
+- **Interactive Port Editor**: Manage protocol (\`TCP\`, \`UDP\`, \`SCTP\`) and port numbers/names directly with quick-add presets (\`80 HTTP\`, \`443 HTTPS\`, \`53 DNS\`, \`8080\`).
+- **Interactive Peer & Label Editor**: Add/remove labels on \`PodSelector\` and \`NamespaceSelector\` peers, and edit \`IPBlock\` CIDR blocks.
+- **Enriched Resource Table**: Displays Policy Types, Target Pod match label badges, Ingress rules & port chips, Egress rules & port chips, and metadata labels.
+
+### 🔥 OpenShift Registry Pruner Route Integration
+- **Automated External Route Discovery**: Auto-detects \`--registry-url\` from the OpenShift image registry route.
+- **Manual Route Configuration**: Editable registry URL field in the image pruner modal with live auto-detection.
+- **Automated CronJob Generator**: Injects the detected external registry URL into generated OpenShift \`batch/v1 CronJob\` manifests.
 
 ---
 
 ### 📦 Release Binaries & Packages
 
-#### 🪟 Windows Packages (x86 & x64)
-- **\`OpenShift GUI-1.2.2-win.zip\`** (Windows x64 64-bit Standalone Portable App)
-- **\`OpenShift GUI-1.2.2-ia32-win.zip\`** (Windows x86 32-bit Standalone Portable App)
+#### 🪟 Windows Packages (x64 & x86)
+- **\`OpenShift GUI ${VERSION}.exe\`** (Self-Contained Standalone Portable Executable)
+- **\`OpenShift GUI Setup ${VERSION}.exe\`** (Windows Setup Installer)
+- **\`OpenShift GUI-${VERSION}-win.zip\`** (Windows x64 Portable App Package)
+- **\`OpenShift GUI-${VERSION}-ia32-win.zip\`** (Windows x86 32-bit Portable App Package)
 
 #### 🍏 macOS Packages (Apple Silicon)
-- **\`OpenShift GUI-1.2.2-arm64-mac.zip\`** (macOS Apple Silicon Desktop App)
-- **\`openshift-gui-darwin-arm64\`** (Native Mach-O 64-bit CLI / TUI Executable)
-- **\`openshift-gui-v1.2.2-darwin-arm64.zip\`** / **\`.tar.gz\`**
+- **\`OpenShift GUI-${VERSION}-arm64-mac.zip\`** (macOS Apple Silicon Desktop App)
+- **\`openshift-gui-darwin-arm64\`** (Native Mach-O 64-bit Standalone CLI / TUI Binary)
+- **\`openshift-gui-v${VERSION}-darwin-arm64.zip\`** / **\`.tar.gz\`**
 
 #### 🔐 Checksums
-Refer to \`SHA256SUMS.txt\` for binary validation hashes.`;
+Refer to \`SHA256SUMS.txt\` for SHA-256 verification hashes.`;
 
 async function publishRelease() {
   console.log(`Creating GitHub release for ${tagName}...`);
@@ -74,14 +86,16 @@ async function publishRelease() {
   const uploadUrlTemplate = releaseData.upload_url.replace(/\{(\?.*)?\}/, '');
   const releaseDir = path.join(ROOT_DIR, 'release');
   const filesToUpload = [
-    'OpenShift GUI-1.2.2-win.zip',
-    'OpenShift GUI-1.2.2-ia32-win.zip',
-    'OpenShift GUI-1.2.2-arm64-mac.zip',
+    `OpenShift GUI ${VERSION}.exe`,
+    `OpenShift GUI Setup ${VERSION}.exe`,
+    `OpenShift GUI-${VERSION}-win.zip`,
+    `OpenShift GUI-${VERSION}-ia32-win.zip`,
+    `OpenShift GUI-${VERSION}-arm64-mac.zip`,
     'openshift-gui-darwin-arm64',
-    'openshift-gui-v1.2.2-darwin-arm64.zip',
-    'openshift-gui-v1.2.2-darwin-arm64.tar.gz',
-    'openshift-gui-1.2.2.tgz',
-    'openshift-gui-v1.2.2-standalone.tar.gz',
+    `openshift-gui-v${VERSION}-darwin-arm64.zip`,
+    `openshift-gui-v${VERSION}-darwin-arm64.tar.gz`,
+    `openshift-gui-${VERSION}.tgz`,
+    `openshift-gui-v${VERSION}-standalone.tar.gz`,
     'SHA256SUMS.txt',
   ];
 

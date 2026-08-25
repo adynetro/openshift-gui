@@ -53,7 +53,32 @@ export interface IpcApi {
     keepTagRevisions?: number;
     keepYoungerThan?: string;
     namespace?: string;
+    registryUrl?: string;
   }) => Promise<string>;
+  getRegistryUrl: () => Promise<string>;
+  cleanContexts: (options: {
+    keepActiveOnly?: boolean;
+    contextNamesToDelete?: string[];
+    contextNamesToKeep?: string[];
+    pruneDangling?: boolean;
+  }) => Promise<{
+    success: boolean;
+    backupPath?: string;
+    deletedContexts: string[];
+    deletedClusters: string[];
+    deletedUsers: string[];
+    remainingContexts: string[];
+    message: string;
+  }>;
+  deleteContext: (contextName: string, pruneDangling?: boolean) => Promise<{
+    success: boolean;
+    backupPath?: string;
+    deletedContexts: string[];
+    deletedClusters: string[];
+    deletedUsers: string[];
+    remainingContexts: string[];
+    message: string;
+  }>;
 }
 
 const api: IpcApi = {
@@ -106,6 +131,9 @@ const api: IpcApi = {
   getNodeDebugInfo: (nodeName) => ipcRenderer.invoke('debug:getNodeInfo', nodeName),
   pruneImages: (options) => ipcRenderer.invoke('kube:pruneImages', options),
   getImagePrunerCronJobYaml: (options) => ipcRenderer.invoke('kube:getImagePrunerCronJobYaml', options),
+  getRegistryUrl: () => ipcRenderer.invoke('kube:getRegistryUrl'),
+  cleanContexts: (options) => ipcRenderer.invoke('kube:cleanContexts', options),
+  deleteContext: (contextName, pruneDangling) => ipcRenderer.invoke('kube:deleteContext', contextName, pruneDangling),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', api);

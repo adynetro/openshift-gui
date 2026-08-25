@@ -318,7 +318,7 @@ export class OcClient {
         }
 
         case 'networkpolicies': {
-          const policyTypes = raw.spec?.policyTypes || ['Ingress'];
+          const policyTypes: string[] = raw.spec?.policyTypes || ['Ingress'];
           const types = policyTypes.join(', ');
           const matchLabels = raw.spec?.podSelector?.matchLabels || {};
           const podSelector =
@@ -327,8 +327,37 @@ export class OcClient {
                   .map(([k, v]) => `${k}=${v}`)
                   .join(', ')
               : 'All Pods ({})';
-          const ingressRulesCount = (raw.spec?.ingress || []).length;
-          const egressRulesCount = (raw.spec?.egress || []).length;
+
+          const ingressRules = raw.spec?.ingress || [];
+          const egressRules = raw.spec?.egress || [];
+          const ingressRulesCount = ingressRules.length;
+          const egressRulesCount = egressRules.length;
+
+          // Extract Ingress Ports
+          const ingressPorts: string[] = [];
+          for (const rule of ingressRules) {
+            if (rule.ports && rule.ports.length > 0) {
+              for (const p of rule.ports) {
+                const portStr = `${p.port ?? '*'}/${p.protocol || 'TCP'}`;
+                if (!ingressPorts.includes(portStr)) ingressPorts.push(portStr);
+              }
+            } else {
+              if (!ingressPorts.includes('All Ports (*)')) ingressPorts.push('All Ports (*)');
+            }
+          }
+
+          // Extract Egress Ports
+          const egressPorts: string[] = [];
+          for (const rule of egressRules) {
+            if (rule.ports && rule.ports.length > 0) {
+              for (const p of rule.ports) {
+                const portStr = `${p.port ?? '*'}/${p.protocol || 'TCP'}`;
+                if (!egressPorts.includes(portStr)) egressPorts.push(portStr);
+              }
+            } else {
+              if (!egressPorts.includes('All Ports (*)')) egressPorts.push('All Ports (*)');
+            }
+          }
 
           return {
             id: `${ns}/${name}`,
@@ -341,8 +370,11 @@ export class OcClient {
             extra: {
               types,
               podSelector,
+              matchLabels,
               ingressRulesCount,
               egressRulesCount,
+              ingressPorts,
+              egressPorts,
               policyTypes,
             },
             labels: raw.metadata?.labels || {},
@@ -743,6 +775,46 @@ export class OcClient {
   }
 
   /**
+   * Discovers the external OpenShift integrated registry URL / route host.
+   */
+  static async getRegistryUrl(): Promise<string> {
+    try {
+      // 1. Try finding routes in openshift-image-registry namespace
+      const routeCmd = `oc get route -n openshift-image-registry -o jsonpath='{.items[0].spec.host}'`;
+      const { stdout: routeHost } = await this.runCommand(routeCmd, 15000);
+      if (routeHost && routeHost.trim()) {
+        return routeHost.trim();
+      }
+
+      // 2. Try default-route or registry-route specifically
+      const defRouteCmd = `oc get route default-route -n openshift-image-registry -o jsonpath='{.spec.host}'`;
+      const { stdout: defHost } = await this.runCommand(defRouteCmd, 15000);
+      if (defHost && defHost.trim()) {
+        return defHost.trim();
+      }
+
+      // 3. Try cluster image config public repository
+      const configCmd = `oc get image.config.openshift.io/cluster -o jsonpath='{.status.publicDockerImageRepository}'`;
+      const { stdout: configHost } = await this.runCommand(configCmd, 15000);
+      if (configHost && configHost.trim()) {
+        return configHost.trim();
+      }
+
+      // 4. Try any imagestream dockerImageRepository
+      const isCmd = `oc get is -A -o jsonpath='{.items[0].status.dockerImageRepository}'`;
+      const { stdout: isRepo } = await this.runCommand(isCmd, 15000);
+      if (isRepo && isRepo.trim()) {
+        const parts = isRepo.trim().split('/');
+        if (parts.length > 1) return parts[0];
+      }
+
+      return 'image-registry.openshift-image-registry.svc:5000';
+    } catch {
+      return 'image-registry.openshift-image-registry.svc:5000';
+    }
+  }
+
+  /**
    * Runs OpenShift integrated registry image and blob pruner (`oc adm prune images`).
    * Can run in dry-run mode (simulation) or with `--confirm` to delete unreferenced blobs and free storage.
    */
@@ -760,14 +832,19 @@ export class OcClient {
       const allFlag = options.all !== false ? '--all=true' : '--all=false';
       const ignoreRefs = options.ignoreInvalidRefs ? '--ignore-invalid-refs=true' : '';
       const confirmFlag = options.confirm ? '--confirm' : '';
-      const regUrl = options.registryUrl ? `--registry-url="${options.registryUrl}"` : '';
 
-      const cmd = `oc adm prune images --keep-tag-revisions=${keepRevs} --keep-younger-than=${keepAge} ${allFlag} ${ignoreRefs} ${regUrl} ${confirmFlag}`.trim().replace(/\s+/g, ' ');
+      let regUrlStr = (options.registryUrl || '').trim();
+      if (!regUrlStr) {
+        regUrlStr = await this.getRegistryUrl();
+      }
+      const regUrlFlag = regUrlStr ? `--registry-url="${regUrlStr}"` : '';
+
+      const cmd = `oc adm prune images --keep-tag-revisions=${keepRevs} --keep-younger-than=${keepAge} ${allFlag} ${ignoreRefs} ${regUrlFlag} ${confirmFlag}`.trim().replace(/\s+/g, ' ');
 
       const { stdout, stderr } = await this.runCommand(cmd, 120000);
 
       const fullOutput = (stdout || '') + (stderr ? `\n${stderr}` : '');
-      const isSuccess = !stderr || fullOutput.toLowerCase().includes('summary:') || fullOutput.toLowerCase().includes('dry run enabled');
+      const isSuccess = !stderr || fullOutput.toLowerCase().includes('summary:') || fullOutput.toLowerCase().includes('dry run enabled') || fullOutput.toLowerCase().includes('deleting');
 
       return {
         success: isSuccess,
@@ -797,11 +874,14 @@ export class OcClient {
     keepTagRevisions?: number;
     keepYoungerThan?: string;
     namespace?: string;
+    registryUrl?: string;
   }): string {
     const schedule = options.schedule || '0 0 * * 0'; // Weekly Sunday at midnight
     const keepRevs = options.keepTagRevisions ?? 3;
     const keepAge = options.keepYoungerThan || '60m';
     const ns = options.namespace || 'openshift-image-registry';
+    const regUrl = (options.registryUrl || '').trim();
+    const regUrlFlag = regUrl ? `\n            - --registry-url=${regUrl}` : '';
 
     return `apiVersion: v1
 kind: ServiceAccount

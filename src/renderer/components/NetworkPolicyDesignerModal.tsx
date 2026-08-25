@@ -419,6 +419,266 @@ function yamlToModel(yamlStr: string, defaultNs: string): NetworkPolicyModel {
   }
 }
 
+interface InlinePortsEditorProps {
+  ports: PortRule[];
+  onAddPort: (protocol: 'TCP' | 'UDP' | 'SCTP', port: string) => void;
+  onRemovePort: (portId: string) => void;
+  colorScheme: 'cyan' | 'emerald';
+}
+
+const InlinePortsEditor: React.FC<InlinePortsEditorProps> = ({
+  ports,
+  onAddPort,
+  onRemovePort,
+  colorScheme,
+}) => {
+  const [protocol, setProtocol] = useState<'TCP' | 'UDP' | 'SCTP'>('TCP');
+  const [portVal, setPortVal] = useState<string>('');
+
+  const handleAdd = () => {
+    if (!portVal.trim()) return;
+    onAddPort(protocol, portVal.trim());
+    setPortVal('');
+  };
+
+  const isCyan = colorScheme === 'cyan';
+  const badgeBg = isCyan ? 'bg-cyan-950 text-cyan-300 border-cyan-800' : 'bg-emerald-950 text-emerald-300 border-emerald-800';
+  const btnBg = isCyan ? 'bg-cyan-600 hover:bg-cyan-500' : 'bg-emerald-600 hover:bg-emerald-500';
+
+  return (
+    <div className="space-y-1.5 pt-1.5 border-t border-slate-800">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] text-slate-400 uppercase font-bold">
+          Allowed Ports ({ports.length > 0 ? `${ports.length}` : 'All (*)'}):
+        </span>
+      </div>
+
+      {/* Ports Badges List */}
+      <div className="flex flex-wrap gap-1 items-center min-h-[22px]">
+        {ports.length > 0 ? (
+          ports.map((p) => (
+            <span
+              key={p.id}
+              className={`px-2 py-0.5 rounded border text-[11px] font-mono flex items-center gap-1.5 shadow-sm ${badgeBg}`}
+            >
+              <span>{p.protocol}/{p.port}</span>
+              <button
+                type="button"
+                onClick={() => onRemovePort(p.id)}
+                className="hover:text-rose-400 font-bold leading-none px-0.5 cursor-pointer"
+                title="Remove port"
+              >
+                ×
+              </button>
+            </span>
+          ))
+        ) : (
+          <span className="text-[10px] text-slate-400 italic">
+            No port restrictions (all ports allowed)
+          </span>
+        )}
+      </div>
+
+      {/* Inline Add Port Input Form */}
+      <div className="flex items-center gap-1.5 pt-1">
+        <select
+          value={protocol}
+          onChange={(e) => setProtocol(e.target.value as any)}
+          className="px-1.5 py-1 rounded text-[11px] font-mono bg-slate-900 border border-slate-700 text-slate-200 outline-none cursor-pointer"
+        >
+          <option value="TCP">TCP</option>
+          <option value="UDP">UDP</option>
+          <option value="SCTP">SCTP</option>
+        </select>
+        <input
+          type="text"
+          value={portVal}
+          onChange={(e) => setPortVal(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              handleAdd();
+            }
+          }}
+          placeholder="port (e.g. 80, 443, 8080)"
+          className="px-2 py-1 rounded text-[11px] font-mono border border-slate-700 bg-slate-900/80 text-slate-200 outline-none flex-1 focus:border-slate-500"
+        />
+        <button
+          type="button"
+          onClick={handleAdd}
+          className={`px-2.5 py-1 rounded text-white text-xs font-bold transition-colors cursor-pointer ${btnBg}`}
+        >
+          + Add Port
+        </button>
+      </div>
+
+      {/* Quick Port Presets */}
+      <div className="flex flex-wrap gap-1 pt-0.5">
+        <button
+          type="button"
+          onClick={() => onAddPort('TCP', '80')}
+          className="px-1.5 py-0.5 rounded bg-slate-800/80 hover:bg-slate-700 text-[10px] text-slate-300 border border-slate-700 cursor-pointer"
+        >
+          + 80 (HTTP)
+        </button>
+        <button
+          type="button"
+          onClick={() => onAddPort('TCP', '443')}
+          className="px-1.5 py-0.5 rounded bg-slate-800/80 hover:bg-slate-700 text-[10px] text-slate-300 border border-slate-700 cursor-pointer"
+        >
+          + 443 (HTTPS)
+        </button>
+        <button
+          type="button"
+          onClick={() => onAddPort('UDP', '53')}
+          className="px-1.5 py-0.5 rounded bg-slate-800/80 hover:bg-slate-700 text-[10px] text-slate-300 border border-slate-700 cursor-pointer"
+        >
+          + 53 (DNS)
+        </button>
+        <button
+          type="button"
+          onClick={() => onAddPort('TCP', '8080')}
+          className="px-1.5 py-0.5 rounded bg-slate-800/80 hover:bg-slate-700 text-[10px] text-slate-300 border border-slate-700 cursor-pointer"
+        >
+          + 8080
+        </button>
+      </div>
+    </div>
+  );
+};
+
+interface InlinePeerEditorProps {
+  peer: PeerRule;
+  onRemovePeer: () => void;
+  onAddLabel: (selectorKey: 'podSelector' | 'namespaceSelector', k: string, v: string) => void;
+  onRemoveLabel: (selectorKey: 'podSelector' | 'namespaceSelector', k: string) => void;
+  onUpdateCidr: (cidr: string) => void;
+  colorScheme: 'cyan' | 'emerald';
+}
+
+const InlinePeerEditor: React.FC<InlinePeerEditorProps> = ({
+  peer,
+  onRemovePeer,
+  onAddLabel,
+  onRemoveLabel,
+  onUpdateCidr,
+  colorScheme,
+}) => {
+  const [labelKey, setLabelKey] = useState('');
+  const [labelVal, setLabelVal] = useState('');
+
+  const isPod = peer.type === 'pod' || peer.type === 'namespace-and-pod';
+  const isNamespace = peer.type === 'namespace' || peer.type === 'namespace-and-pod';
+  const isIpBlock = peer.type === 'ipBlock';
+
+  const isCyan = colorScheme === 'cyan';
+  const selectorKey = isPod ? 'podSelector' : 'namespaceSelector';
+  const labels = isPod ? peer.podSelector || {} : peer.namespaceSelector || {};
+
+  const handleAddLabel = () => {
+    if (!labelKey.trim()) return;
+    onAddLabel(selectorKey, labelKey.trim(), labelVal.trim());
+    setLabelKey('');
+    setLabelVal('');
+  };
+
+  return (
+    <div className="p-2 rounded-lg bg-slate-900/90 border border-slate-800 space-y-1.5 text-xs font-mono shadow-inner">
+      <div className="flex items-center justify-between pb-1 border-b border-slate-800 text-[11px]">
+        <div className="flex items-center gap-1.5 font-bold">
+          {isIpBlock && <Globe size={12} className="text-amber-400" />}
+          {isPod && <Box size={12} className={isCyan ? 'text-cyan-400' : 'text-emerald-400'} />}
+          {isNamespace && <Layers size={12} className="text-purple-400" />}
+          <span className={isIpBlock ? 'text-amber-300' : isPod ? (isCyan ? 'text-cyan-300' : 'text-emerald-300') : 'text-purple-300'}>
+            {isIpBlock ? 'IPBlock CIDR' : isPod ? 'Pod Selector' : 'Namespace Selector'}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={onRemovePeer}
+          className="text-slate-500 hover:text-rose-400 p-0.5 cursor-pointer"
+          title="Remove source"
+        >
+          <Trash2 size={11} />
+        </button>
+      </div>
+
+      {isIpBlock && (
+        <div className="flex items-center gap-1.5">
+          <input
+            type="text"
+            value={peer.ipBlock?.cidr || ''}
+            onChange={(e) => onUpdateCidr(e.target.value)}
+            placeholder="e.g. 10.0.0.0/16 or 0.0.0.0/0"
+            className="flex-1 px-2 py-1 rounded bg-slate-800 border border-slate-700 text-amber-300 text-xs font-mono outline-none focus:border-amber-500"
+          />
+        </div>
+      )}
+
+      {(isPod || isNamespace) && (
+        <div className="space-y-1.5">
+          {/* Label Chips */}
+          <div className="flex flex-wrap gap-1">
+            {Object.keys(labels).length > 0 ? (
+              Object.entries(labels).map(([k, v]) => (
+                <span
+                  key={k}
+                  className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-200 border border-slate-700 text-[10px] flex items-center gap-1"
+                >
+                  <span>{k}={v}</span>
+                  <button
+                    type="button"
+                    onClick={() => onRemoveLabel(selectorKey, k)}
+                    className="text-slate-400 hover:text-rose-400 font-bold cursor-pointer"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))
+            ) : (
+              <span className="text-[10px] text-slate-400 italic">
+                {isPod ? 'Matches all pods in namespace' : 'Matches all namespaces'}
+              </span>
+            )}
+          </div>
+
+          {/* Add Match Label */}
+          <div className="flex items-center gap-1 pt-0.5">
+            <input
+              type="text"
+              value={labelKey}
+              onChange={(e) => setLabelKey(e.target.value)}
+              placeholder="key"
+              className="w-20 px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-slate-200 outline-none focus:border-slate-500"
+            />
+            <span className="text-slate-400">=</span>
+            <input
+              type="text"
+              value={labelVal}
+              onChange={(e) => setLabelVal(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleAddLabel();
+                }
+              }}
+              placeholder="val"
+              className="w-20 px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-slate-200 outline-none focus:border-slate-500"
+            />
+            <button
+              type="button"
+              onClick={handleAddLabel}
+              className="px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 text-white text-[10px] font-bold cursor-pointer"
+            >
+              + Label
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const NetworkPolicyDesignerModal: React.FC<NetworkPolicyDesignerModalProps> = ({
   item,
   namespace,
@@ -630,6 +890,185 @@ export const NetworkPolicyDesignerModal: React.FC<NetworkPolicyDesignerModalProp
       ...m,
       egressRules: m.egressRules.filter((r) => r.id !== id),
     }));
+  };
+
+  // Port and Label Editing Handlers for Rules & Peers
+  const handleAddPortToRule = (direction: 'ingress' | 'egress', ruleId: string, protocol: 'TCP' | 'UDP' | 'SCTP', port: string) => {
+    if (!port.trim()) return;
+    updateModel((m) => {
+      const portObj: PortRule = {
+        id: `port-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+        protocol,
+        port: port.trim(),
+      };
+      if (direction === 'ingress') {
+        const ingressRules = m.ingressRules.map((r) =>
+          r.id === ruleId ? { ...r, ports: [...r.ports, portObj] } : r
+        );
+        return { ...m, ingressRules };
+      } else {
+        const egressRules = m.egressRules.map((r) =>
+          r.id === ruleId ? { ...r, ports: [...r.ports, portObj] } : r
+        );
+        return { ...m, egressRules };
+      }
+    });
+  };
+
+  const handleRemovePortFromRule = (direction: 'ingress' | 'egress', ruleId: string, portId: string) => {
+    updateModel((m) => {
+      if (direction === 'ingress') {
+        const ingressRules = m.ingressRules.map((r) =>
+          r.id === ruleId ? { ...r, ports: r.ports.filter((p) => p.id !== portId) } : r
+        );
+        return { ...m, ingressRules };
+      } else {
+        const egressRules = m.egressRules.map((r) =>
+          r.id === ruleId ? { ...r, ports: r.ports.filter((p) => p.id !== portId) } : r
+        );
+        return { ...m, egressRules };
+      }
+    });
+  };
+
+  const handleAddPeerToRule = (direction: 'ingress' | 'egress', ruleId: string, peerType: 'pod' | 'namespace' | 'ipBlock') => {
+    updateModel((m) => {
+      const newPeer: PeerRule = {
+        id: `peer-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+        type: peerType,
+        podSelector: peerType === 'pod' ? { app: 'frontend' } : undefined,
+        namespaceSelector: peerType === 'namespace' ? { 'kubernetes.io/metadata.name': 'openshift-dns' } : undefined,
+        ipBlock: peerType === 'ipBlock' ? { cidr: '0.0.0.0/0' } : undefined,
+      };
+      if (direction === 'ingress') {
+        const ingressRules = m.ingressRules.map((r) =>
+          r.id === ruleId ? { ...r, from: [...r.from, newPeer] } : r
+        );
+        return { ...m, ingressRules };
+      } else {
+        const egressRules = m.egressRules.map((r) =>
+          r.id === ruleId ? { ...r, to: [...r.to, newPeer] } : r
+        );
+        return { ...m, egressRules };
+      }
+    });
+  };
+
+  const handleRemovePeerFromRule = (direction: 'ingress' | 'egress', ruleId: string, peerId: string) => {
+    updateModel((m) => {
+      if (direction === 'ingress') {
+        const ingressRules = m.ingressRules.map((r) =>
+          r.id === ruleId ? { ...r, from: r.from.filter((p) => p.id !== peerId) } : r
+        );
+        return { ...m, ingressRules };
+      } else {
+        const egressRules = m.egressRules.map((r) =>
+          r.id === ruleId ? { ...r, to: r.to.filter((p) => p.id !== peerId) } : r
+        );
+        return { ...m, egressRules };
+      }
+    });
+  };
+
+  const handleAddLabelToPeer = (
+    direction: 'ingress' | 'egress',
+    ruleId: string,
+    peerId: string,
+    selectorKey: 'podSelector' | 'namespaceSelector',
+    key: string,
+    val: string
+  ) => {
+    if (!key.trim()) return;
+    updateModel((m) => {
+      if (direction === 'ingress') {
+        const ingressRules = m.ingressRules.map((r) => {
+          if (r.id !== ruleId) return r;
+          const from = r.from.map((p) => {
+            if (p.id !== peerId) return p;
+            const existing = p[selectorKey] || {};
+            return { ...p, [selectorKey]: { ...existing, [key.trim()]: val.trim() } };
+          });
+          return { ...r, from };
+        });
+        return { ...m, ingressRules };
+      } else {
+        const egressRules = m.egressRules.map((r) => {
+          if (r.id !== ruleId) return r;
+          const to = r.to.map((p) => {
+            if (p.id !== peerId) return p;
+            const existing = p[selectorKey] || {};
+            return { ...p, [selectorKey]: { ...existing, [key.trim()]: val.trim() } };
+          });
+          return { ...r, to };
+        });
+        return { ...m, egressRules };
+      }
+    });
+  };
+
+  const handleRemoveLabelFromPeer = (
+    direction: 'ingress' | 'egress',
+    ruleId: string,
+    peerId: string,
+    selectorKey: 'podSelector' | 'namespaceSelector',
+    key: string
+  ) => {
+    updateModel((m) => {
+      if (direction === 'ingress') {
+        const ingressRules = m.ingressRules.map((r) => {
+          if (r.id !== ruleId) return r;
+          const from = r.from.map((p) => {
+            if (p.id !== peerId) return p;
+            const existing = { ...(p[selectorKey] || {}) };
+            delete existing[key];
+            return { ...p, [selectorKey]: existing };
+          });
+          return { ...r, from };
+        });
+        return { ...m, ingressRules };
+      } else {
+        const egressRules = m.egressRules.map((r) => {
+          if (r.id !== ruleId) return r;
+          const to = r.to.map((p) => {
+            if (p.id !== peerId) return p;
+            const existing = { ...(p[selectorKey] || {}) };
+            delete existing[key];
+            return { ...p, [selectorKey]: existing };
+          });
+          return { ...r, to };
+        });
+        return { ...m, egressRules };
+      }
+    });
+  };
+
+  const handleUpdatePeerCidr = (
+    direction: 'ingress' | 'egress',
+    ruleId: string,
+    peerId: string,
+    cidr: string
+  ) => {
+    updateModel((m) => {
+      if (direction === 'ingress') {
+        const ingressRules = m.ingressRules.map((r) => {
+          if (r.id !== ruleId) return r;
+          const from = r.from.map((p) =>
+            p.id === peerId ? { ...p, ipBlock: { ...p.ipBlock, cidr: cidr.trim() } } : p
+          );
+          return { ...r, from };
+        });
+        return { ...m, ingressRules };
+      } else {
+        const egressRules = m.egressRules.map((r) => {
+          if (r.id !== ruleId) return r;
+          const to = r.to.map((p) =>
+            p.id === peerId ? { ...p, ipBlock: { ...p.ipBlock, cidr: cidr.trim() } } : p
+          );
+          return { ...r, to };
+        });
+        return { ...m, egressRules };
+      }
+    });
   };
 
   return (
@@ -883,7 +1322,7 @@ export const NetworkPolicyDesignerModal: React.FC<NetworkPolicyDesignerModalProp
                       model.ingressRules.map((rule, idx) => (
                         <div
                           key={rule.id}
-                          className="p-3 rounded-lg border space-y-2 text-xs font-mono shadow-sm"
+                          className="p-3 rounded-lg border space-y-3 text-xs font-mono shadow-sm"
                           style={{
                             backgroundColor: 'var(--bg-input, #0f172a)',
                             borderColor: 'var(--border-subtle, #334155)',
@@ -893,63 +1332,73 @@ export const NetworkPolicyDesignerModal: React.FC<NetworkPolicyDesignerModalProp
                             <span className="font-bold text-cyan-300 text-[11px]">Rule #{idx + 1}</span>
                             <button
                               onClick={() => handleRemoveIngressRule(rule.id)}
-                              className="text-rose-400 hover:text-rose-300 p-0.5 rounded"
+                              className="text-rose-400 hover:text-rose-300 p-0.5 rounded cursor-pointer"
                               title="Delete Ingress Rule"
                             >
                               <Trash2 size={12} />
                             </button>
                           </div>
 
-                          {/* Sources */}
-                          <div className="space-y-1">
-                            <span className="text-[10px] text-slate-400 uppercase font-bold">From Sources:</span>
-                            {rule.from.map((f) => (
-                              <div key={f.id} className="p-1.5 rounded bg-slate-900/60 border border-slate-800 text-[11px]">
-                                {f.type === 'ipBlock' && f.ipBlock && (
-                                  <div className="flex items-center gap-1.5 text-amber-300">
-                                    <Globe size={11} />
-                                    <span>IPBlock: {f.ipBlock.cidr}</span>
-                                  </div>
-                                )}
-                                {f.type === 'pod' && (
-                                  <div className="flex items-center gap-1.5 text-cyan-300">
-                                    <Box size={11} />
-                                    <span>
-                                      PodSelector:{' '}
-                                      {Object.entries(f.podSelector || {})
-                                        .map(([k, v]) => `${k}=${v}`)
-                                        .join(', ') || 'All pods in project'}
-                                    </span>
-                                  </div>
-                                )}
-                                {f.type === 'namespace' && (
-                                  <div className="flex items-center gap-1.5 text-purple-300">
-                                    <Layers size={11} />
-                                    <span>
-                                      NamespaceSelector:{' '}
-                                      {Object.entries(f.namespaceSelector || {})
-                                        .map(([k, v]) => `${k}=${v}`)
-                                        .join(', ') || 'All namespaces'}
-                                    </span>
-                                  </div>
-                                )}
+                          {/* Sources (from) */}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] text-slate-400 uppercase font-bold">
+                                From Sources ({rule.from.length > 0 ? rule.from.length : 'All (*)'}):
+                              </span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddPeerToRule('ingress', rule.id, 'pod')}
+                                  className="px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 text-[10px] hover:bg-cyan-900 cursor-pointer"
+                                  title="Add Pod Selector Source"
+                                >
+                                  + Pod
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddPeerToRule('ingress', rule.id, 'namespace')}
+                                  className="px-1.5 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-800 text-[10px] hover:bg-purple-900 cursor-pointer"
+                                  title="Add Namespace Selector Source"
+                                >
+                                  + NS
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddPeerToRule('ingress', rule.id, 'ipBlock')}
+                                  className="px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800 text-[10px] hover:bg-amber-900 cursor-pointer"
+                                  title="Add IPBlock CIDR Source"
+                                >
+                                  + IPBlock
+                                </button>
                               </div>
-                            ))}
+                            </div>
+
+                            {rule.from.length === 0 ? (
+                              <div className="p-2 rounded bg-slate-900/60 border border-slate-800 text-[11px] text-slate-400 italic">
+                                Allows traffic from all sources (in-cluster pods, namespaces, and external IPs)
+                              </div>
+                            ) : (
+                              rule.from.map((f) => (
+                                <InlinePeerEditor
+                                  key={f.id}
+                                  peer={f}
+                                  onRemovePeer={() => handleRemovePeerFromRule('ingress', rule.id, f.id)}
+                                  onAddLabel={(sec, k, v) => handleAddLabelToPeer('ingress', rule.id, f.id, sec, k, v)}
+                                  onRemoveLabel={(sec, k) => handleRemoveLabelFromPeer('ingress', rule.id, f.id, sec, k)}
+                                  onUpdateCidr={(cidr) => handleUpdatePeerCidr('ingress', rule.id, f.id, cidr)}
+                                  colorScheme="cyan"
+                                />
+                              ))
+                            )}
                           </div>
 
                           {/* Allowed Ports */}
-                          {rule.ports.length > 0 && (
-                            <div className="space-y-1 pt-1">
-                              <span className="text-[10px] text-slate-400 uppercase font-bold">Allowed Ports:</span>
-                              <div className="flex flex-wrap gap-1">
-                                {rule.ports.map((p) => (
-                                  <span key={p.id} className="px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 text-[10px]">
-                                    {p.protocol} / {p.port}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
+                          <InlinePortsEditor
+                            ports={rule.ports}
+                            onAddPort={(proto, port) => handleAddPortToRule('ingress', rule.id, proto, port)}
+                            onRemovePort={(portId) => handleRemovePortFromRule('ingress', rule.id, portId)}
+                            colorScheme="cyan"
+                          />
                         </div>
                       ))
                     )}
@@ -1039,7 +1488,7 @@ export const NetworkPolicyDesignerModal: React.FC<NetworkPolicyDesignerModalProp
                                 <span>{k}={v}</span>
                                 <button
                                   onClick={() => handleRemoveTargetLabel(k)}
-                                  className="text-purple-400 hover:text-rose-400"
+                                  className="text-purple-400 hover:text-rose-400 font-bold cursor-pointer"
                                 >
                                   ×
                                 </button>
@@ -1054,7 +1503,7 @@ export const NetworkPolicyDesignerModal: React.FC<NetworkPolicyDesignerModalProp
                               value={newLabelKey}
                               onChange={(e) => setNewLabelKey(e.target.value)}
                               placeholder="key (e.g. app)"
-                              className="px-2 py-1 rounded text-[11px] font-mono border bg-transparent flex-1"
+                              className="px-2 py-1 rounded text-[11px] font-mono border bg-transparent flex-1 focus:border-purple-500 outline-none"
                               style={{ borderColor: 'var(--border-subtle, #334155)' }}
                             />
                             <span className="text-slate-400">=</span>
@@ -1062,15 +1511,64 @@ export const NetworkPolicyDesignerModal: React.FC<NetworkPolicyDesignerModalProp
                               type="text"
                               value={newLabelVal}
                               onChange={(e) => setNewLabelVal(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleAddTargetLabel();
+                                }
+                              }}
                               placeholder="value (e.g. backend)"
-                              className="px-2 py-1 rounded text-[11px] font-mono border bg-transparent flex-1"
+                              className="px-2 py-1 rounded text-[11px] font-mono border bg-transparent flex-1 focus:border-purple-500 outline-none"
                               style={{ borderColor: 'var(--border-subtle, #334155)' }}
                             />
                             <button
                               onClick={handleAddTargetLabel}
-                              className="px-2.5 py-1 rounded bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold"
+                              className="px-2.5 py-1 rounded bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold cursor-pointer transition-colors"
                             >
-                              Add
+                              + Add
+                            </button>
+                          </div>
+
+                          {/* Quick Target Label Presets */}
+                          <div className="flex flex-wrap gap-1 pt-1">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                updateModel((m) => ({
+                                  ...m,
+                                  targetAllPods: false,
+                                  targetPodLabels: { ...m.targetPodLabels, app: 'frontend' },
+                                }))
+                              }
+                              className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-purple-300 border border-slate-700 cursor-pointer"
+                            >
+                              + app=frontend
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                updateModel((m) => ({
+                                  ...m,
+                                  targetAllPods: false,
+                                  targetPodLabels: { ...m.targetPodLabels, app: 'backend' },
+                                }))
+                              }
+                              className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-purple-300 border border-slate-700 cursor-pointer"
+                            >
+                              + app=backend
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                updateModel((m) => ({
+                                  ...m,
+                                  targetAllPods: false,
+                                  targetPodLabels: { ...m.targetPodLabels, tier: 'api' },
+                                }))
+                              }
+                              className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-purple-300 border border-slate-700 cursor-pointer"
+                            >
+                              + tier=api
                             </button>
                           </div>
                         </div>
@@ -1166,7 +1664,7 @@ export const NetworkPolicyDesignerModal: React.FC<NetworkPolicyDesignerModalProp
                       model.egressRules.map((rule, idx) => (
                         <div
                           key={rule.id}
-                          className="p-3 rounded-lg border space-y-2 text-xs font-mono shadow-sm"
+                          className="p-3 rounded-lg border space-y-3 text-xs font-mono shadow-sm"
                           style={{
                             backgroundColor: 'var(--bg-input, #0f172a)',
                             borderColor: 'var(--border-subtle, #334155)',
@@ -1176,63 +1674,73 @@ export const NetworkPolicyDesignerModal: React.FC<NetworkPolicyDesignerModalProp
                             <span className="font-bold text-emerald-300 text-[11px]">Rule #{idx + 1}</span>
                             <button
                               onClick={() => handleRemoveEgressRule(rule.id)}
-                              className="text-rose-400 hover:text-rose-300 p-0.5 rounded"
+                              className="text-rose-400 hover:text-rose-300 p-0.5 rounded cursor-pointer"
                               title="Delete Egress Rule"
                             >
                               <Trash2 size={12} />
                             </button>
                           </div>
 
-                          {/* Destinations */}
-                          <div className="space-y-1">
-                            <span className="text-[10px] text-slate-400 uppercase font-bold">To Destinations:</span>
-                            {rule.to.map((t) => (
-                              <div key={t.id} className="p-1.5 rounded bg-slate-900/60 border border-slate-800 text-[11px]">
-                                {t.type === 'ipBlock' && t.ipBlock && (
-                                  <div className="flex items-center gap-1.5 text-amber-300">
-                                    <Globe size={11} />
-                                    <span>IPBlock: {t.ipBlock.cidr}</span>
-                                  </div>
-                                )}
-                                {t.type === 'pod' && (
-                                  <div className="flex items-center gap-1.5 text-emerald-300">
-                                    <Box size={11} />
-                                    <span>
-                                      PodSelector:{' '}
-                                      {Object.entries(t.podSelector || {})
-                                        .map(([k, v]) => `${k}=${v}`)
-                                        .join(', ') || 'All pods in project'}
-                                    </span>
-                                  </div>
-                                )}
-                                {t.type === 'namespace' && (
-                                  <div className="flex items-center gap-1.5 text-purple-300">
-                                    <Layers size={11} />
-                                    <span>
-                                      NamespaceSelector:{' '}
-                                      {Object.entries(t.namespaceSelector || {})
-                                        .map(([k, v]) => `${k}=${v}`)
-                                        .join(', ') || 'All namespaces'}
-                                    </span>
-                                  </div>
-                                )}
+                          {/* Destinations (to) */}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] text-slate-400 uppercase font-bold">
+                                To Destinations ({rule.to.length > 0 ? rule.to.length : 'All (*)'}):
+                              </span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddPeerToRule('egress', rule.id, 'pod')}
+                                  className="px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 text-[10px] hover:bg-emerald-900 cursor-pointer"
+                                  title="Add Pod Selector Destination"
+                                >
+                                  + Pod
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddPeerToRule('egress', rule.id, 'namespace')}
+                                  className="px-1.5 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-800 text-[10px] hover:bg-purple-900 cursor-pointer"
+                                  title="Add Namespace Selector Destination"
+                                >
+                                  + NS
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddPeerToRule('egress', rule.id, 'ipBlock')}
+                                  className="px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800 text-[10px] hover:bg-amber-900 cursor-pointer"
+                                  title="Add IPBlock CIDR Destination"
+                                >
+                                  + IPBlock
+                                </button>
                               </div>
-                            ))}
+                            </div>
+
+                            {rule.to.length === 0 ? (
+                              <div className="p-2 rounded bg-slate-900/60 border border-slate-800 text-[11px] text-slate-400 italic">
+                                Allows outbound traffic to all destinations (in-cluster and internet)
+                              </div>
+                            ) : (
+                              rule.to.map((t) => (
+                                <InlinePeerEditor
+                                  key={t.id}
+                                  peer={t}
+                                  onRemovePeer={() => handleRemovePeerFromRule('egress', rule.id, t.id)}
+                                  onAddLabel={(sec, k, v) => handleAddLabelToPeer('egress', rule.id, t.id, sec, k, v)}
+                                  onRemoveLabel={(sec, k) => handleRemoveLabelFromPeer('egress', rule.id, t.id, sec, k)}
+                                  onUpdateCidr={(cidr) => handleUpdatePeerCidr('egress', rule.id, t.id, cidr)}
+                                  colorScheme="emerald"
+                                />
+                              ))
+                            )}
                           </div>
 
                           {/* Allowed Ports */}
-                          {rule.ports.length > 0 && (
-                            <div className="space-y-1 pt-1">
-                              <span className="text-[10px] text-slate-400 uppercase font-bold">Allowed Ports:</span>
-                              <div className="flex flex-wrap gap-1">
-                                {rule.ports.map((p) => (
-                                  <span key={p.id} className="px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 text-[10px]">
-                                    {p.protocol} / {p.port}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
+                          <InlinePortsEditor
+                            ports={rule.ports}
+                            onAddPort={(proto, port) => handleAddPortToRule('egress', rule.id, proto, port)}
+                            onRemovePort={(portId) => handleRemovePortFromRule('egress', rule.id, portId)}
+                            colorScheme="emerald"
+                          />
                         </div>
                       ))
                     )}

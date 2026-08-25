@@ -32,8 +32,16 @@
     "icon": "build/icon.png",
     "target": [
       {
+        "target": "portable",
+        "arch": ["x64", "ia32"]
+      },
+      {
         "target": "zip",
-        "arch": ["ia32", "x64"]
+        "arch": ["x64", "ia32"]
+      },
+      {
+        "target": "nsis",
+        "arch": ["x64", "ia32"]
       }
     ]
   }
