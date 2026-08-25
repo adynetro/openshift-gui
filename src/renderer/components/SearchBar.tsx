@@ -1,5 +1,22 @@
 import React from 'react';
-import { Search, X, Zap, Terminal, Sparkles, RefreshCw, FileText, Code2, Trash2, Filter, Eraser, Anchor } from 'lucide-react';
+import {
+  Search,
+  X,
+  Zap,
+  Terminal,
+  Sparkles,
+  RefreshCw,
+  FileText,
+  Code2,
+  Trash2,
+  Filter,
+  Eraser,
+  Anchor,
+  Workflow,
+  SquareTerminal,
+  ScrollText,
+  Bug,
+} from 'lucide-react';
 import { ResourceKind, ResourceItem } from '../../types/k8s.js';
 
 interface SearchBarProps {
@@ -49,15 +66,42 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     }
     const pills: { id: string; label: string; tooltip: string; icon: any; color: string; disabled?: boolean }[] = [];
 
-    // Live logs for pods
+    // Pod Actions in Top Toolbar when selected
     if (currentKind === 'pods') {
+      pills.push({
+        id: 'terminal',
+        label: 'Terminal',
+        tooltip: 'Open Interactive Pod Shell Terminal',
+        icon: SquareTerminal,
+        color: 'hover:border-cyan-500 hover:text-cyan-300 hover:bg-cyan-950/40 text-cyan-400 border-cyan-900/50 bg-cyan-950/20',
+        disabled: !selectedItem,
+      });
       pills.push({
         id: 'logs',
         label: 'Logs',
         tooltip: 'Stream Live Pod Logs',
-        icon: Terminal,
+        icon: ScrollText,
         color: 'hover:border-emerald-500 hover:text-emerald-300 hover:bg-emerald-950/40 text-emerald-400 border-emerald-900/50 bg-emerald-950/20',
         disabled: !selectedItem,
+      });
+      pills.push({
+        id: 'debug-pod',
+        label: 'Debug Pod',
+        tooltip: 'Debug Pod (Failure Diagnostics & oc debug container replica)',
+        icon: Bug,
+        color: 'hover:border-purple-500 hover:text-purple-300 hover:bg-purple-950/40 text-purple-400 border-purple-900/50 bg-purple-950/20',
+        disabled: !selectedItem,
+      });
+    }
+
+    if (currentKind === 'networkpolicies') {
+      pills.push({
+        id: 'netpol-designer',
+        label: selectedItem ? 'Visual Designer' : '+ Create NetPol',
+        tooltip: 'Open Interactive Visual NetworkPolicy Designer & Editor',
+        icon: Workflow,
+        color: 'hover:border-cyan-500 hover:text-cyan-300 hover:bg-cyan-950/40 text-cyan-400 border-cyan-900/50 bg-cyan-950/20',
+        disabled: false,
       });
     }
 

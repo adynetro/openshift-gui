@@ -147,7 +147,7 @@ export const YamlModal: React.FC<YamlModalProps> = ({ mode, item, namespace, onC
               <span className="text-xs">Loading details...</span>
             </div>
           ) : (
-            <div className="flex-1 h-full w-full overflow-auto flex flex-col">
+            <div className="flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col">
               <CodeMirror
                 value={content}
                 height="100%"

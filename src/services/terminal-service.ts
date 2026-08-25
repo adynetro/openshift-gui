@@ -1,5 +1,6 @@
 import { spawn, ChildProcess } from 'node:child_process';
 import { BrowserWindow } from 'electron';
+import { getExecEnv } from './oc-client.js';
 
 interface TerminalSession {
   id: string;
@@ -7,45 +8,24 @@ interface TerminalSession {
   targetName: string;
   namespace: string;
   container?: string;
+  mode?: 'exec' | 'debug-pod' | 'debug-node';
 }
 
 export class TerminalService {
   private static sessions = new Map<string, TerminalSession>();
 
   /**
-   * Starts an interactive shell session in a pod using oc exec.
+   * Starts an interactive shell session in a pod or node using oc exec / oc debug.
    */
   static startSession(
     targetName: string,
     namespace: string,
     container?: string,
-    window?: BrowserWindow
+    window?: BrowserWindow,
+    mode: 'exec' | 'debug-pod' | 'debug-node' = 'exec'
   ): string {
     const sessionId = `term-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
     const targetWin = window || BrowserWindow.getAllWindows()[0];
-
-    // Interactive shell command with colored prompt and fallback
-    const execCmd = `stty onlcr 2>/dev/null || true; export TERM=xterm-256color; export PS1="[\\u@\\h \\W]\\$ "; if command -v bash >/dev/null 2>&1; then exec bash -i; elif command -v sh >/dev/null 2>&1; then exec sh -i; else exec /bin/sh -i; fi`;
-
-    const args = ['exec', '-i', targetName];
-
-    if (namespace && namespace !== 'all-projects') {
-      args.push('-n', namespace);
-    }
-
-    if (container) {
-      args.push('-c', container);
-    }
-
-    args.push('--', 'sh', '-c', execCmd);
-
-    const child = spawn('oc', args, {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: {
-        ...process.env,
-        TERM: 'xterm-256color',
-      },
-    });
 
     const sendData = (text: string) => {
       const win = targetWin || BrowserWindow.getAllWindows()[0];
@@ -56,6 +36,43 @@ export class TerminalService {
         });
       }
     };
+
+    let args: string[] = [];
+
+    if (mode === 'debug-node') {
+      // oc debug node/<nodeName> -> privileged host debugger
+      args = ['debug', `node/${targetName}`];
+    } else if (mode === 'debug-pod') {
+      // oc debug pod/<podName> -n <namespace> -> replica debug container
+      args = ['debug', `pod/${targetName}`];
+      if (namespace && namespace !== 'all-projects' && namespace !== '__all__') {
+        args.push('-n', namespace);
+      }
+      if (container) {
+        args.push('-c', container);
+      }
+      args.push('--keep-annotations');
+    } else {
+      // Standard oc exec -i
+      const execCmd = `stty onlcr 2>/dev/null || true; export TERM=xterm-256color; export PS1="[\\u@\\h \\W]\\$ "; if command -v bash >/dev/null 2>&1; then exec bash -i; elif command -v sh >/dev/null 2>&1; then exec sh -i; else exec /bin/sh -i; fi`;
+
+      args = ['exec', '-i', targetName];
+      if (namespace && namespace !== 'all-projects' && namespace !== '__all__') {
+        args.push('-n', namespace);
+      }
+      if (container) {
+        args.push('-c', container);
+      }
+      args.push('--', 'sh', '-c', execCmd);
+    }
+
+    const child = spawn('oc', args, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: {
+        ...getExecEnv(),
+        TERM: 'xterm-256color',
+      },
+    });
 
     child.stdout.on('data', (chunk) => {
       sendData(chunk.toString('utf-8'));

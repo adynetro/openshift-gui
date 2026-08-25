@@ -3,7 +3,19 @@ import { promisify } from 'node:util';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { ResourceKind, ResourceItem, ImageStreamResource, WorkloadDetails, WorkloadRevisionItem, WorkloadPodItem, TopologyData, TopologyNode } from '../types/k8s.js';
+import {
+  ResourceKind,
+  ResourceItem,
+  ImageStreamResource,
+  WorkloadDetails,
+  WorkloadRevisionItem,
+  WorkloadPodItem,
+  TopologyData,
+  TopologyNode,
+  PodDebugDiagnostics,
+  NodeDebugDiagnostics,
+  ContainerDebugState,
+} from '../types/k8s.js';
 import { formatAge, getStatusColor } from '../utils/formatters.js';
 import { SemverSorter } from './semver-sorter.js';
 
@@ -649,7 +661,7 @@ export class OcClient {
     try {
       fs.writeFileSync(tmpFile, yamlContent, 'utf8');
       const nsFlag = namespace && namespace !== 'all-projects' ? `-n "${namespace}"` : '';
-      const cmd = `oc apply -f "${tmpFile}" ${nsFlag}"${tmpFile}" ${nsFlag}`;
+      const cmd = `oc apply -f "${tmpFile}" ${nsFlag}`;
       const { stdout, stderr } = await this.runCommand(cmd);
 
       if (stderr && !stdout) {
@@ -1593,6 +1605,275 @@ export class OcClient {
         events: [],
         error: err.message || 'Failed to fetch operator events',
       };
+    }
+  }
+
+  /**
+   * Fetches rich debugging diagnostics for a pod (status, container crash state, exit codes, previous logs, events).
+   */
+  static async getPodDebugInfo(
+    podName: string,
+    namespace: string
+  ): Promise<{ diagnostics?: PodDebugDiagnostics; error?: string }> {
+    try {
+      const getPodCmd = `oc get pod "${podName}" -n "${namespace}" -o json`;
+      const { stdout: podStdout, stderr: podStderr } = await this.runCommand(getPodCmd);
+      if (!podStdout) {
+        return { error: podStderr || `Failed to fetch pod ${podName}` };
+      }
+
+      const podJson = JSON.parse(podStdout);
+      const phase = podJson.status?.phase || 'Unknown';
+      const nodeName = podJson.spec?.nodeName || '-';
+      const podIP = podJson.status?.podIP || '-';
+      const startTime = podJson.status?.startTime;
+      const reason = podJson.status?.reason;
+      const message = podJson.status?.message;
+
+      const parseContainers = (specs: any[], statuses: any[]): ContainerDebugState[] => {
+        return (specs || []).map((spec: any) => {
+          const status = (statuses || []).find((s: any) => s.name === spec.name) || {};
+          const ready = !!status.ready;
+          const restartCount = status.restartCount || 0;
+          const image = status.image || spec.image || '-';
+
+          let stateType: 'running' | 'waiting' | 'terminated' = 'waiting';
+          let stateDetails: any = {};
+
+          if (status.state?.running) {
+            stateType = 'running';
+            stateDetails = status.state.running;
+          } else if (status.state?.terminated) {
+            stateType = 'terminated';
+            stateDetails = status.state.terminated;
+          } else if (status.state?.waiting) {
+            stateType = 'waiting';
+            stateDetails = status.state.waiting;
+          }
+
+          let lastStateDetails: any = undefined;
+          if (status.lastState?.terminated) {
+            lastStateDetails = status.lastState.terminated;
+          } else if (status.lastState?.waiting) {
+            lastStateDetails = status.lastState.waiting;
+          }
+
+          return {
+            name: spec.name,
+            image,
+            ready,
+            restartCount,
+            state: {
+              type: stateType,
+              reason: stateDetails.reason,
+              message: stateDetails.message,
+              exitCode: stateDetails.exitCode,
+              signal: stateDetails.signal,
+              startedAt: stateDetails.startedAt,
+              finishedAt: stateDetails.finishedAt,
+            },
+            lastState: lastStateDetails
+              ? {
+                  reason: lastStateDetails.reason,
+                  message: lastStateDetails.message,
+                  exitCode: lastStateDetails.exitCode,
+                  signal: lastStateDetails.signal,
+                  startedAt: lastStateDetails.startedAt,
+                  finishedAt: lastStateDetails.finishedAt,
+                }
+              : undefined,
+          };
+        });
+      };
+
+      const containers = parseContainers(
+        podJson.spec?.containers || [],
+        podJson.status?.containerStatuses || []
+      );
+
+      const initContainers = parseContainers(
+        podJson.spec?.initContainers || [],
+        podJson.status?.initContainerStatuses || []
+      );
+
+      // Fetch Previous Logs (if crashed/restarted) or Recent Logs
+      let previousLogs = '';
+      let recentLogs = '';
+
+      try {
+        const prevLogsCmd = `oc logs "${podName}" -n "${namespace}" --previous --tail=100`;
+        const { stdout: prevOut } = await this.runCommand(prevLogsCmd, 8000);
+        previousLogs = prevOut;
+      } catch {}
+
+      try {
+        const curLogsCmd = `oc logs "${podName}" -n "${namespace}" --tail=100`;
+        const { stdout: curOut } = await this.runCommand(curLogsCmd, 8000);
+        recentLogs = curOut;
+      } catch {}
+
+      // Fetch Pod Events
+      const events: any[] = [];
+      try {
+        const eventsCmd = `oc get events -n "${namespace}" --field-selector involvedObject.name="${podName}" -o json`;
+        const { stdout: evtOut } = await this.runCommand(eventsCmd, 8000);
+        if (evtOut) {
+          const evtJson = JSON.parse(evtOut);
+          for (const item of evtJson.items || []) {
+            events.push({
+              type: item.type || 'Normal',
+              reason: item.reason || '-',
+              message: item.message || '',
+              count: item.count || 1,
+              lastTimestamp: item.lastTimestamp || item.eventTime || item.metadata?.creationTimestamp || '',
+              source: item.source?.component || item.reportingComponent || '',
+            });
+          }
+        }
+      } catch {}
+
+      // Determine smart suggested action
+      let suggestedAction = 'Inspect container logs and status above or start an interactive debug session.';
+      const hasOOM = containers.some((c) => c.state.reason === 'OOMKilled' || c.lastState?.reason === 'OOMKilled');
+      const hasCrash = containers.some((c) => c.state.reason === 'CrashLoopBackOff' || (c.state.exitCode !== undefined && c.state.exitCode !== 0));
+      const hasImagePull = containers.some((c) => c.state.reason?.includes('ImagePull') || c.state.reason?.includes('ErrImagePull'));
+
+      if (hasOOM) {
+        suggestedAction = 'Container was killed due to Out Of Memory (OOMKilled / Exit 137). Increase memory request/limit in pod or deployment resources.';
+      } else if (hasImagePull) {
+        suggestedAction = 'Image pull failed. Verify container image repository URL, tag, and image pull secret / credentials.';
+      } else if (hasCrash) {
+        suggestedAction = 'Application crashed on entrypoint. Launch an interactive Debug Shell (oc debug) or check Previous Logs to inspect the traceback.';
+      }
+
+      return {
+        diagnostics: {
+          podName,
+          namespace,
+          phase,
+          nodeName,
+          podIP,
+          startTime,
+          reason,
+          message,
+          containers,
+          initContainers,
+          previousLogs,
+          recentLogs,
+          events,
+          suggestedAction,
+        },
+      };
+    } catch (err: any) {
+      return { error: err.message || 'Failed to retrieve pod diagnostics' };
+    }
+  }
+
+  /**
+   * Fetches detailed node health, capacity, conditions, system info, and events for node debugging.
+   */
+  static async getNodeDebugInfo(
+    nodeName: string
+  ): Promise<{ diagnostics?: NodeDebugDiagnostics; error?: string }> {
+    try {
+      const getNodeCmd = `oc get node "${nodeName}" -o json`;
+      const { stdout: nodeStdout, stderr: nodeStderr } = await this.runCommand(getNodeCmd);
+      if (!nodeStdout) {
+        return { error: nodeStderr || `Failed to fetch node ${nodeName}` };
+      }
+
+      const nodeJson = JSON.parse(nodeStdout);
+      const roles: string[] = [];
+      const labels = nodeJson.metadata?.labels || {};
+      for (const key of Object.keys(labels)) {
+        if (key.startsWith('node-role.kubernetes.io/')) {
+          roles.push(key.replace('node-role.kubernetes.io/', ''));
+        }
+      }
+      if (roles.length === 0) roles.push('worker');
+
+      const conditions = (nodeJson.status?.conditions || []).map((c: any) => ({
+        type: c.type || '-',
+        status: c.status || '-',
+        reason: c.reason || '-',
+        message: c.message || '',
+        lastTransitionTime: c.lastTransitionTime || '',
+      }));
+
+      const readyCond = conditions.find((c: any) => c.type === 'Ready');
+      const status = readyCond?.status === 'True' ? 'Ready' : 'NotReady';
+
+      const capacity = {
+        cpu: nodeJson.status?.capacity?.cpu || '-',
+        memory: nodeJson.status?.capacity?.memory || '-',
+        pods: nodeJson.status?.capacity?.pods || '-',
+        ephemeralStorage: nodeJson.status?.capacity?.['ephemeral-storage'] || '-',
+      };
+
+      const allocatable = {
+        cpu: nodeJson.status?.allocatable?.cpu || '-',
+        memory: nodeJson.status?.allocatable?.memory || '-',
+        pods: nodeJson.status?.allocatable?.pods || '-',
+        ephemeralStorage: nodeJson.status?.allocatable?.['ephemeral-storage'] || '-',
+      };
+
+      const nodeInfo = nodeJson.status?.nodeInfo || {};
+      const systemInfo = {
+        osImage: nodeInfo.osImage || '-',
+        kernelVersion: nodeInfo.kernelVersion || '-',
+        containerRuntime: nodeInfo.containerRuntimeVersion || '-',
+        kubeletVersion: nodeInfo.kubeletVersion || '-',
+        architecture: nodeInfo.architecture || '-',
+        operatingSystem: nodeInfo.operatingSystem || '-',
+      };
+
+      const taints = (nodeJson.spec?.taints || []).map((t: any) => ({
+        key: t.key,
+        value: t.value,
+        effect: t.effect,
+      }));
+
+      const addresses = (nodeJson.status?.addresses || []).map((a: any) => ({
+        type: a.type,
+        address: a.address,
+      }));
+
+      // Fetch Node Events
+      const events: any[] = [];
+      try {
+        const eventsCmd = `oc get events -A --field-selector involvedObject.name="${nodeName}" -o json`;
+        const { stdout: evtOut } = await this.runCommand(eventsCmd, 8000);
+        if (evtOut) {
+          const evtJson = JSON.parse(evtOut);
+          for (const item of evtJson.items || []) {
+            events.push({
+              type: item.type || 'Normal',
+              reason: item.reason || '-',
+              message: item.message || '',
+              count: item.count || 1,
+              lastTimestamp: item.lastTimestamp || item.eventTime || item.metadata?.creationTimestamp || '',
+              source: item.source?.component || item.reportingComponent || '',
+            });
+          }
+        }
+      } catch {}
+
+      return {
+        diagnostics: {
+          nodeName,
+          status,
+          roles,
+          conditions,
+          capacity,
+          allocatable,
+          systemInfo,
+          taints,
+          events,
+          addresses,
+        },
+      };
+    } catch (err: any) {
+      return { error: err.message || 'Failed to retrieve node diagnostics' };
     }
   }
 }

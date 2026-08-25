@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { X, Save, FileCode2, RefreshCw, AlertTriangle, CheckCircle2, Copy, Check, RotateCcw, ShieldCheck } from "lucide-react";
 import CodeMirror from "@uiw/react-codemirror";
 import { yaml } from "@codemirror/lang-yaml";
-import { parse as parseYaml } from "yaml";
+import { parseAllDocuments } from "yaml";
 import { ResourceItem } from "../../types/k8s.js";
 import { useCurrentTheme } from "../utils/themes.js";
 
@@ -51,12 +51,20 @@ export const EditYamlModal: React.FC<EditYamlModalProps> = ({
     loadData();
   }, [item, namespace]);
 
+  const validateYamlString = (val: string) => {
+    if (!val.trim()) return;
+    const docs = parseAllDocuments(val);
+    for (const doc of docs) {
+      if (doc.errors && doc.errors.length > 0) {
+        throw doc.errors[0];
+      }
+    }
+  };
+
   const handleTextChange = useCallback((val: string) => {
     setYamlText(val);
     try {
-      if (val.trim()) {
-        parseYaml(val);
-      }
+      validateYamlString(val);
       setValidationError(null);
     } catch (err: any) {
       setValidationError(err.message || "YAML syntax error");
@@ -65,7 +73,7 @@ export const EditYamlModal: React.FC<EditYamlModalProps> = ({
 
   const handleSave = async () => {
     try {
-      parseYaml(yamlText);
+      validateYamlString(yamlText);
     } catch (err: any) {
       setValidationError(`Invalid YAML: ${err.message}`);
       return;
@@ -220,16 +228,6 @@ export const EditYamlModal: React.FC<EditYamlModalProps> = ({
             </button>
 
             <button
-              onClick={handleSave}
-              disabled={saving || loading || !!validationError}
-              className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-emerald-950/60 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
-              title="Save changes and apply to cluster (Cmd+S)"
-            >
-              {saving ? <RefreshCw size={13} className="animate-spin" /> : <Save size={13} />}
-              <span>Save & Apply (⌘S)</span>
-            </button>
-
-            <button
               onClick={onClose}
               className="p-1.5 rounded-lg opacity-70 hover:opacity-100 hover:bg-white/10 transition-colors"
               title="Close window (Esc)"
@@ -273,7 +271,7 @@ export const EditYamlModal: React.FC<EditYamlModalProps> = ({
               <span className="text-xs">Loading resource YAML...</span>
             </div>
           ) : (
-            <div className="flex-1 h-full w-full overflow-auto flex flex-col">
+            <div className="flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col">
               <CodeMirror
                 value={yamlText}
                 height="100%"

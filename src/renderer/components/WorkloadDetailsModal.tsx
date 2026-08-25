@@ -23,6 +23,7 @@ import {
   Zap,
   SquareTerminal,
   ScrollText,
+  Bug,
 } from 'lucide-react';
 import { ResourceItem, WorkloadDetails, WorkloadRevisionItem, WorkloadPodItem } from '../../types/k8s.js';
 
@@ -35,6 +36,7 @@ interface WorkloadDetailsModalProps {
   onOpenPodLogs?: (podName: string) => void;
   onOpenPodDescribe?: (podName: string) => void;
   onOpenPodYaml?: (podName: string) => void;
+  onOpenPodDebug?: (podName: string) => void;
 }
 
 export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
@@ -46,6 +48,7 @@ export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
   onOpenPodLogs,
   onOpenPodDescribe,
   onOpenPodYaml,
+  onOpenPodDebug,
 }) => {
   const [details, setDetails] = useState<WorkloadDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -462,6 +465,31 @@ export const WorkloadDetailsModal: React.FC<WorkloadDetailsModalProps> = ({
                             <td className="py-2.5 px-3 opacity-60">{pod.age}</td>
                             <td className="py-2.5 px-3 text-right">
                               <div className="flex items-center justify-end gap-1">
+                                <button
+                                  onClick={() => {
+                                    if (onOpenPodDebug) {
+                                      onOpenPodDebug(pod.name);
+                                    } else {
+                                      onAction('debug-pod', {
+                                        id: pod.name,
+                                        name: pod.name,
+                                        namespace: pod.namespace,
+                                        kind: 'pods',
+                                        status: pod.status,
+                                        age: pod.age,
+                                      });
+                                    }
+                                  }}
+                                  className={`p-1 rounded border transition-colors ${
+                                    pod.status !== 'Running'
+                                      ? 'bg-rose-950/80 hover:bg-rose-900 text-rose-300 border-rose-800'
+                                      : 'bg-white/5 hover:bg-purple-950 text-purple-400 border-[var(--border-subtle,#334155)] hover:border-purple-500'
+                                  }`}
+                                  title="Debug this pod (Failure Diagnostics & oc debug shell)"
+                                >
+                                  <Bug size={12} />
+                                </button>
+
                                 <button
                                   onClick={() => {
                                     if (onOpenPodTerminal) {

@@ -155,3 +155,101 @@ export interface ClusterInfo {
   namespace: string;
   connected: boolean;
 }
+
+export interface ContainerDebugState {
+  name: string;
+  image: string;
+  ready: boolean;
+  restartCount: number;
+  state: {
+    type: 'running' | 'waiting' | 'terminated';
+    reason?: string;
+    message?: string;
+    exitCode?: number;
+    signal?: number;
+    startedAt?: string;
+    finishedAt?: string;
+  };
+  lastState?: {
+    reason?: string;
+    message?: string;
+    exitCode?: number;
+    signal?: number;
+    startedAt?: string;
+    finishedAt?: string;
+  };
+}
+
+export interface PodDebugDiagnostics {
+  podName: string;
+  namespace: string;
+  phase: string;
+  nodeName: string;
+  podIP: string;
+  startTime?: string;
+  reason?: string;
+  message?: string;
+  containers: ContainerDebugState[];
+  initContainers: ContainerDebugState[];
+  previousLogs?: string;
+  recentLogs?: string;
+  events: Array<{
+    type: string;
+    reason: string;
+    message: string;
+    count: number;
+    lastTimestamp: string;
+    source?: string;
+  }>;
+  suggestedAction?: string;
+}
+
+export interface NodeDebugDiagnostics {
+  nodeName: string;
+  status: string;
+  roles: string[];
+  conditions: Array<{
+    type: string;
+    status: string;
+    reason?: string;
+    message?: string;
+    lastTransitionTime?: string;
+  }>;
+  capacity: {
+    cpu: string;
+    memory: string;
+    pods: string;
+    ephemeralStorage?: string;
+  };
+  allocatable: {
+    cpu: string;
+    memory: string;
+    pods: string;
+    ephemeralStorage?: string;
+  };
+  systemInfo: {
+    osImage: string;
+    kernelVersion: string;
+    containerRuntime: string;
+    kubeletVersion: string;
+    architecture: string;
+    operatingSystem: string;
+  };
+  taints: Array<{
+    key: string;
+    value?: string;
+    effect: string;
+  }>;
+  events: Array<{
+    type: string;
+    reason: string;
+    message: string;
+    count: number;
+    lastTimestamp: string;
+    source?: string;
+  }>;
+  addresses: Array<{
+    type: string;
+    address: string;
+  }>;
+}

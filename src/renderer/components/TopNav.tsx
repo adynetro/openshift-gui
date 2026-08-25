@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layers, FolderGit2, Server, User, AlertTriangle, Globe } from 'lucide-react';
+import { Layers, FolderGit2, Server, User, AlertTriangle, Globe, Plus, Sparkles, Rocket } from 'lucide-react';
 import { ThemeConfig } from '../utils/themes.js';
 
 interface TopNavProps {
@@ -11,6 +11,7 @@ interface TopNavProps {
   isUnauthorized?: boolean;
   onOpenContextModal: () => void;
   onOpenProjectModal: () => void;
+  onOpenAddAppModal: () => void;
   onThemeChange?: (theme: ThemeConfig) => void;
 }
 
@@ -23,6 +24,7 @@ export const TopNav: React.FC<TopNavProps> = ({
   isUnauthorized,
   onOpenContextModal,
   onOpenProjectModal,
+  onOpenAddAppModal,
   onThemeChange,
 }) => {
   const isAllProjects = !currentProject || currentProject === 'all-projects' || currentProject === '__all__';
@@ -95,6 +97,25 @@ export const TopNav: React.FC<TopNavProps> = ({
             </div>
             <div className="text-xs font-semibold text-slate-200 truncate max-w-[190px]">
               {isAllProjects ? 'All Projects (Cluster-Wide)' : currentProject}
+            </div>
+          </div>
+        </button>
+
+        {/* Add App Workload Wizard Button */}
+        <button
+          onClick={onOpenAddAppModal}
+          className="no-drag flex items-center gap-2.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 hover:border-red-500/50 transition-all text-left group cursor-pointer"
+          title="Deploy new Application Workload (Deployment, StatefulSet, CronJob, DeploymentConfig) (or press 'a')"
+        >
+          <div className="w-6 h-6 rounded bg-red-500/10 flex items-center justify-center text-red-400 group-hover:text-red-300">
+            <Plus size={14} />
+          </div>
+          <div>
+            <div className="text-[10px] uppercase font-bold text-red-400 tracking-wider flex items-center gap-1">
+              Workload <span className="bg-slate-900 px-1 py-0.2 rounded text-[9px] text-slate-400">a</span>
+            </div>
+            <div className="text-xs font-semibold text-slate-200">
+              + Add App
             </div>
           </div>
         </button>

@@ -286,10 +286,11 @@ export const HelmModal: React.FC<HelmModalProps> = ({
               <span className="text-xs">Loading Helm release details...</span>
             </div>
           ) : activeTab === 'edit-values' ? (
-            <div className="flex-1 h-full overflow-auto rounded-lg border border-[#49483e] bg-[#272822]">
+            <div className="flex-1 min-h-0 h-full overflow-hidden rounded-lg border border-[#49483e] bg-[#272822]">
               <CodeMirror
                 value={editedValues}
                 height="100%"
+                className="h-full flex-1 w-full"
                 theme={cmTheme}
                 extensions={[yaml()]}
                 onChange={handleValuesChange}
@@ -350,10 +351,11 @@ export const HelmModal: React.FC<HelmModalProps> = ({
               </table>
             </div>
           ) : (
-            <div className="flex-1 h-full overflow-auto rounded-lg border border-[#49483e] bg-[#272822]">
+            <div className="flex-1 min-h-0 h-full overflow-hidden rounded-lg border border-[#49483e] bg-[#272822]">
               <CodeMirror
                 value={activeTab === 'values' ? valuesContent || '# No values found.' : manifestContent || '# No manifest found.'}
                 height="100%"
+                className="h-full flex-1 w-full"
                 theme={cmTheme}
                 extensions={[yaml()]}
                 editable={false}

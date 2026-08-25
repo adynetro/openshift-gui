@@ -26,6 +26,10 @@ import {
   ShieldCheck,
   CheckSquare,
   Square,
+  Bug,
+  Server,
+  Workflow,
+  Shield,
 } from 'lucide-react';
 import { ResourceKind, ResourceItem, ImageStreamResource } from '../../types/k8s.js';
 
@@ -344,7 +348,7 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
               </>
             )}
             <th className="py-3 px-3">Age</th>
-            {kind !== 'events' && kind !== 'clusteroperators' && !isWorkload && (
+            {kind !== 'events' && kind !== 'clusteroperators' && !isWorkload && kind !== 'pods' && (
               <th className="py-3 px-4 text-right">Actions</th>
             )}
           </tr>
@@ -458,6 +462,32 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                       <ShieldCheck size={12} className="text-cyan-400 shrink-0" />
                       <span className="truncate">{item.name}</span>
                     </button>
+                  ) : kind === 'networkpolicies' ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectItem(item);
+                        onRowAction('netpol-designer', item);
+                      }}
+                      className="text-left font-bold text-slate-100 hover:text-cyan-300 hover:underline truncate max-w-[280px] transition-colors cursor-pointer flex items-center gap-1.5"
+                      title={`Click to open Visual NetworkPolicy Designer for ${item.name}`}
+                    >
+                      <Workflow size={12} className="text-cyan-400 shrink-0" />
+                      <span className="truncate">{item.name}</span>
+                    </button>
+                  ) : kind === 'nodes' ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectItem(item);
+                        onRowAction('debug-node', item);
+                      }}
+                      className="text-left font-bold text-slate-100 hover:text-purple-300 hover:underline truncate max-w-[280px] transition-colors cursor-pointer flex items-center gap-1.5"
+                      title={`Click to open Node Diagnostics & Host Debugger for ${item.name}`}
+                    >
+                      <Server size={12} className="text-purple-400 shrink-0" />
+                      <span className="truncate">{item.name}</span>
+                    </button>
                   ) : (
                     <span className="truncate max-w-[280px]" title={item.name}>
                       {item.name}
@@ -502,7 +532,9 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                 {kind === 'pods' && (
                   <>
                     <td className="py-2.5 px-3 font-mono text-slate-300">{item.ready || '-'}</td>
-                    <td className="py-2.5 px-3">{getStatusBadge(item.status, item.statusColor)}</td>
+                    <td className="py-2.5 px-3">
+                      {getStatusBadge(item.status, item.statusColor)}
+                    </td>
                     <td className="py-2.5 px-3 font-mono text-amber-300">
                       {item.restarts ? `${item.restarts}x` : '0'}
                     </td>
@@ -818,36 +850,42 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                 <td className="py-2.5 px-3 font-mono text-slate-400">{item.age}</td>
 
                 {/* Clean Pictogram Quick Action Buttons with Hover Tooltips */}
-                {kind !== 'events' && kind !== 'clusteroperators' && !isWorkload && (
+                {kind !== 'events' && kind !== 'clusteroperators' && !isWorkload && kind !== 'pods' && (
                   <td className="py-2 px-4 text-right">
                     <div className="flex items-center justify-end gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
-                      {/* Live Logs and Interactive Terminal for Pods */}
-                      {kind === 'pods' && (
-                        <>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onRowAction('terminal', item);
-                            }}
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-cyan-950 text-cyan-400 border border-slate-700 hover:border-cyan-500 transition-colors"
-                            title="Open Interactive Pod Terminal (Shell)"
-                            aria-label="Open Terminal"
-                          >
-                            <SquareTerminal size={14} />
-                          </button>
 
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onRowAction('logs', item);
-                            }}
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-emerald-950 text-emerald-400 border border-slate-700 hover:border-emerald-500 transition-colors"
-                            title="Stream Live Aggregated Logs"
-                            aria-label="Live Logs"
-                          >
-                            <ScrollText size={14} />
-                          </button>
-                        </>
+                      {/* Debug Action for Nodes */}
+                      {kind === 'nodes' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRowAction('debug-node', item);
+                          }}
+                          className={`p-1.5 rounded-lg border transition-all ${
+                            item.status !== 'Ready'
+                              ? 'bg-rose-950/80 hover:bg-rose-900 text-rose-300 border-rose-700 shadow-sm shadow-rose-950 animate-pulse'
+                              : 'bg-slate-800 hover:bg-purple-950 text-purple-400 border-slate-700 hover:border-purple-500'
+                          }`}
+                          title="Debug Node (Host Shell & Health Diagnostics)"
+                          aria-label="Debug Node"
+                        >
+                          <Bug size={14} />
+                        </button>
+                      )}
+
+                      {/* NetworkPolicy Visual Designer Action */}
+                      {kind === 'networkpolicies' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRowAction('netpol-designer', item);
+                          }}
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-cyan-950 text-cyan-400 border border-slate-700 hover:border-cyan-500 transition-colors"
+                          title="Open Interactive Visual NetworkPolicy Designer"
+                          aria-label="Visual Designer"
+                        >
+                          <Workflow size={14} />
+                        </button>
                       )}
 
                       {/* Edit Secret Action */}

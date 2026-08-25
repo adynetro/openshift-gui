@@ -164,9 +164,18 @@ export function registerIpcHandlers(mainWindow: electron.BrowserWindow): void {
     }
   });
 
-  // Interactive Pod Terminal Handlers
-  ipcMain.handle('terminal:start', async (_event, targetName: string, namespace: string, container?: string) => {
-    return TerminalService.startSession(targetName, namespace, container, mainWindow);
+  // Debug Diagnostics Handlers
+  ipcMain.handle('debug:getPodInfo', async (_event, podName: string, namespace: string) => {
+    return await OcClient.getPodDebugInfo(podName, namespace);
+  });
+
+  ipcMain.handle('debug:getNodeInfo', async (_event, nodeName: string) => {
+    return await OcClient.getNodeDebugInfo(nodeName);
+  });
+
+  // Interactive Terminal Handlers (Supports Pod Exec, Pod Debug replica, and Node Host Debugger)
+  ipcMain.handle('terminal:start', async (_event, targetName: string, namespace: string, container?: string, mode: 'exec' | 'debug-pod' | 'debug-node' = 'exec') => {
+    return TerminalService.startSession(targetName, namespace, container, mainWindow, mode);
   });
 
   ipcMain.handle('terminal:write', async (_event, sessionId: string, data: string) => {

@@ -121,7 +121,6 @@ input, select, textarea, a {
 /* CodeMirror IDE Custom Styling */
 .cm-editor {
   height: 100% !important;
-  min-height: 100% !important;
   width: 100% !important;
   font-family: 'JetBrains Mono', 'Fira Code', Menlo, Monaco, Consolas, monospace !important;
   font-size: 13px !important;
@@ -131,23 +130,14 @@ input, select, textarea, a {
 
 .cm-scroller {
   height: 100% !important;
-  min-height: 100% !important;
   font-family: inherit !important;
   overflow: auto !important;
 }
 
-.cm-content {
-  min-height: 100% !important;
-  padding: 8px 0 !important;
-}
-
 .cm-gutters {
-  min-height: 100% !important;
-  position: sticky !important;
-  left: 0 !important;
-  top: 0 !important;
-  z-index: 10 !important;
   border-right: 1px solid var(--border-color, #1e293b) !important;
+  background-color: var(--bg-card-header, #0f172a) !important;
+  color: var(--text-muted, #94a3b8) !important;
 }
 
 .cm-lineNumbers {
@@ -159,6 +149,7 @@ input, select, textarea, a {
   min-width: 24px !important;
   text-align: right !important;
   user-select: none !important;
+  white-space: nowrap !important;
 }
 
 .cm-activeLineGutter {

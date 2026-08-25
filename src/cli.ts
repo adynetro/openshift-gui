@@ -15,7 +15,7 @@ export function parseCliArgs(argv: string[]): { options: CliOptions } {
   program
     .name('openshift-gui')
     .description('Interactive Modern Terminal UI for OpenShift & Kubernetes CLI with Helm & ImageStream SemVer Cleanup')
-    .version('0.1.0')
+    .version('1.1.0')
     .option('-n, --namespace <namespace>', 'Specific namespace or project to open')
     .option('-c, --context <context>', 'Kubeconfig context to activate on start')
     .option('-k, --kind <kind>', 'Initial resource view (pods, deployments, routes, imagestreams, helm, etc.)', 'pods')

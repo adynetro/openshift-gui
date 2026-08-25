@@ -13,9 +13,13 @@ import { WorkloadDetailsModal } from './components/WorkloadDetailsModal.js';
 import { TopologyView } from './components/TopologyView.js';
 import { ContextModal } from './components/ContextModal.js';
 import { SecretEditorModal } from './components/SecretEditorModal.js';
+import { NetworkPolicyDesignerModal } from './components/NetworkPolicyDesignerModal.js';
 import { ResizePvcModal } from './components/ResizePvcModal.js';
 import { CrdInstancesModal } from './components/CrdInstancesModal.js';
 import { PodTerminalModal } from './components/PodTerminalModal.js';
+import { AddAppWizardModal } from './components/AddAppWizardModal.js';
+import { PodDebugModal } from './components/PodDebugModal.js';
+import { NodeDebugModal } from './components/NodeDebugModal.js';
 import { ClusterOperatorEventsModal } from './components/ClusterOperatorEventsModal.js';
 import { HelpModal } from './components/HelpModal.js';
 import { BatchDeleteModal } from './components/BatchDeleteModal.js';
@@ -27,9 +31,13 @@ type ModalMode =
   | 'none'
   | 'context'
   | 'project'
+  | 'add-app'
   | 'workload-details'
   | 'logs'
   | 'terminal'
+  | 'debug-pod'
+  | 'debug-node'
+  | 'netpol-designer'
   | 'operator-events'
   | 'yaml'
   | 'edit-yaml'
@@ -290,9 +298,12 @@ export const App: React.FC = () => {
   // Action Dispatcher with Modal Stack preservation
   const handleAction = (actionType: string, targetItem?: ResourceItem) => {
     const item = targetItem || selectedItem;
-    if (!item && actionType !== 'help') return;
+    if (!item && actionType !== 'help' && actionType !== 'netpol-designer' && actionType !== 'add-app') return;
 
     switch (actionType) {
+      case 'add-app':
+        openModal('add-app');
+        break;
       case 'workload-details':
         openModal('workload-details', item);
         break;
@@ -324,6 +335,15 @@ export const App: React.FC = () => {
         break;
       case 'terminal':
         openModal('terminal', item);
+        break;
+      case 'debug-pod':
+        openModal('debug-pod', item);
+        break;
+      case 'debug-node':
+        openModal('debug-node', item);
+        break;
+      case 'netpol-designer':
+        openModal('netpol-designer', item);
         break;
       case 'operator-events':
         openModal('operator-events', item);
@@ -407,6 +427,7 @@ export const App: React.FC = () => {
       else if (e.key === 'n') setCurrentKind('nodes');
       else if (e.key === 'o') setCurrentKind('clusteroperators');
       else if (e.key === 'e') setCurrentKind('events');
+      else if (e.key === 'a') openModal('add-app');
       else if (e.key === '?') openModal('help');
     };
 
@@ -431,6 +452,9 @@ export const App: React.FC = () => {
         onOpenProjectModal={() => {
           loadKubeInfo();
           openModal('project');
+        }}
+        onOpenAddAppModal={() => {
+          openModal('add-app');
         }}
       />
 
@@ -602,6 +626,73 @@ export const App: React.FC = () => {
               age: '',
             });
           }}
+          onOpenPodDebug={(podName) => {
+            openModal('debug-pod', {
+              id: podName,
+              name: podName,
+              namespace: selectedItem.namespace || currentProject,
+              kind: 'pods',
+              status: 'Running',
+              age: '',
+            });
+          }}
+        />
+      )}
+
+      {/* Pod Failure Diagnostics & oc debug Modal */}
+      {modalMode === 'debug-pod' && selectedItem && (
+        <PodDebugModal
+          item={selectedItem}
+          namespace={selectedItem.namespace || currentProject}
+          onClose={closeModal}
+          onOpenLogs={(podName) => {
+            openModal('logs', {
+              id: podName,
+              name: podName,
+              namespace: selectedItem.namespace || currentProject,
+              kind: 'pods',
+              status: 'Running',
+              age: '',
+            });
+          }}
+          onOpenYaml={(podName) => {
+            openModal('yaml', {
+              id: podName,
+              name: podName,
+              namespace: selectedItem.namespace || currentProject,
+              kind: 'pods',
+              status: 'Running',
+              age: '',
+            });
+          }}
+        />
+      )}
+
+      {/* Node Health Diagnostics & Host Debugger Modal */}
+      {modalMode === 'debug-node' && selectedItem && (
+        <NodeDebugModal
+          item={selectedItem}
+          onClose={closeModal}
+          onOpenYaml={(nodeName) => {
+            openModal('yaml', {
+              id: nodeName,
+              name: nodeName,
+              namespace: '',
+              kind: 'nodes',
+              status: 'Ready',
+              age: '',
+            });
+          }}
+          onOpenDescribe={(nodeName) => {
+            openModal('describe', {
+              id: nodeName,
+              name: nodeName,
+              namespace: '',
+              kind: 'nodes',
+              status: 'Ready',
+              age: '',
+            });
+          }}
         />
       )}
 
@@ -639,6 +730,31 @@ export const App: React.FC = () => {
         <EditYamlModal
           item={selectedItem}
           namespace={selectedItem.namespace || currentProject}
+          onClose={closeModal}
+          onSuccess={(msg) => {
+            showToast(msg, 'success');
+            fetchResources(false);
+          }}
+        />
+      )}
+
+      {/* Add Application Workload Wizard Modal (inspired by k8syaml) */}
+      {modalMode === 'add-app' && (
+        <AddAppWizardModal
+          namespace={currentProject !== 'all-projects' && currentProject !== '__all__' ? currentProject : 'default'}
+          onClose={closeModal}
+          onSuccess={(msg) => {
+            showToast(msg, 'success');
+            fetchResources(false);
+          }}
+        />
+      )}
+
+      {/* Interactive NetworkPolicy Graphic Visual Designer Modal */}
+      {modalMode === 'netpol-designer' && (
+        <NetworkPolicyDesignerModal
+          item={selectedItem}
+          namespace={selectedItem?.namespace || currentProject || 'default'}
           onClose={closeModal}
           onSuccess={(msg) => {
             showToast(msg, 'success');

@@ -34,10 +34,12 @@ export interface IpcApi {
   startLogStream: (targetName: string, namespace: string, kind?: string, container?: string) => Promise<string>;
   stopLogStream: (streamId: string) => Promise<void>;
   onLogLine: (callback: (data: { streamId: string; line: any }) => void) => () => void;
-  startTerminal: (targetName: string, namespace: string, container?: string) => Promise<string>;
+  startTerminal: (targetName: string, namespace: string, container?: string, mode?: 'exec' | 'debug-pod' | 'debug-node') => Promise<string>;
   writeTerminal: (sessionId: string, data: string) => Promise<void>;
   stopTerminal: (sessionId: string) => Promise<void>;
   onTerminalData: (callback: (data: { sessionId: string; data: string }) => void) => () => void;
+  getPodDebugInfo: (podName: string, namespace: string) => Promise<{ diagnostics?: any; error?: string }>;
+  getNodeDebugInfo: (nodeName: string) => Promise<{ diagnostics?: any; error?: string }>;
 }
 
 const api: IpcApi = {
@@ -78,7 +80,7 @@ const api: IpcApi = {
     ipcRenderer.on('logs:line', sub);
     return () => ipcRenderer.removeListener('logs:line', sub);
   },
-  startTerminal: (target, ns, container) => ipcRenderer.invoke('terminal:start', target, ns, container),
+  startTerminal: (target, ns, container, mode) => ipcRenderer.invoke('terminal:start', target, ns, container, mode),
   writeTerminal: (sessionId, data) => ipcRenderer.invoke('terminal:write', sessionId, data),
   stopTerminal: (sessionId) => ipcRenderer.invoke('terminal:stop', sessionId),
   onTerminalData: (callback) => {
@@ -86,6 +88,8 @@ const api: IpcApi = {
     ipcRenderer.on('terminal:data', sub);
     return () => ipcRenderer.removeListener('terminal:data', sub);
   },
+  getPodDebugInfo: (podName, ns) => ipcRenderer.invoke('debug:getPodInfo', podName, ns),
+  getNodeDebugInfo: (nodeName) => ipcRenderer.invoke('debug:getNodeInfo', nodeName),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', api);
