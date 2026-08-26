@@ -94,12 +94,16 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
+declare const __APP_VERSION__: string | undefined;
+
 export const Sidebar: React.FC<SidebarProps> = ({
   currentKind,
   onSelectKind,
   counts,
   onOpenHelp,
 }) => {
+  const displayVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.0.1';
+
   return (
     <aside
       className="w-64 border-r flex flex-col justify-between select-none shrink-0 transition-colors duration-150"
@@ -210,7 +214,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         <div className="px-3 text-[10px] opacity-60 font-mono flex items-center justify-between">
           <span>OpenShift GUI</span>
-          <span className="text-emerald-400 font-bold">v1.2.2</span>
+          <span className="text-emerald-400 font-bold">v{displayVersion}</span>
         </div>
       </div>
     </aside>

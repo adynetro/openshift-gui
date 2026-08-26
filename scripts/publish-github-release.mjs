@@ -10,15 +10,16 @@ const token = execSync('printf "protocol=https\\nhost=github.com\\n" | git crede
 
 const repo = 'adynetro/openshift-gui';
 const tagName = `v${VERSION}`;
-const releaseName = `OpenShift GUI v${VERSION} - Direct HTTPS REST Engine, 92% Bundle Reduction, High-Throughput Streaming & Multi-Platform Packages`;
+const releaseName = `OpenShift GUI v${VERSION} - Synchronized UI Versioning, Direct HTTPS REST Engine & Multi-Platform Packages`;
 
-const releaseBody = `## 🚀 OpenShift GUI v${VERSION} - Major Architecture & Performance Release
+const releaseBody = `## 🚀 OpenShift GUI v${VERSION} - Patch Release
 
-OpenShift GUI v${VERSION} is a major evolutionary release bringing a direct high-speed HTTPS REST engine with connection pooling, drastic bundle optimization (92% initial bundle size reduction via React.lazy code splitting), buffered log streaming, memoized SemVer sorters, and cross-platform native binaries for macOS, Windows, and Linux.
+### 🏷️ Dynamic Version Synchronization
+- **Automated UI Versioning**: The version indicator on the bottom-left sidebar is now dynamically bound via compile-time injection (\`__APP_VERSION__\`) directly from \`package.json\`, ensuring the UI footer always accurately reflects the installed desktop release version.
 
 ---
 
-### ⚡ High-Speed Direct HTTPS REST Engine
+### ⚡ Direct High-Speed HTTPS REST Engine
 - **Persistent Keep-Alive Connection Pool**: Bypasses the overhead of spawning heavyweight \`oc\` CLI processes for polling. HTTP Keep-Alive sockets maintain connections directly to the Kubernetes / OpenShift API server.
 - **Eliminates 65K Buffer & Pipe Truncation**: Large JSON responses (>65KB) in topology and resource explorers stream directly into memory without kernel pipe truncation.
 - **10x-20x Faster Topology**: Concurrent micro-queries for workloads, services, routes, PVCs, and pods execute in parallel over the pooled connection in **~60ms** (down from 2-4 seconds).

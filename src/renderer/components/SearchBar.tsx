@@ -122,9 +122,9 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       });
       pills.push({
         id: 'prune-image-blobs',
-        label: 'Prune Registry Blobs',
+        label: 'Prune Registry',
         tooltip: 'Open OpenShift Image & Blob Pruner (oc adm prune images)',
-        icon: Flame,
+        icon: Sparkles,
         color: 'hover:border-rose-500 hover:text-rose-300 hover:bg-rose-950/40 text-rose-400 border-rose-900/50 bg-rose-950/20',
         disabled: false,
       });

@@ -442,15 +442,21 @@ const InlinePortsEditor: React.FC<InlinePortsEditorProps> = ({
   };
 
   const isCyan = colorScheme === 'cyan';
-  const badgeBg = isCyan ? 'bg-cyan-950 text-cyan-300 border-cyan-800' : 'bg-emerald-950 text-emerald-300 border-emerald-800';
-  const btnBg = isCyan ? 'bg-cyan-600 hover:bg-cyan-500' : 'bg-emerald-600 hover:bg-emerald-500';
+  const badgeBg = isCyan
+    ? 'bg-cyan-950 text-cyan-300 border-cyan-800'
+    : 'bg-emerald-950 text-emerald-300 border-emerald-800';
+  const btnBg = isCyan
+    ? 'bg-cyan-600 hover:bg-cyan-500 shadow-cyan-950'
+    : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-950';
+  const focusBorder = isCyan ? 'focus:border-cyan-500' : 'focus:border-emerald-500';
 
   return (
-    <div className="space-y-1.5 pt-1.5 border-t border-slate-800">
-      <div className="flex items-center justify-between">
-        <span className="text-[10px] text-slate-400 uppercase font-bold">
-          Allowed Ports ({ports.length > 0 ? `${ports.length}` : 'All (*)'}):
-        </span>
+    <div className="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-2 text-xs font-mono shadow-inner">
+      <div className="flex items-center justify-between pb-1 border-b border-slate-800 text-[11px]">
+        <div className={`flex items-center gap-1.5 font-bold ${isCyan ? 'text-cyan-300' : 'text-emerald-300'}`}>
+          <Zap size={12} className={isCyan ? 'text-cyan-400' : 'text-emerald-400'} />
+          <span>Allowed Ports ({ports.length > 0 ? ports.length : 'All *'}):</span>
+        </div>
       </div>
 
       {/* Ports Badges List */}
@@ -484,7 +490,7 @@ const InlinePortsEditor: React.FC<InlinePortsEditorProps> = ({
         <select
           value={protocol}
           onChange={(e) => setProtocol(e.target.value as any)}
-          className="px-1.5 py-1 rounded text-[11px] font-mono bg-slate-900 border border-slate-700 text-slate-200 outline-none cursor-pointer"
+          className="shrink-0 px-2 py-1 rounded text-[11px] font-mono bg-slate-800 border border-slate-700 text-slate-200 outline-none cursor-pointer"
         >
           <option value="TCP">TCP</option>
           <option value="UDP">UDP</option>
@@ -501,44 +507,61 @@ const InlinePortsEditor: React.FC<InlinePortsEditorProps> = ({
             }
           }}
           placeholder="port (e.g. 80, 443, 8080)"
-          className="px-2 py-1 rounded text-[11px] font-mono border border-slate-700 bg-slate-900/80 text-slate-200 outline-none flex-1 focus:border-slate-500"
+          className={`min-w-0 flex-1 px-2 py-1 rounded text-[11px] font-mono border border-slate-700 bg-slate-800 text-slate-200 outline-none ${focusBorder}`}
         />
         <button
           type="button"
           onClick={handleAdd}
-          className={`px-2.5 py-1 rounded text-white text-xs font-bold transition-colors cursor-pointer ${btnBg}`}
+          className={`shrink-0 whitespace-nowrap px-2.5 py-1 rounded text-white text-xs font-bold transition-all shadow cursor-pointer ${btnBg}`}
         >
           + Add Port
         </button>
       </div>
 
       {/* Quick Port Presets */}
-      <div className="flex flex-wrap gap-1 pt-0.5">
+      <div className="flex flex-wrap gap-1 pt-1 border-t border-slate-800/80">
+        <span className="text-[10px] text-slate-400 self-center pr-1">Presets:</span>
         <button
           type="button"
           onClick={() => onAddPort('TCP', '80')}
-          className="px-1.5 py-0.5 rounded bg-slate-800/80 hover:bg-slate-700 text-[10px] text-slate-300 border border-slate-700 cursor-pointer"
+          className={`px-1.5 py-0.5 rounded text-[10px] cursor-pointer transition-colors ${
+            isCyan
+              ? 'bg-cyan-950/60 hover:bg-cyan-900 text-cyan-300 border border-cyan-800/80'
+              : 'bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300 border border-emerald-800/80'
+          }`}
         >
           + 80 (HTTP)
         </button>
         <button
           type="button"
           onClick={() => onAddPort('TCP', '443')}
-          className="px-1.5 py-0.5 rounded bg-slate-800/80 hover:bg-slate-700 text-[10px] text-slate-300 border border-slate-700 cursor-pointer"
+          className={`px-1.5 py-0.5 rounded text-[10px] cursor-pointer transition-colors ${
+            isCyan
+              ? 'bg-cyan-950/60 hover:bg-cyan-900 text-cyan-300 border border-cyan-800/80'
+              : 'bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300 border border-emerald-800/80'
+          }`}
         >
           + 443 (HTTPS)
         </button>
         <button
           type="button"
           onClick={() => onAddPort('UDP', '53')}
-          className="px-1.5 py-0.5 rounded bg-slate-800/80 hover:bg-slate-700 text-[10px] text-slate-300 border border-slate-700 cursor-pointer"
+          className={`px-1.5 py-0.5 rounded text-[10px] cursor-pointer transition-colors ${
+            isCyan
+              ? 'bg-cyan-950/60 hover:bg-cyan-900 text-cyan-300 border border-cyan-800/80'
+              : 'bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300 border border-emerald-800/80'
+          }`}
         >
           + 53 (DNS)
         </button>
         <button
           type="button"
           onClick={() => onAddPort('TCP', '8080')}
-          className="px-1.5 py-0.5 rounded bg-slate-800/80 hover:bg-slate-700 text-[10px] text-slate-300 border border-slate-700 cursor-pointer"
+          className={`px-1.5 py-0.5 rounded text-[10px] cursor-pointer transition-colors ${
+            isCyan
+              ? 'bg-cyan-950/60 hover:bg-cyan-900 text-cyan-300 border border-cyan-800/80'
+              : 'bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300 border border-emerald-800/80'
+          }`}
         >
           + 8080
         </button>
@@ -582,8 +605,32 @@ const InlinePeerEditor: React.FC<InlinePeerEditorProps> = ({
     setLabelVal('');
   };
 
+  const badgeBg = isPod
+    ? isCyan
+      ? 'bg-cyan-950 text-cyan-300 border-cyan-800'
+      : 'bg-emerald-950 text-emerald-300 border-emerald-800'
+    : isNamespace
+    ? 'bg-purple-950 text-purple-300 border-purple-800'
+    : 'bg-amber-950 text-amber-300 border-amber-800';
+
+  const btnBg = isPod
+    ? isCyan
+      ? 'bg-cyan-600 hover:bg-cyan-500 shadow-cyan-950'
+      : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-950'
+    : isNamespace
+    ? 'bg-purple-600 hover:bg-purple-500 shadow-purple-950'
+    : 'bg-amber-600 hover:bg-amber-500 shadow-amber-950';
+
+  const focusBorder = isPod
+    ? isCyan
+      ? 'focus:border-cyan-500'
+      : 'focus:border-emerald-500'
+    : isNamespace
+    ? 'focus:border-purple-500'
+    : 'focus:border-amber-500';
+
   return (
-    <div className="p-2 rounded-lg bg-slate-900/90 border border-slate-800 space-y-1.5 text-xs font-mono shadow-inner">
+    <div className="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-2 text-xs font-mono shadow-inner">
       <div className="flex items-center justify-between pb-1 border-b border-slate-800 text-[11px]">
         <div className="flex items-center gap-1.5 font-bold">
           {isIpBlock && <Globe size={12} className="text-amber-400" />}
@@ -604,32 +651,66 @@ const InlinePeerEditor: React.FC<InlinePeerEditorProps> = ({
       </div>
 
       {isIpBlock && (
-        <div className="flex items-center gap-1.5">
-          <input
-            type="text"
-            value={peer.ipBlock?.cidr || ''}
-            onChange={(e) => onUpdateCidr(e.target.value)}
-            placeholder="e.g. 10.0.0.0/16 or 0.0.0.0/0"
-            className="flex-1 px-2 py-1 rounded bg-slate-800 border border-slate-700 text-amber-300 text-xs font-mono outline-none focus:border-amber-500"
-          />
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-1.5">
+            <input
+              type="text"
+              value={peer.ipBlock?.cidr || ''}
+              onChange={(e) => onUpdateCidr(e.target.value)}
+              placeholder="e.g. 10.0.0.0/16 or 0.0.0.0/0"
+              className="flex-1 px-2 py-1 rounded bg-slate-800 border border-slate-700 text-amber-300 text-xs font-mono outline-none focus:border-amber-500"
+            />
+          </div>
+          <div className="flex flex-wrap gap-1 pt-1 border-t border-slate-800/80">
+            <span className="text-[10px] text-slate-400 self-center pr-1">Presets:</span>
+            <button
+              type="button"
+              onClick={() => onUpdateCidr('0.0.0.0/0')}
+              className="px-1.5 py-0.5 rounded bg-amber-950/60 hover:bg-amber-900 text-amber-300 border border-amber-800/80 text-[10px] cursor-pointer"
+            >
+              0.0.0.0/0 (Internet)
+            </button>
+            <button
+              type="button"
+              onClick={() => onUpdateCidr('10.0.0.0/8')}
+              className="px-1.5 py-0.5 rounded bg-amber-950/60 hover:bg-amber-900 text-amber-300 border border-amber-800/80 text-[10px] cursor-pointer"
+            >
+              10.0.0.0/8 (VPC)
+            </button>
+            <button
+              type="button"
+              onClick={() => onUpdateCidr('172.16.0.0/12')}
+              className="px-1.5 py-0.5 rounded bg-amber-950/60 hover:bg-amber-900 text-amber-300 border border-amber-800/80 text-[10px] cursor-pointer"
+            >
+              172.16.0.0/12
+            </button>
+            <button
+              type="button"
+              onClick={() => onUpdateCidr('192.168.0.0/16')}
+              className="px-1.5 py-0.5 rounded bg-amber-950/60 hover:bg-amber-900 text-amber-300 border border-amber-800/80 text-[10px] cursor-pointer"
+            >
+              192.168.0.0/16
+            </button>
+          </div>
         </div>
       )}
 
       {(isPod || isNamespace) && (
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           {/* Label Chips */}
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-1 min-h-[22px]">
             {Object.keys(labels).length > 0 ? (
               Object.entries(labels).map(([k, v]) => (
                 <span
                   key={k}
-                  className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-200 border border-slate-700 text-[10px] flex items-center gap-1"
+                  className={`px-2 py-0.5 rounded border text-[11px] flex items-center gap-1.5 shadow-sm font-mono ${badgeBg}`}
                 >
                   <span>{k}={v}</span>
                   <button
                     type="button"
                     onClick={() => onRemoveLabel(selectorKey, k)}
-                    className="text-slate-400 hover:text-rose-400 font-bold cursor-pointer"
+                    className="hover:text-rose-400 font-bold px-0.5 cursor-pointer leading-none"
+                    title="Remove label"
                   >
                     ×
                   </button>
@@ -643,15 +724,15 @@ const InlinePeerEditor: React.FC<InlinePeerEditorProps> = ({
           </div>
 
           {/* Add Match Label */}
-          <div className="flex items-center gap-1 pt-0.5">
+          <div className="flex items-center gap-1.5 pt-1">
             <input
               type="text"
               value={labelKey}
               onChange={(e) => setLabelKey(e.target.value)}
-              placeholder="key"
-              className="w-20 px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-slate-200 outline-none focus:border-slate-500"
+              placeholder="key (e.g. app)"
+              className={`min-w-0 flex-1 px-2 py-1 rounded bg-slate-800 border border-slate-700 text-[11px] font-mono text-slate-200 outline-none ${focusBorder}`}
             />
-            <span className="text-slate-400">=</span>
+            <span className="text-slate-400 font-bold">=</span>
             <input
               type="text"
               value={labelVal}
@@ -662,16 +743,96 @@ const InlinePeerEditor: React.FC<InlinePeerEditorProps> = ({
                   handleAddLabel();
                 }
               }}
-              placeholder="val"
-              className="w-20 px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-slate-200 outline-none focus:border-slate-500"
+              placeholder="val (e.g. frontend)"
+              className={`min-w-0 flex-1 px-2 py-1 rounded bg-slate-800 border border-slate-700 text-[11px] font-mono text-slate-200 outline-none ${focusBorder}`}
             />
             <button
               type="button"
               onClick={handleAddLabel}
-              className="px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 text-white text-[10px] font-bold cursor-pointer"
+              className={`shrink-0 whitespace-nowrap px-2.5 py-1 rounded text-white text-xs font-bold transition-all shadow cursor-pointer ${btnBg}`}
             >
-              + Label
+              + Add Label
             </button>
+          </div>
+
+          {/* Quick Presets for Peer */}
+          <div className="flex flex-wrap gap-1 pt-1 border-t border-slate-800/80">
+            <span className="text-[10px] text-slate-400 self-center pr-1">Presets:</span>
+            {isPod ? (
+              isCyan ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onAddLabel(selectorKey, 'app', 'frontend')}
+                    className="px-1.5 py-0.5 rounded bg-cyan-950/60 hover:bg-cyan-900 text-cyan-300 border border-cyan-800/80 text-[10px] cursor-pointer"
+                  >
+                    + app=frontend
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onAddLabel(selectorKey, 'app', 'ingress')}
+                    className="px-1.5 py-0.5 rounded bg-cyan-950/60 hover:bg-cyan-900 text-cyan-300 border border-cyan-800/80 text-[10px] cursor-pointer"
+                  >
+                    + app=ingress
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onAddLabel(selectorKey, 'tier', 'web')}
+                    className="px-1.5 py-0.5 rounded bg-cyan-950/60 hover:bg-cyan-900 text-cyan-300 border border-cyan-800/80 text-[10px] cursor-pointer"
+                  >
+                    + tier=web
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onAddLabel(selectorKey, 'role', 'db')}
+                    className="px-1.5 py-0.5 rounded bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300 border border-emerald-800/80 text-[10px] cursor-pointer"
+                  >
+                    + role=db
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onAddLabel(selectorKey, 'app', 'database')}
+                    className="px-1.5 py-0.5 rounded bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300 border border-emerald-800/80 text-[10px] cursor-pointer"
+                  >
+                    + app=database
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onAddLabel(selectorKey, 'tier', 'backend')}
+                    className="px-1.5 py-0.5 rounded bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300 border border-emerald-800/80 text-[10px] cursor-pointer"
+                  >
+                    + tier=backend
+                  </button>
+                </>
+              )
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onAddLabel(selectorKey, 'kubernetes.io/metadata.name', 'ingress-nginx')}
+                  className="px-1.5 py-0.5 rounded bg-purple-950/60 hover:bg-purple-900 text-purple-300 border border-purple-800/80 text-[10px] cursor-pointer"
+                >
+                  + ns=ingress-nginx
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onAddLabel(selectorKey, 'kubernetes.io/metadata.name', 'openshift-ingress')}
+                  className="px-1.5 py-0.5 rounded bg-purple-950/60 hover:bg-purple-900 text-purple-300 border border-purple-800/80 text-[10px] cursor-pointer"
+                >
+                  + ns=openshift-ingress
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onAddLabel(selectorKey, 'team', 'backend')}
+                  className="px-1.5 py-0.5 rounded bg-purple-950/60 hover:bg-purple-900 text-purple-300 border border-purple-800/80 text-[10px] cursor-pointer"
+                >
+                  + team=backend
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -1249,6 +1410,118 @@ export const NetworkPolicyDesignerModal: React.FC<NetworkPolicyDesignerModalProp
           </div>
         )}
 
+        {/* Top Designer Actions Toolbar (Consistent with Top Toolbar pattern) */}
+        <div
+          className="px-4 py-2 border-b flex items-center justify-between gap-3 flex-wrap text-xs shrink-0 font-mono transition-colors"
+          style={{
+            backgroundColor: 'var(--bg-card-header, #0f172a)',
+            borderColor: 'var(--border-subtle, #334155)',
+          }}
+        >
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1 uppercase tracking-wider">
+              <Zap size={11} className="text-amber-400" /> Actions:
+            </span>
+
+            {/* Ingress Action Button */}
+            <button
+              type="button"
+              onClick={handleAddIngressRule}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold border transition-all text-cyan-400 border-cyan-900/60 bg-cyan-950/40 hover:bg-cyan-900/60 hover:border-cyan-500 shadow-sm cursor-pointer"
+              title="Add a new Ingress (Inbound) Rule"
+            >
+              <Plus size={12} />
+              <span>+ Ingress Rule</span>
+            </button>
+
+            {/* Egress Action Button */}
+            <button
+              type="button"
+              onClick={handleAddEgressRule}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold border transition-all text-emerald-400 border-emerald-900/60 bg-emerald-950/40 hover:bg-emerald-900/60 hover:border-emerald-500 shadow-sm cursor-pointer"
+              title="Add a new Egress (Outbound) Rule"
+            >
+              <Plus size={12} />
+              <span>+ Egress Rule</span>
+            </button>
+
+            <div className="h-4 w-px bg-slate-800 mx-1" />
+
+            {/* Isolation Toggles */}
+            <label className="flex items-center gap-1.5 px-2 py-1 rounded border border-cyan-900/50 bg-cyan-950/20 text-cyan-300 text-[11px] cursor-pointer hover:bg-cyan-950/40">
+              <input
+                type="checkbox"
+                checked={model.policyTypes.ingress}
+                onChange={(e) =>
+                  updateModel((m) => ({
+                    ...m,
+                    policyTypes: { ...m.policyTypes, ingress: e.target.checked },
+                  }))
+                }
+                className="accent-cyan-500"
+              />
+              <span>Isolate Ingress</span>
+            </label>
+
+            <label className="flex items-center gap-1.5 px-2 py-1 rounded border border-emerald-900/50 bg-emerald-950/20 text-emerald-300 text-[11px] cursor-pointer hover:bg-emerald-950/40">
+              <input
+                type="checkbox"
+                checked={model.policyTypes.egress}
+                onChange={(e) =>
+                  updateModel((m) => ({
+                    ...m,
+                    policyTypes: { ...m.policyTypes, egress: e.target.checked },
+                  }))
+                }
+                className="accent-emerald-500"
+              />
+              <span>Isolate Egress</span>
+            </label>
+
+            <div className="h-4 w-px bg-slate-800 mx-1" />
+
+            {/* Target Scope Toggle */}
+            <label className="flex items-center gap-1.5 px-2 py-1 rounded border border-purple-900/50 bg-purple-950/20 text-purple-300 text-[11px] cursor-pointer hover:bg-purple-950/40">
+              <input
+                type="checkbox"
+                checked={model.targetAllPods}
+                onChange={(e) =>
+                  updateModel((m) => ({
+                    ...m,
+                    targetAllPods: e.target.checked,
+                  }))
+                }
+                className="accent-purple-500"
+              />
+              <span>Target All Pods</span>
+            </label>
+
+            <div className="h-4 w-px bg-slate-800 mx-1" />
+
+            {/* Quick Clear All Rules */}
+            <button
+              type="button"
+              onClick={() => updateModel((m) => ({ ...m, ingressRules: [], egressRules: [] }))}
+              className="flex items-center gap-1 px-2 py-1 rounded border border-rose-900/40 bg-rose-950/20 text-rose-400 hover:bg-rose-950/50 text-[11px] cursor-pointer"
+              title="Clear all ingress and egress rules"
+            >
+              <Trash2 size={11} />
+              <span>Clear Rules</span>
+            </button>
+          </div>
+
+          {/* Right side summary indicator */}
+          <div className="flex items-center gap-2 text-[11px] font-mono text-slate-400">
+            <span className="text-cyan-400 font-bold">{model.ingressRules.length} Ingress</span>
+            <span>•</span>
+            <span className="text-purple-400 font-bold">
+              {model.targetAllPods ? 'All Pods' : `${Object.keys(model.targetPodLabels).length} Target Label(s)`}
+            </span>
+            <span>•</span>
+            <span className="text-emerald-400 font-bold">{model.egressRules.length} Egress</span>
+          </div>
+        </div>
+
         {/* Modal Main Body */}
         <div className="flex-1 min-h-0 flex overflow-hidden">
           {/* LEFT / MAIN: VISUAL GRAPHIC DESIGNER CANVAS */}
@@ -1281,7 +1554,7 @@ export const NetworkPolicyDesignerModal: React.FC<NetworkPolicyDesignerModalProp
                   >
                     <div className="flex items-center gap-2">
                       <div className="w-6 h-6 rounded flex items-center justify-center bg-cyan-600/20 text-cyan-400">
-                        <ArrowRight size={14} />
+                        <ArrowLeft size={14} />
                       </div>
                       <div>
                         <h3 className="text-xs font-bold text-cyan-400">Ingress (Inbound)</h3>
@@ -1293,20 +1566,15 @@ export const NetworkPolicyDesignerModal: React.FC<NetworkPolicyDesignerModalProp
                       </div>
                     </div>
 
-                    <label className="flex items-center gap-1.5 cursor-pointer text-xs font-mono">
-                      <input
-                        type="checkbox"
-                        checked={model.policyTypes.ingress}
-                        onChange={(e) =>
-                          updateModel((m) => ({
-                            ...m,
-                            policyTypes: { ...m.policyTypes, ingress: e.target.checked },
-                          }))
-                        }
-                        className="accent-cyan-500"
-                      />
-                      <span className="text-[11px] text-slate-300">Isolate Ingress</span>
-                    </label>
+                    <button
+                      type="button"
+                      onClick={handleAddIngressRule}
+                      className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-800 flex items-center gap-1 cursor-pointer transition-colors shadow-sm"
+                      title="Add Ingress Rule"
+                    >
+                      <Plus size={11} />
+                      <span>Rule</span>
+                    </button>
                   </div>
 
                   <div className="p-3 flex-1 overflow-y-auto space-y-3">
@@ -1349,7 +1617,7 @@ export const NetworkPolicyDesignerModal: React.FC<NetworkPolicyDesignerModalProp
                                 <button
                                   type="button"
                                   onClick={() => handleAddPeerToRule('ingress', rule.id, 'pod')}
-                                  className="px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 text-[10px] hover:bg-cyan-900 cursor-pointer"
+                                  className="px-2 py-0.5 rounded bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-800 text-[10px] font-bold cursor-pointer transition-colors shadow-sm"
                                   title="Add Pod Selector Source"
                                 >
                                   + Pod
@@ -1357,7 +1625,7 @@ export const NetworkPolicyDesignerModal: React.FC<NetworkPolicyDesignerModalProp
                                 <button
                                   type="button"
                                   onClick={() => handleAddPeerToRule('ingress', rule.id, 'namespace')}
-                                  className="px-1.5 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-800 text-[10px] hover:bg-purple-900 cursor-pointer"
+                                  className="px-2 py-0.5 rounded bg-purple-950 hover:bg-purple-900 text-purple-300 border border-purple-800 text-[10px] font-bold cursor-pointer transition-colors shadow-sm"
                                   title="Add Namespace Selector Source"
                                 >
                                   + NS
@@ -1365,7 +1633,7 @@ export const NetworkPolicyDesignerModal: React.FC<NetworkPolicyDesignerModalProp
                                 <button
                                   type="button"
                                   onClick={() => handleAddPeerToRule('ingress', rule.id, 'ipBlock')}
-                                  className="px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800 text-[10px] hover:bg-amber-900 cursor-pointer"
+                                  className="px-2 py-0.5 rounded bg-amber-950 hover:bg-amber-900 text-amber-300 border border-amber-800 text-[10px] font-bold cursor-pointer transition-colors shadow-sm"
                                   title="Add IPBlock CIDR Source"
                                 >
                                   + IPBlock
@@ -1403,13 +1671,32 @@ export const NetworkPolicyDesignerModal: React.FC<NetworkPolicyDesignerModalProp
                       ))
                     )}
 
-                    <button
-                      onClick={handleAddIngressRule}
-                      className="w-full py-2 rounded-lg border border-dashed text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-white/5 transition-all text-cyan-400 border-cyan-800/80 cursor-pointer"
+
+
+                    {/* Visual Ingress Status Footer Representation */}
+                    <div
+                      className="p-4 rounded-xl border text-center space-y-2 shadow-inner mt-3"
+                      style={{
+                        backgroundColor: 'rgba(6, 182, 212, 0.06)',
+                        borderColor: 'rgba(6, 182, 212, 0.3)',
+                      }}
                     >
-                      <Plus size={13} />
-                      <span>Add Ingress Rule</span>
-                    </button>
+                      <div className="w-10 h-10 rounded-xl bg-cyan-600/20 text-cyan-400 flex items-center justify-center mx-auto border border-cyan-500/40 shadow-lg">
+                        <ArrowLeft size={20} />
+                      </div>
+                      <h4 className="text-xs font-bold text-cyan-300 font-mono">
+                        {model.policyTypes.ingress
+                          ? `${model.ingressRules.length} Ingress Rule(s) Configured`
+                          : 'Ingress Isolation Disabled'}
+                      </h4>
+                      <p className="text-[10px] text-slate-400 font-mono">
+                        {model.policyTypes.ingress
+                          ? model.ingressRules.length === 0
+                            ? '🚫 Drops all inbound traffic to target pods'
+                            : '🛡️ Inbound restricted to configured sources & ports'
+                          : '🔓 Unrestricted inbound traffic allowed'}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
@@ -1671,20 +1958,15 @@ export const NetworkPolicyDesignerModal: React.FC<NetworkPolicyDesignerModalProp
                       </div>
                     </div>
 
-                    <label className="flex items-center gap-1.5 cursor-pointer text-xs font-mono">
-                      <input
-                        type="checkbox"
-                        checked={model.policyTypes.egress}
-                        onChange={(e) =>
-                          updateModel((m) => ({
-                            ...m,
-                            policyTypes: { ...m.policyTypes, egress: e.target.checked },
-                          }))
-                        }
-                        className="accent-emerald-500"
-                      />
-                      <span className="text-[11px] text-slate-300">Isolate Egress</span>
-                    </label>
+                    <button
+                      type="button"
+                      onClick={handleAddEgressRule}
+                      className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-800 flex items-center gap-1 cursor-pointer transition-colors shadow-sm"
+                      title="Add Egress Rule"
+                    >
+                      <Plus size={11} />
+                      <span>Rule</span>
+                    </button>
                   </div>
 
                   <div className="p-3 flex-1 overflow-y-auto space-y-3">
@@ -1727,7 +2009,7 @@ export const NetworkPolicyDesignerModal: React.FC<NetworkPolicyDesignerModalProp
                                 <button
                                   type="button"
                                   onClick={() => handleAddPeerToRule('egress', rule.id, 'pod')}
-                                  className="px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 text-[10px] hover:bg-emerald-900 cursor-pointer"
+                                  className="px-2 py-0.5 rounded bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-800 text-[10px] font-bold cursor-pointer transition-colors shadow-sm"
                                   title="Add Pod Selector Destination"
                                 >
                                   + Pod
@@ -1735,7 +2017,7 @@ export const NetworkPolicyDesignerModal: React.FC<NetworkPolicyDesignerModalProp
                                 <button
                                   type="button"
                                   onClick={() => handleAddPeerToRule('egress', rule.id, 'namespace')}
-                                  className="px-1.5 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-800 text-[10px] hover:bg-purple-900 cursor-pointer"
+                                  className="px-2 py-0.5 rounded bg-purple-950 hover:bg-purple-900 text-purple-300 border border-purple-800 text-[10px] font-bold cursor-pointer transition-colors shadow-sm"
                                   title="Add Namespace Selector Destination"
                                 >
                                   + NS
@@ -1743,7 +2025,7 @@ export const NetworkPolicyDesignerModal: React.FC<NetworkPolicyDesignerModalProp
                                 <button
                                   type="button"
                                   onClick={() => handleAddPeerToRule('egress', rule.id, 'ipBlock')}
-                                  className="px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800 text-[10px] hover:bg-amber-900 cursor-pointer"
+                                  className="px-2 py-0.5 rounded bg-amber-950 hover:bg-amber-900 text-amber-300 border border-amber-800 text-[10px] font-bold cursor-pointer transition-colors shadow-sm"
                                   title="Add IPBlock CIDR Destination"
                                 >
                                   + IPBlock
@@ -1781,13 +2063,32 @@ export const NetworkPolicyDesignerModal: React.FC<NetworkPolicyDesignerModalProp
                       ))
                     )}
 
-                    <button
-                      onClick={handleAddEgressRule}
-                      className="w-full py-2 rounded-lg border border-dashed text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-white/5 transition-all text-emerald-400 border-emerald-800/80 cursor-pointer"
+
+
+                    {/* Visual Egress Status Footer Representation */}
+                    <div
+                      className="p-4 rounded-xl border text-center space-y-2 shadow-inner mt-3"
+                      style={{
+                        backgroundColor: 'rgba(16, 185, 129, 0.06)',
+                        borderColor: 'rgba(16, 185, 129, 0.3)',
+                      }}
                     >
-                      <Plus size={13} />
-                      <span>Add Egress Rule</span>
-                    </button>
+                      <div className="w-10 h-10 rounded-xl bg-emerald-600/20 text-emerald-400 flex items-center justify-center mx-auto border border-emerald-500/40 shadow-lg">
+                        <ArrowRight size={20} />
+                      </div>
+                      <h4 className="text-xs font-bold text-emerald-300 font-mono">
+                        {model.policyTypes.egress
+                          ? `${model.egressRules.length} Egress Rule(s) Configured`
+                          : 'Egress Isolation Disabled'}
+                      </h4>
+                      <p className="text-[10px] text-slate-400 font-mono">
+                        {model.policyTypes.egress
+                          ? model.egressRules.length === 0
+                            ? '🚫 Drops all outbound traffic from target pods'
+                            : '🛡️ Outbound restricted to configured destinations & ports'
+                          : '🔓 Unrestricted outbound traffic allowed'}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
