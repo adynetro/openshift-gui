@@ -1,29 +1,32 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, Suspense, lazy } from 'react';
 import { TopNav } from './components/TopNav.js';
 import { Sidebar } from './components/Sidebar.js';
 import { SearchBar } from './components/SearchBar.js';
 import { ResourceTable } from './components/ResourceTable.js';
-import { LogViewer } from './components/LogViewer.js';
-import { YamlModal } from './components/YamlModal.js';
-import { EditYamlModal } from './components/EditYamlModal.js';
-import { ImageStreamModal } from './components/ImageStreamModal.js';
-import { HelmModal } from './components/HelmModal.js';
-import { ActionDialog } from './components/ActionDialog.js';
-import { WorkloadDetailsModal } from './components/WorkloadDetailsModal.js';
 import { TopologyView } from './components/TopologyView.js';
-import { ContextModal } from './components/ContextModal.js';
-import { SecretEditorModal } from './components/SecretEditorModal.js';
-import { NetworkPolicyDesignerModal } from './components/NetworkPolicyDesignerModal.js';
-import { ResizePvcModal } from './components/ResizePvcModal.js';
-import { CrdInstancesModal } from './components/CrdInstancesModal.js';
-import { PodTerminalModal } from './components/PodTerminalModal.js';
-import { AddAppWizardModal } from './components/AddAppWizardModal.js';
-import { PodDebugModal } from './components/PodDebugModal.js';
-import { NodeDebugModal } from './components/NodeDebugModal.js';
-import { ClusterOperatorEventsModal } from './components/ClusterOperatorEventsModal.js';
-import { HelpModal } from './components/HelpModal.js';
-import { BatchDeleteModal } from './components/BatchDeleteModal.js';
-import { ImageRegistryPrunerModal } from './components/ImageRegistryPrunerModal.js';
+
+// Lazy-loaded modal components to split heavy dependencies (CodeMirror, Xterm, Wizard, Netpol Designer)
+const LogViewer = lazy(() => import('./components/LogViewer.js').then((m) => ({ default: m.LogViewer })));
+const YamlModal = lazy(() => import('./components/YamlModal.js').then((m) => ({ default: m.YamlModal })));
+const EditYamlModal = lazy(() => import('./components/EditYamlModal.js').then((m) => ({ default: m.EditYamlModal })));
+const ImageStreamModal = lazy(() => import('./components/ImageStreamModal.js').then((m) => ({ default: m.ImageStreamModal })));
+const HelmModal = lazy(() => import('./components/HelmModal.js').then((m) => ({ default: m.HelmModal })));
+const ActionDialog = lazy(() => import('./components/ActionDialog.js').then((m) => ({ default: m.ActionDialog })));
+const WorkloadDetailsModal = lazy(() => import('./components/WorkloadDetailsModal.js').then((m) => ({ default: m.WorkloadDetailsModal })));
+const ContextModal = lazy(() => import('./components/ContextModal.js').then((m) => ({ default: m.ContextModal })));
+const SecretEditorModal = lazy(() => import('./components/SecretEditorModal.js').then((m) => ({ default: m.SecretEditorModal })));
+const NetworkPolicyDesignerModal = lazy(() => import('./components/NetworkPolicyDesignerModal.js').then((m) => ({ default: m.NetworkPolicyDesignerModal })));
+const ResizePvcModal = lazy(() => import('./components/ResizePvcModal.js').then((m) => ({ default: m.ResizePvcModal })));
+const CrdInstancesModal = lazy(() => import('./components/CrdInstancesModal.js').then((m) => ({ default: m.CrdInstancesModal })));
+const PodTerminalModal = lazy(() => import('./components/PodTerminalModal.js').then((m) => ({ default: m.PodTerminalModal })));
+const AddAppWizardModal = lazy(() => import('./components/AddAppWizardModal.js').then((m) => ({ default: m.AddAppWizardModal })));
+const PodDebugModal = lazy(() => import('./components/PodDebugModal.js').then((m) => ({ default: m.PodDebugModal })));
+const NodeDebugModal = lazy(() => import('./components/NodeDebugModal.js').then((m) => ({ default: m.NodeDebugModal })));
+const ClusterOperatorEventsModal = lazy(() => import('./components/ClusterOperatorEventsModal.js').then((m) => ({ default: m.ClusterOperatorEventsModal })));
+const HelpModal = lazy(() => import('./components/HelpModal.js').then((m) => ({ default: m.HelpModal })));
+const BatchDeleteModal = lazy(() => import('./components/BatchDeleteModal.js').then((m) => ({ default: m.BatchDeleteModal })));
+const ImageRegistryPrunerModal = lazy(() => import('./components/ImageRegistryPrunerModal.js').then((m) => ({ default: m.ImageRegistryPrunerModal })));
+
 import { ResourceKind, ResourceItem, KubeContext, ProjectInfo, ImageStreamResource } from '../types/k8s.js';
 import { FuzzyMatcher } from '../utils/fuzzy.js';
 import { CheckCircle2, AlertTriangle } from 'lucide-react';
@@ -579,336 +582,337 @@ export const App: React.FC = () => {
       {/* ========================================================================= */}
       {/* MODAL WINDOWS WITH FULL STACK BACK-NAVIGATION                             */}
       {/* ========================================================================= */}
+      <Suspense fallback={null}>
+        {/* Context Switcher Modal */}
+        {modalMode === 'context' && (
+          <ContextModal
+            mode="context"
+            contexts={contexts}
+            projects={projects}
+            currentContext={currentContext}
+            currentProject={currentProject}
+            onSelectContext={handleSwitchContext}
+            onSelectProject={() => {}}
+            onRefreshContexts={loadKubeInfo}
+            onClose={closeModal}
+          />
+        )}
 
-      {/* Context Switcher Modal */}
-      {modalMode === 'context' && (
-        <ContextModal
-          mode="context"
-          contexts={contexts}
-          projects={projects}
-          currentContext={currentContext}
-          currentProject={currentProject}
-          onSelectContext={handleSwitchContext}
-          onSelectProject={() => {}}
-          onRefreshContexts={loadKubeInfo}
-          onClose={closeModal}
-        />
-      )}
+        {/* Project Switcher Modal */}
+        {modalMode === 'project' && (
+          <ContextModal
+            mode="project"
+            contexts={contexts}
+            projects={projects}
+            currentContext={currentContext}
+            currentProject={currentProject}
+            onSelectContext={() => {}}
+            onSelectProject={handleSwitchProject}
+            onClose={closeModal}
+          />
+        )}
 
-      {/* Project Switcher Modal */}
-      {modalMode === 'project' && (
-        <ContextModal
-          mode="project"
-          contexts={contexts}
-          projects={projects}
-          currentContext={currentContext}
-          currentProject={currentProject}
-          onSelectContext={() => {}}
-          onSelectProject={handleSwitchProject}
-          onClose={closeModal}
-        />
-      )}
+        {/* Workload Hierarchy Details Modal (Replicasets / ReplicationControllers & Live Pods) */}
+        {modalMode === 'workload-details' && selectedItem && (
+          <WorkloadDetailsModal
+            item={selectedItem}
+            namespace={selectedItem.namespace || currentProject}
+            onClose={closeModal}
+            onAction={(act, target) => handleAction(act, target || selectedItem)}
+            onOpenPodTerminal={(podName) => {
+              openModal('terminal', {
+                id: podName,
+                name: podName,
+                namespace: selectedItem.namespace || currentProject,
+                kind: 'pods',
+                status: 'Running',
+                age: '',
+              });
+            }}
+            onOpenPodLogs={(podName) => {
+              openModal('logs', {
+                id: podName,
+                name: podName,
+                namespace: selectedItem.namespace || currentProject,
+                kind: 'pods',
+                status: 'Running',
+                age: '',
+              });
+            }}
+            onOpenPodDescribe={(podName) => {
+              openModal('describe', {
+                id: podName,
+                name: podName,
+                namespace: selectedItem.namespace || currentProject,
+                kind: 'pods',
+                status: 'Running',
+                age: '',
+              });
+            }}
+            onOpenPodYaml={(podName) => {
+              openModal('yaml', {
+                id: podName,
+                name: podName,
+                namespace: selectedItem.namespace || currentProject,
+                kind: 'pods',
+                status: 'Running',
+                age: '',
+              });
+            }}
+            onOpenPodDebug={(podName) => {
+              openModal('debug-pod', {
+                id: podName,
+                name: podName,
+                namespace: selectedItem.namespace || currentProject,
+                kind: 'pods',
+                status: 'Running',
+                age: '',
+              });
+            }}
+          />
+        )}
 
-      {/* Workload Hierarchy Details Modal (Replicasets / ReplicationControllers & Live Pods) */}
-      {modalMode === 'workload-details' && selectedItem && (
-        <WorkloadDetailsModal
-          item={selectedItem}
-          namespace={selectedItem.namespace || currentProject}
-          onClose={closeModal}
-          onAction={(act, target) => handleAction(act, target || selectedItem)}
-          onOpenPodTerminal={(podName) => {
-            openModal('terminal', {
-              id: podName,
-              name: podName,
-              namespace: selectedItem.namespace || currentProject,
-              kind: 'pods',
-              status: 'Running',
-              age: '',
-            });
-          }}
-          onOpenPodLogs={(podName) => {
-            openModal('logs', {
-              id: podName,
-              name: podName,
-              namespace: selectedItem.namespace || currentProject,
-              kind: 'pods',
-              status: 'Running',
-              age: '',
-            });
-          }}
-          onOpenPodDescribe={(podName) => {
-            openModal('describe', {
-              id: podName,
-              name: podName,
-              namespace: selectedItem.namespace || currentProject,
-              kind: 'pods',
-              status: 'Running',
-              age: '',
-            });
-          }}
-          onOpenPodYaml={(podName) => {
-            openModal('yaml', {
-              id: podName,
-              name: podName,
-              namespace: selectedItem.namespace || currentProject,
-              kind: 'pods',
-              status: 'Running',
-              age: '',
-            });
-          }}
-          onOpenPodDebug={(podName) => {
-            openModal('debug-pod', {
-              id: podName,
-              name: podName,
-              namespace: selectedItem.namespace || currentProject,
-              kind: 'pods',
-              status: 'Running',
-              age: '',
-            });
-          }}
-        />
-      )}
+        {/* Pod Failure Diagnostics & oc debug Modal */}
+        {modalMode === 'debug-pod' && selectedItem && (
+          <PodDebugModal
+            item={selectedItem}
+            namespace={selectedItem.namespace || currentProject}
+            onClose={closeModal}
+            onOpenLogs={(podName) => {
+              openModal('logs', {
+                id: podName,
+                name: podName,
+                namespace: selectedItem.namespace || currentProject,
+                kind: 'pods',
+                status: 'Running',
+                age: '',
+              });
+            }}
+            onOpenYaml={(podName) => {
+              openModal('yaml', {
+                id: podName,
+                name: podName,
+                namespace: selectedItem.namespace || currentProject,
+                kind: 'pods',
+                status: 'Running',
+                age: '',
+              });
+            }}
+          />
+        )}
 
-      {/* Pod Failure Diagnostics & oc debug Modal */}
-      {modalMode === 'debug-pod' && selectedItem && (
-        <PodDebugModal
-          item={selectedItem}
-          namespace={selectedItem.namespace || currentProject}
-          onClose={closeModal}
-          onOpenLogs={(podName) => {
-            openModal('logs', {
-              id: podName,
-              name: podName,
-              namespace: selectedItem.namespace || currentProject,
-              kind: 'pods',
-              status: 'Running',
-              age: '',
-            });
-          }}
-          onOpenYaml={(podName) => {
-            openModal('yaml', {
-              id: podName,
-              name: podName,
-              namespace: selectedItem.namespace || currentProject,
-              kind: 'pods',
-              status: 'Running',
-              age: '',
-            });
-          }}
-        />
-      )}
+        {/* Node Health Diagnostics & Host Debugger Modal */}
+        {modalMode === 'debug-node' && selectedItem && (
+          <NodeDebugModal
+            item={selectedItem}
+            onClose={closeModal}
+            onOpenYaml={(nodeName) => {
+              openModal('yaml', {
+                id: nodeName,
+                name: nodeName,
+                namespace: '',
+                kind: 'nodes',
+                status: 'Ready',
+                age: '',
+              });
+            }}
+            onOpenDescribe={(nodeName) => {
+              openModal('describe', {
+                id: nodeName,
+                name: nodeName,
+                namespace: '',
+                kind: 'nodes',
+                status: 'Ready',
+                age: '',
+              });
+            }}
+          />
+        )}
 
-      {/* Node Health Diagnostics & Host Debugger Modal */}
-      {modalMode === 'debug-node' && selectedItem && (
-        <NodeDebugModal
-          item={selectedItem}
-          onClose={closeModal}
-          onOpenYaml={(nodeName) => {
-            openModal('yaml', {
-              id: nodeName,
-              name: nodeName,
-              namespace: '',
-              kind: 'nodes',
-              status: 'Ready',
-              age: '',
-            });
-          }}
-          onOpenDescribe={(nodeName) => {
-            openModal('describe', {
-              id: nodeName,
-              name: nodeName,
-              namespace: '',
-              kind: 'nodes',
-              status: 'Ready',
-              age: '',
-            });
-          }}
-        />
-      )}
+        {/* Interactive Pod Terminal Modal */}
+        {modalMode === 'terminal' && selectedItem && (
+          <PodTerminalModal
+            item={selectedItem}
+            namespace={selectedItem.namespace || currentProject}
+            onClose={closeModal}
+          />
+        )}
 
-      {/* Interactive Pod Terminal Modal */}
-      {modalMode === 'terminal' && selectedItem && (
-        <PodTerminalModal
-          item={selectedItem}
-          namespace={selectedItem.namespace || currentProject}
-          onClose={closeModal}
-        />
-      )}
+        {/* Live Log Streamer Modal */}
+        {modalMode === 'logs' && selectedItem && (
+          <LogViewer
+            item={selectedItem}
+            namespace={selectedItem.namespace || currentProject}
+            onClose={closeModal}
+          />
+        )}
 
-      {/* Live Log Streamer Modal */}
-      {modalMode === 'logs' && selectedItem && (
-        <LogViewer
-          item={selectedItem}
-          namespace={selectedItem.namespace || currentProject}
-          onClose={closeModal}
-        />
-      )}
+        {/* Read-Only YAML / Describe Modal with direct Edit Button */}
+        {(modalMode === 'yaml' || modalMode === 'describe') && selectedItem && (
+          <YamlModal
+            mode={modalMode}
+            item={selectedItem}
+            namespace={selectedItem.namespace || currentProject}
+            onClose={closeModal}
+            onEdit={() => openModal('edit-yaml')}
+          />
+        )}
 
-      {/* Read-Only YAML / Describe Modal with direct Edit Button */}
-      {(modalMode === 'yaml' || modalMode === 'describe') && selectedItem && (
-        <YamlModal
-          mode={modalMode}
-          item={selectedItem}
-          namespace={selectedItem.namespace || currentProject}
-          onClose={closeModal}
-          onEdit={() => openModal('edit-yaml')}
-        />
-      )}
+        {/* Interactive Edit YAML Modal */}
+        {modalMode === 'edit-yaml' && selectedItem && (
+          <EditYamlModal
+            item={selectedItem}
+            namespace={selectedItem.namespace || currentProject}
+            onClose={closeModal}
+            onSuccess={(msg) => {
+              showToast(msg, 'success');
+              fetchResources(false);
+            }}
+          />
+        )}
 
-      {/* Interactive Edit YAML Modal */}
-      {modalMode === 'edit-yaml' && selectedItem && (
-        <EditYamlModal
-          item={selectedItem}
-          namespace={selectedItem.namespace || currentProject}
-          onClose={closeModal}
-          onSuccess={(msg) => {
-            showToast(msg, 'success');
-            fetchResources(false);
-          }}
-        />
-      )}
+        {/* Add Application Workload Wizard Modal (inspired by k8syaml) */}
+        {modalMode === 'add-app' && (
+          <AddAppWizardModal
+            namespace={currentProject !== 'all-projects' && currentProject !== '__all__' ? currentProject : 'default'}
+            onClose={closeModal}
+            onSuccess={(msg) => {
+              showToast(msg, 'success');
+              fetchResources(false);
+            }}
+          />
+        )}
 
-      {/* Add Application Workload Wizard Modal (inspired by k8syaml) */}
-      {modalMode === 'add-app' && (
-        <AddAppWizardModal
-          namespace={currentProject !== 'all-projects' && currentProject !== '__all__' ? currentProject : 'default'}
-          onClose={closeModal}
-          onSuccess={(msg) => {
-            showToast(msg, 'success');
-            fetchResources(false);
-          }}
-        />
-      )}
+        {/* Interactive NetworkPolicy Graphic Visual Designer Modal */}
+        {modalMode === 'netpol-designer' && (
+          <NetworkPolicyDesignerModal
+            item={selectedItem}
+            namespace={selectedItem?.namespace || currentProject || 'default'}
+            onClose={closeModal}
+            onSuccess={(msg) => {
+              showToast(msg, 'success');
+              fetchResources(false);
+            }}
+          />
+        )}
 
-      {/* Interactive NetworkPolicy Graphic Visual Designer Modal */}
-      {modalMode === 'netpol-designer' && (
-        <NetworkPolicyDesignerModal
-          item={selectedItem}
-          namespace={selectedItem?.namespace || currentProject || 'default'}
-          onClose={closeModal}
-          onSuccess={(msg) => {
-            showToast(msg, 'success');
-            fetchResources(false);
-          }}
-        />
-      )}
+        {/* GUI Secret Editor Modal (Decoded Plaintext Key-Values) */}
+        {modalMode === 'edit-secret' && selectedItem && (
+          <SecretEditorModal
+            item={selectedItem}
+            namespace={selectedItem.namespace || currentProject}
+            onClose={closeModal}
+            onSuccess={(msg) => {
+              showToast(msg, 'success');
+              fetchResources(false);
+            }}
+          />
+        )}
 
-      {/* GUI Secret Editor Modal (Decoded Plaintext Key-Values) */}
-      {modalMode === 'edit-secret' && selectedItem && (
-        <SecretEditorModal
-          item={selectedItem}
-          namespace={selectedItem.namespace || currentProject}
-          onClose={closeModal}
-          onSuccess={(msg) => {
-            showToast(msg, 'success');
-            fetchResources(false);
-          }}
-        />
-      )}
+        {/* PVC Storage Capacity Resize Modal */}
+        {modalMode === 'resize-pvc' && selectedItem && (
+          <ResizePvcModal
+            item={selectedItem}
+            namespace={selectedItem.namespace || currentProject}
+            onClose={closeModal}
+            onSuccess={(msg) => {
+              showToast(msg, 'success');
+              fetchResources(false);
+            }}
+          />
+        )}
 
-      {/* PVC Storage Capacity Resize Modal */}
-      {modalMode === 'resize-pvc' && selectedItem && (
-        <ResizePvcModal
-          item={selectedItem}
-          namespace={selectedItem.namespace || currentProject}
-          onClose={closeModal}
-          onSuccess={(msg) => {
-            showToast(msg, 'success');
-            fetchResources(false);
-          }}
-        />
-      )}
+        {/* CRD Custom Resource Instances Explorer & Editor Modal */}
+        {modalMode === 'crd-instances' && selectedItem && (
+          <CrdInstancesModal
+            crdItem={selectedItem}
+            namespace={currentProject}
+            onClose={closeModal}
+            onEditInstance={(inst) => openModal('edit-yaml', inst)}
+            onDescribeInstance={(inst) => openModal('describe', inst)}
+            onDeleteInstance={(inst) => openModal('delete', inst)}
+          />
+        )}
 
-      {/* CRD Custom Resource Instances Explorer & Editor Modal */}
-      {modalMode === 'crd-instances' && selectedItem && (
-        <CrdInstancesModal
-          crdItem={selectedItem}
-          namespace={currentProject}
-          onClose={closeModal}
-          onEditInstance={(inst) => openModal('edit-yaml', inst)}
-          onDescribeInstance={(inst) => openModal('describe', inst)}
-          onDeleteInstance={(inst) => openModal('delete', inst)}
-        />
-      )}
+        {/* Cluster Operator Live Events & Condition Transition Modal */}
+        {modalMode === 'operator-events' && selectedItem && (
+          <ClusterOperatorEventsModal
+            operatorItem={selectedItem}
+            onClose={closeModal}
+          />
+        )}
 
-      {/* Cluster Operator Live Events & Condition Transition Modal */}
-      {modalMode === 'operator-events' && selectedItem && (
-        <ClusterOperatorEventsModal
-          operatorItem={selectedItem}
-          onClose={closeModal}
-        />
-      )}
+        {/* ImageStream SemVer Tag Manager & Cleanup Wizard Modal */}
+        {modalMode === 'clean-is' && selectedItem && (
+          <ImageStreamModal
+            imageStream={selectedItem as ImageStreamResource}
+            namespace={selectedItem.namespace || currentProject}
+            onClose={closeModal}
+            onRefresh={() => fetchResources(false)}
+          />
+        )}
 
-      {/* ImageStream SemVer Tag Manager & Cleanup Wizard Modal */}
-      {modalMode === 'clean-is' && selectedItem && (
-        <ImageStreamModal
-          imageStream={selectedItem as ImageStreamResource}
-          namespace={selectedItem.namespace || currentProject}
-          onClose={closeModal}
-          onRefresh={() => fetchResources(false)}
-        />
-      )}
+        {/* OpenShift Integrated Registry Image & Blob Pruner Modal */}
+        {modalMode === 'prune-image-blobs' && (
+          <ImageRegistryPrunerModal
+            onClose={closeModal}
+            onRefresh={() => fetchResources(false)}
+          />
+        )}
 
-      {/* OpenShift Integrated Registry Image & Blob Pruner Modal */}
-      {modalMode === 'prune-image-blobs' && (
-        <ImageRegistryPrunerModal
-          onClose={closeModal}
-          onRefresh={() => fetchResources(false)}
-        />
-      )}
+        {/* Helm Release Manager Modal (Values Edit & Upgrade) */}
+        {modalMode === 'helm' && selectedItem && (
+          <HelmModal
+            release={selectedItem}
+            namespace={selectedItem.namespace || currentProject}
+            onClose={closeModal}
+            onRefresh={() => fetchResources(false)}
+          />
+        )}
 
-      {/* Helm Release Manager Modal (Values Edit & Upgrade) */}
-      {modalMode === 'helm' && selectedItem && (
-        <HelmModal
-          release={selectedItem}
-          namespace={selectedItem.namespace || currentProject}
-          onClose={closeModal}
-          onRefresh={() => fetchResources(false)}
-        />
-      )}
+        {/* Workload Action Dialogs (Scale, Restart, Delete) */}
+        {(modalMode === 'scale' || modalMode === 'restart' || modalMode === 'delete') && selectedItem && (
+          <ActionDialog
+            mode={modalMode}
+            item={selectedItem}
+            namespace={selectedItem.namespace || currentProject}
+            onClose={closeModal}
+            onSuccess={(msg) => {
+              closeModal();
+              showToast(msg, 'success');
+              fetchResources(false);
+            }}
+            onError={(msg) => {
+              closeModal();
+              showToast(msg, 'error');
+            }}
+          />
+        )}
 
-      {/* Workload Action Dialogs (Scale, Restart, Delete) */}
-      {(modalMode === 'scale' || modalMode === 'restart' || modalMode === 'delete') && selectedItem && (
-        <ActionDialog
-          mode={modalMode}
-          item={selectedItem}
-          namespace={selectedItem.namespace || currentProject}
-          onClose={closeModal}
-          onSuccess={(msg) => {
-            closeModal();
-            showToast(msg, 'success');
-            fetchResources(false);
-          }}
-          onError={(msg) => {
-            closeModal();
-            showToast(msg, 'error');
-          }}
-        />
-      )}
+        {/* Keyboard Shortcuts & Help Modal */}
+        {modalMode === 'help' && (
+          <HelpModal onClose={closeModal} />
+        )}
 
-      {/* Keyboard Shortcuts & Help Modal */}
-      {modalMode === 'help' && (
-        <HelpModal onClose={closeModal} />
-      )}
-
-      {/* Themed Batch Delete Confirmation Modal */}
-      {batchDeleteModalOpen && (
-        <BatchDeleteModal
-          items={resources.filter((r) => selectedPodIds.has(r.id))}
-          namespace={currentProject}
-          onClose={() => setBatchDeleteModalOpen(false)}
-          onSuccess={(msg) => {
-            setBatchDeleteModalOpen(false);
-            showToast(msg, 'success');
-            setSelectedPodIds(new Set());
-            fetchResources(false);
-          }}
-          onError={(msg) => {
-            setBatchDeleteModalOpen(false);
-            showToast(msg, 'error');
-          }}
-        />
-      )}
+        {/* Themed Batch Delete Confirmation Modal */}
+        {batchDeleteModalOpen && (
+          <BatchDeleteModal
+            items={resources.filter((r) => selectedPodIds.has(r.id))}
+            namespace={currentProject}
+            onClose={() => setBatchDeleteModalOpen(false)}
+            onSuccess={(msg) => {
+              setBatchDeleteModalOpen(false);
+              showToast(msg, 'success');
+              setSelectedPodIds(new Set());
+              fetchResources(false);
+            }}
+            onError={(msg) => {
+              setBatchDeleteModalOpen(false);
+              showToast(msg, 'error');
+            }}
+          />
+        )}
+      </Suspense>
     </div>
   );
 };

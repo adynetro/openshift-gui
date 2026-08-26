@@ -53,6 +53,9 @@ export const LogViewer: React.FC<LogViewerProps> = ({ item, namespace, onClose }
   const [selectedContainer, setSelectedContainer] = useState<string>('');
   const [copied, setCopied] = useState<boolean>(false);
 
+  const isPausedRef = useRef<boolean>(isPaused);
+  isPausedRef.current = isPaused;
+
   const terminalEndRef = useRef<HTMLDivElement | null>(null);
   const streamIdRef = useRef<string | null>(null);
 
@@ -80,12 +83,17 @@ export const LogViewer: React.FC<LogViewerProps> = ({ item, namespace, onClose }
         );
         streamIdRef.current = streamId;
 
-        unlisten = (window as any).electronAPI.onLogLine((data: { streamId: string; line: LogEntry }) => {
-          if (data.streamId === streamId && !isPaused) {
+        unlisten = (window as any).electronAPI.onLogLine((data: { streamId: string; line?: LogEntry; lines?: LogEntry[] }) => {
+          if (data.streamId === streamId && !isPausedRef.current) {
+            const incoming = data.lines || (data.line ? [data.line] : []);
+            if (incoming.length === 0) return;
+
             setLogs((prev) => {
-              const next = [...prev, data.line];
-              if (next.length > 2500) next.shift();
-              return next;
+              const combined = prev.length === 0 ? incoming : prev.concat(incoming);
+              if (combined.length > 2500) {
+                return combined.slice(-2500);
+              }
+              return combined;
             });
           }
         });
@@ -102,11 +110,11 @@ export const LogViewer: React.FC<LogViewerProps> = ({ item, namespace, onClose }
         (window as any).electronAPI.stopLogStream(streamIdRef.current);
       }
     };
-  }, [item.name, item.kind, namespace, selectedContainer, isPaused]);
+  }, [item.name, item.kind, namespace, selectedContainer]);
 
   useEffect(() => {
     if (autoScroll && terminalEndRef.current) {
-      terminalEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      terminalEndRef.current.scrollIntoView({ behavior: 'auto' });
     }
   }, [logs, autoScroll]);
 

@@ -10,6 +10,10 @@ export interface LogEntry {
   raw: string;
 }
 
+// Pre-compiled regex patterns to avoid per-line instantiation
+const PREFIX_REGEX = /^\[pod\/([^/\]]+)(?:\/([^\]]+))?\]\s*(.*)$/;
+const TIMESTAMP_REGEX = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z)\s+(.*)$/;
+
 export class LogStreamer extends EventEmitter {
   private process: ChildProcess | null = null;
   private logs: LogEntry[] = [];
@@ -111,7 +115,10 @@ export class LogStreamer extends EventEmitter {
       const lines = text.split('\n');
       partialLine = lines.pop() || '';
 
-      for (const line of lines) {
+      const batch: LogEntry[] = [];
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
         if (!line.trim()) continue;
 
         // Filter out CLI deprecation warning noise
@@ -125,8 +132,7 @@ export class LogStreamer extends EventEmitter {
         let content = line;
 
         // 1. Parse multi-pod prefix [pod/<podName>/<containerName>] or [pod/<podName>]
-        const prefixRegex = /^\[pod\/([^/\]]+)(?:\/([^\]]+))?\]\s*(.*)$/;
-        const prefixMatch = content.match(prefixRegex);
+        const prefixMatch = content.match(PREFIX_REGEX);
         if (prefixMatch) {
           pod = prefixMatch[1];
           container = prefixMatch[2];
@@ -134,7 +140,7 @@ export class LogStreamer extends EventEmitter {
         }
 
         // 2. Parse RFC3339 timestamp if present (e.g. 2026-08-24T12:00:00.123456789Z)
-        const tsMatch = content.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z)\s+(.*)$/);
+        const tsMatch = content.match(TIMESTAMP_REGEX);
         if (tsMatch) {
           timestamp = tsMatch[1];
           content = tsMatch[2];
@@ -148,15 +154,19 @@ export class LogStreamer extends EventEmitter {
           raw: content,
         };
 
+        batch.push(entry);
         this.logs.push(entry);
-        if (this.logs.length > this.maxLines) {
-          this.logs.shift();
-        }
-
         this.emit('line', entry);
       }
 
-      this.emit('update', [...this.logs]);
+      if (batch.length > 0) {
+        this.emit('lines', batch);
+      }
+
+      // Bulk trim to avoid O(N) array shifts per line
+      if (this.logs.length > this.maxLines + 200) {
+        this.logs = this.logs.slice(-this.maxLines);
+      }
     };
 
     this.process.stdout?.on('data', handleData);

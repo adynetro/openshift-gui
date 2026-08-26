@@ -26,6 +26,16 @@
   },
   "linux": {
     "icon": "build/icon.png",
+    "target": [
+      {
+        "target": "tar.gz",
+        "arch": ["x64", "arm64"]
+      },
+      {
+        "target": "zip",
+        "arch": ["x64", "arm64"]
+      }
+    ],
     "category": "Development"
   },
   "win": {

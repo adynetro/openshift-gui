@@ -145,10 +145,34 @@ export function registerIpcHandlers(mainWindow: electron.BrowserWindow): void {
     const streamId = `${namespace}/${kind}/${targetName}/${container || 'all'}-${Date.now()}`;
     const streamer = new LogStreamer(targetName, namespace, kind, container, 250);
 
-    streamer.on('line', (entry: LogEntry) => {
-      if (!mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('logs:line', { streamId, line: entry });
+    let pendingLines: LogEntry[] = [];
+    let flushTimer: NodeJS.Timeout | null = null;
+
+    const flushLogs = () => {
+      if (flushTimer) {
+        clearTimeout(flushTimer);
+        flushTimer = null;
       }
+      if (pendingLines.length > 0 && !mainWindow.isDestroyed()) {
+        const batch = pendingLines;
+        pendingLines = [];
+        mainWindow.webContents.send('logs:line', { streamId, lines: batch });
+      }
+    };
+
+    streamer.on('lines', (batch: LogEntry[]) => {
+      for (let i = 0; i < batch.length; i++) {
+        pendingLines.push(batch[i]);
+      }
+      if (pendingLines.length >= 40) {
+        flushLogs();
+      } else if (!flushTimer) {
+        flushTimer = setTimeout(flushLogs, 25);
+      }
+    });
+
+    streamer.on('end', () => {
+      flushLogs();
     });
 
     streamer.start();

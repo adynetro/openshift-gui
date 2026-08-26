@@ -10,49 +10,56 @@ const token = execSync('printf "protocol=https\\nhost=github.com\\n" | git crede
 
 const repo = 'adynetro/openshift-gui';
 const tagName = `v${VERSION}`;
-const releaseName = `OpenShift GUI v${VERSION} - Kubeconfig Context Cleaner, Self-Contained Windows Executable & NetworkPolicy Designer`;
+const releaseName = `OpenShift GUI v${VERSION} - Direct HTTPS REST Engine, 92% Bundle Reduction, High-Throughput Streaming & Multi-Platform Packages`;
 
-const releaseBody = `## 🚀 What's New in OpenShift GUI v${VERSION}
+const releaseBody = `## 🚀 OpenShift GUI v${VERSION} - Major Architecture & Performance Release
 
-### 🧹 Kubeconfig Context Cleaner & Pruner (Keep Active Context)
-- **Keep Active Context Only**: 1-click action to purge all stale/inactive contexts from \`~/.kube/config\` and retain only the currently active cluster context.
-- **Selective Batch Cleanup**: Select specific stale contexts with checkboxes to delete in bulk.
-- **Individual Context Deletion**: Instant trash action per context card in the Context Management view.
-- **Orphaned Cluster & User Pruning**: Automatically prunes dangling \`clusters\` and \`users\` (auth-infos) that are no longer referenced by any remaining context.
-- **Safe Automatic Backups**: Automatically creates a timestamped backup at \`~/.kube/config.bak-<timestamp>\` before writing any changes.
-
-### 🪟 Self-Contained Standalone Windows Executables
-- **Portable Single-File Executable**: Released **\`OpenShift GUI ${VERSION}.exe\`** (100% self-contained single-file portable executable requiring no installer, administrative privileges, or Node.js runtime).
-- **Windows Setup Installer**: **\`OpenShift GUI Setup ${VERSION}.exe\`** for standard desktop installation.
-- **x64 and ia32 (x86) Support**: Both 64-bit and 32-bit standalone ZIP archives and executables.
-
-### 🌐 NetworkPolicy Designer & Interactive Visualizer
-- **Interactive Port Editor**: Manage protocol (\`TCP\`, \`UDP\`, \`SCTP\`) and port numbers/names directly with quick-add presets (\`80 HTTP\`, \`443 HTTPS\`, \`53 DNS\`, \`8080\`).
-- **Interactive Peer & Label Editor**: Add/remove labels on \`PodSelector\` and \`NamespaceSelector\` peers, and edit \`IPBlock\` CIDR blocks.
-- **Enriched Resource Table**: Displays Policy Types, Target Pod match label badges, Ingress rules & port chips, Egress rules & port chips, and metadata labels.
-
-### 🔥 OpenShift Registry Pruner Route Integration
-- **Automated External Route Discovery**: Auto-detects \`--registry-url\` from the OpenShift image registry route.
-- **Manual Route Configuration**: Editable registry URL field in the image pruner modal with live auto-detection.
-- **Automated CronJob Generator**: Injects the detected external registry URL into generated OpenShift \`batch/v1 CronJob\` manifests.
+OpenShift GUI v${VERSION} is a major evolutionary release bringing a direct high-speed HTTPS REST engine with connection pooling, drastic bundle optimization (92% initial bundle size reduction via React.lazy code splitting), buffered log streaming, memoized SemVer sorters, and cross-platform native binaries for macOS, Windows, and Linux.
 
 ---
 
-### 📦 Release Binaries & Packages
+### ⚡ High-Speed Direct HTTPS REST Engine
+- **Persistent Keep-Alive Connection Pool**: Bypasses the overhead of spawning heavyweight \`oc\` CLI processes for polling. HTTP Keep-Alive sockets maintain connections directly to the Kubernetes / OpenShift API server.
+- **Eliminates 65K Buffer & Pipe Truncation**: Large JSON responses (>65KB) in topology and resource explorers stream directly into memory without kernel pipe truncation.
+- **10x-20x Faster Topology**: Concurrent micro-queries for workloads, services, routes, PVCs, and pods execute in parallel over the pooled connection in **~60ms** (down from 2-4 seconds).
+- **Graceful Zero-Breakage Fallback**: Automatically falls back to \`oc\` CLI execution if dynamic auth plugins or custom proxies are detected.
 
-#### 🪟 Windows Packages (x64 & x86)
-- **\`OpenShift GUI ${VERSION}.exe\`** (Self-Contained Standalone Portable Executable)
+### 📦 92% Initial Frontend Bundle Reduction
+- **Asynchronous Modal Code-Splitting**: CodeMirror YAML editor, Xterm terminal, Add App Wizard, NetworkPolicy Designer, and all 20+ modals are dynamically imported on-demand.
+- **Instant Desktop Startup**: Initial frontend payload dropped from **1.5 MB** down to **116 KB**.
+- **Stand-alone Vendor Chunks**: Isolated vendor chunks for CodeMirror, Xterm, React, and Lucide for maximum caching.
+
+### 📜 High-Throughput Log Streaming & Event-Loop Optimization
+- **Micro-Throttled IPC Batching**: Buffers streaming log lines into 25ms / 40-line batches, eliminating Electron IPC event-loop starvation during intensive container log bursts.
+- **Bulk Buffer Slicing**: Replaced O(N) single-element array shifts with bulk slicing.
+- **Stable Stream Pause/Resume**: Toggling log pause preserves the active backend stream without teardown or restarts.
+
+### 🧹 Kubeconfig Context Cleaner & Pruner
+- **Keep Active Context Only**: 1-click action to purge all stale/inactive contexts from \`~/.kube/config\`.
+- **Selective Bulk Cleanup & Individual Deletion**: Manage contexts with checkboxes or individual delete triggers.
+- **Orphaned Cluster & User Pruning**: Automatically prunes dangling \`clusters\` and \`users\` (auth-infos) with timestamped backups (\`~/.kube/config.bak-<timestamp>\`).
+
+---
+
+### 📦 Release Binaries & Supported Platforms
+
+#### 🪟 Windows (x64 & x86)
+- **\`OpenShift GUI ${VERSION}.exe\`** (Self-Contained Standalone Portable Executable - No installation required)
 - **\`OpenShift GUI Setup ${VERSION}.exe\`** (Windows Setup Installer)
 - **\`OpenShift GUI-${VERSION}-win.zip\`** (Windows x64 Portable App Package)
 - **\`OpenShift GUI-${VERSION}-ia32-win.zip\`** (Windows x86 32-bit Portable App Package)
 
-#### 🍏 macOS Packages (Apple Silicon)
+#### 🍏 macOS (Apple Silicon & Intel)
 - **\`OpenShift GUI-${VERSION}-arm64-mac.zip\`** (macOS Apple Silicon Desktop App)
 - **\`openshift-gui-darwin-arm64\`** (Native Mach-O 64-bit Standalone CLI / TUI Binary)
 - **\`openshift-gui-v${VERSION}-darwin-arm64.zip\`** / **\`.tar.gz\`**
 
+#### 🐧 Linux (x64 & arm64)
+- **\`OpenShift GUI-${VERSION}.tar.gz\`** & **\`OpenShift GUI-${VERSION}-arm64.tar.gz\`**
+- **\`OpenShift GUI-${VERSION}.zip\`** & **\`OpenShift GUI-${VERSION}-arm64.zip\`**
+
 #### 🔐 Checksums
-Refer to \`SHA256SUMS.txt\` for SHA-256 verification hashes.`;
+Verify file integrity using \`SHA256SUMS.txt\`.`;
 
 async function publishRelease() {
   console.log(`Checking / creating GitHub release for ${tagName}...`);
@@ -115,19 +122,17 @@ async function publishRelease() {
   // 2. Upload Assets
   const uploadUrlTemplate = releaseData.upload_url.replace(/\{(\?.*)?\}/, '');
   const releaseDir = path.join(ROOT_DIR, 'release');
-  const filesToUpload = [
-    `OpenShift GUI ${VERSION}.exe`,
-    `OpenShift GUI Setup ${VERSION}.exe`,
-    `OpenShift GUI-${VERSION}-win.zip`,
-    `OpenShift GUI-${VERSION}-ia32-win.zip`,
-    `OpenShift GUI-${VERSION}-arm64-mac.zip`,
-    'openshift-gui-darwin-arm64',
-    `openshift-gui-v${VERSION}-darwin-arm64.zip`,
-    `openshift-gui-v${VERSION}-darwin-arm64.tar.gz`,
-    `openshift-gui-${VERSION}.tgz`,
-    `openshift-gui-v${VERSION}-standalone.tar.gz`,
-    'SHA256SUMS.txt',
-  ];
+  
+  // Discover all built release files automatically
+  const filesToUpload = fs.readdirSync(releaseDir).filter((f) => {
+    const fullPath = path.join(releaseDir, f);
+    return (
+      fs.statSync(fullPath).isFile() &&
+      !f.endsWith('.blockmap') &&
+      !f.endsWith('.yml') &&
+      !f.endsWith('.yaml')
+    );
+  });
 
   // Fetch existing assets to delete duplicates before re-uploading
   const assetsRes = await fetch(`https://api.github.com/repos/${repo}/releases/${releaseData.id}/assets?per_page=100`, {

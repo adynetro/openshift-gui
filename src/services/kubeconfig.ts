@@ -9,15 +9,22 @@ import { getExecEnv } from './oc-client.js';
 
 const execAsync = promisify(exec);
 
+let cachedKubePath: string | null = null;
+
 export class KubeConfigService {
   /**
    * Finds the exact path to kubeconfig file.
    */
   static getKubeconfigPath(): string {
+    if (cachedKubePath && fs.existsSync(cachedKubePath)) {
+      return cachedKubePath;
+    }
+
     const rawEnv = process.env['KUBECONFIG'];
     if (rawEnv) {
       const first = rawEnv.split(':')[0];
       if (first && fs.existsSync(first)) {
+        cachedKubePath = first;
         return first;
       }
     }
@@ -26,16 +33,18 @@ export class KubeConfigService {
     const candidatePaths = [
       path.join(home, '.kube', 'config'),
       path.join('/Users', os.userInfo().username, '.kube', 'config'),
-      '/Users/alexandru.chiscari/.kube/config',
     ];
 
     for (const p of candidatePaths) {
       if (fs.existsSync(p)) {
+        cachedKubePath = p;
         return p;
       }
     }
 
-    return path.join(home, '.kube', 'config');
+    const defaultPath = path.join(home, '.kube', 'config');
+    cachedKubePath = defaultPath;
+    return defaultPath;
   }
 
   /**
@@ -103,11 +112,89 @@ export class KubeConfigService {
       await execAsync(`oc config use-context "${contextName}"`, {
         env: getExecEnv(),
       });
+      // Invalidate cached config and connection pool
+      try {
+        const { KubeHttpClient } = await import('./kube-http-client.js');
+        KubeHttpClient.reset();
+      } catch {}
       return true;
     } catch (error) {
       console.error('Failed to switch context:', error);
       return false;
     }
+  }
+
+  /**
+   * Reads raw connection details for the active cluster and user from kubeconfig.
+   */
+  static async getActiveClusterConfig(): Promise<{
+    server: string;
+    caData?: string;
+    caFile?: string;
+    insecureSkipTlsVerify?: boolean;
+    token?: string;
+    clientCertData?: string;
+    clientCertFile?: string;
+    clientKeyData?: string;
+    clientKeyFile?: string;
+    namespace?: string;
+  } | null> {
+    const kubePath = this.getKubeconfigPath();
+    let config: any = null;
+
+    if (fs.existsSync(kubePath)) {
+      try {
+        const fileContent = fs.readFileSync(kubePath, 'utf8');
+        config = parseYaml(fileContent);
+      } catch {}
+    }
+
+    if (!config) {
+      try {
+        const { stdout } = await execAsync('oc config view --raw -o json', {
+          env: getExecEnv(),
+          maxBuffer: 20 * 1024 * 1024,
+        });
+        if (stdout.trim()) {
+          config = JSON.parse(stdout);
+        }
+      } catch {}
+    }
+
+    if (!config) return null;
+
+    const current = config['current-context'];
+    if (!current) return null;
+
+    const ctxObj = (config.contexts || []).find((c: any) => c.name === current)?.context;
+    if (!ctxObj) return null;
+
+    const clusterObj = (config.clusters || []).find((c: any) => c.name === ctxObj.cluster)?.cluster;
+    const userObj = (config.users || []).find((u: any) => u.name === ctxObj.user)?.user;
+
+    if (!clusterObj || !clusterObj.server) return null;
+
+    let token = userObj?.token;
+    if (!token && !userObj?.['client-certificate-data'] && !userObj?.['client-certificate']) {
+      // Fast fallback to oc whoami -t if token is managed dynamically
+      try {
+        const { stdout } = await execAsync('oc whoami -t', { env: getExecEnv(), timeout: 5000 });
+        if (stdout.trim()) token = stdout.trim();
+      } catch {}
+    }
+
+    return {
+      server: clusterObj.server,
+      caData: clusterObj['certificate-authority-data'],
+      caFile: clusterObj['certificate-authority'],
+      insecureSkipTlsVerify: !!clusterObj['insecure-skip-tls-verify'],
+      token,
+      clientCertData: userObj?.['client-certificate-data'],
+      clientCertFile: userObj?.['client-certificate'],
+      clientKeyData: userObj?.['client-key-data'],
+      clientKeyFile: userObj?.['client-key'],
+      namespace: ctxObj.namespace || 'default',
+    };
   }
 
   /**
@@ -126,19 +213,36 @@ export class KubeConfigService {
 
     let projectList: ProjectInfo[] = [];
 
-    // Strategy 1: oc get projects -o json
+    // Strategy 0: Direct High-Speed HTTPS REST API (20ms)
     try {
-      const { stdout } = await execAsync('oc get projects -o json', { env: getExecEnv(), maxBuffer: 15 * 1024 * 1024 });
-      const data = JSON.parse(stdout);
-      if (data && Array.isArray(data.items) && data.items.length > 0) {
-        projectList = data.items.map((item: any) => ({
+      const { KubeHttpClient } = await import('./kube-http-client.js');
+      const projectRes = await KubeHttpClient.getResourceList('projects');
+      const items = projectRes.items && projectRes.items.length > 0 ? projectRes.items : (await KubeHttpClient.getResourceList('namespaces')).items;
+      if (items && items.length > 0) {
+        projectList = items.map((item: any) => ({
           name: item.metadata?.name,
           displayName: item.metadata?.annotations?.['openshift.io/display-name'] || item.metadata?.name,
           status: item.status?.phase || 'Active',
           isCurrent: item.metadata?.name === currentNs,
         }));
       }
-    } catch (e) {}
+    } catch {}
+
+    // Strategy 1: oc get projects -o json
+    if (projectList.length === 0) {
+      try {
+        const { stdout } = await execAsync('oc get projects -o json', { env: getExecEnv(), maxBuffer: 15 * 1024 * 1024 });
+        const data = JSON.parse(stdout);
+        if (data && Array.isArray(data.items) && data.items.length > 0) {
+          projectList = data.items.map((item: any) => ({
+            name: item.metadata?.name,
+            displayName: item.metadata?.annotations?.['openshift.io/display-name'] || item.metadata?.name,
+            status: item.status?.phase || 'Active',
+            isCurrent: item.metadata?.name === currentNs,
+          }));
+        }
+      } catch (e) {}
+    }
 
     // Strategy 2: oc projects -q
     if (projectList.length === 0) {
@@ -229,19 +333,19 @@ export class KubeConfigService {
    * Gets cluster metadata.
    */
   static async getClusterInfo(): Promise<ClusterInfo> {
-    const { contexts, currentContext } = await this.getContexts();
-    const active = contexts.find((c) => c.isCurrent || c.name === currentContext);
-    const ns = await this.getCurrentNamespace();
+    const [contextResult, ns, whoamiResult] = await Promise.all([
+      this.getContexts(),
+      this.getCurrentNamespace(),
+      execAsync('oc whoami', { env: getExecEnv() }).catch(() => ({ stdout: '' })),
+    ]);
 
-    let clusterUser = active?.user || '';
-    try {
-      const { stdout } = await execAsync('oc whoami', { env: getExecEnv() });
-      if (stdout.trim()) clusterUser = stdout.trim();
-    } catch (e) {}
+    const { contexts, currentContext } = contextResult;
+    const active = contexts.find((c) => c.isCurrent || c.name === currentContext);
+    const clusterUser = whoamiResult.stdout?.trim() || active?.user || 'Unknown User';
 
     return {
       server: active?.cluster || 'Unknown Cluster',
-      user: clusterUser || active?.user || 'Unknown User',
+      user: clusterUser,
       context: currentContext || 'None',
       namespace: ns || 'all-projects',
       connected: !!currentContext,

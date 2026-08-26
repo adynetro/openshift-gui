@@ -78,11 +78,11 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
           setError(res.error);
         } else if (res.data) {
           setData(res.data);
-          // Keep selected node updated with fresh live state
-          if (selectedNode) {
-            const fresh = res.data.workloads.find((w: TopologyNode) => w.id === selectedNode.id);
-            if (fresh) setSelectedNode(fresh);
-          }
+          // Keep selected node updated with fresh live state without re-triggering callback recreations
+          setSelectedNode((curr) => {
+            if (!curr) return null;
+            return res.data.workloads.find((w: TopologyNode) => w.id === curr.id) || curr;
+          });
         }
       } catch (err: any) {
         if (!isBackground) setError(err.message || 'Failed to fetch topology data');
@@ -90,7 +90,7 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
         if (!isBackground) setLoading(false);
       }
     },
-    [currentProject, selectedNode]
+    [currentProject]
   );
 
   useEffect(() => {

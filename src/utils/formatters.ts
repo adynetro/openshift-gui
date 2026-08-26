@@ -1,55 +1,88 @@
+const EXACT_STATUS_COLORS: Record<string, 'green' | 'red' | 'yellow' | 'blue' | 'gray'> = {
+  running: 'green',
+  active: 'green',
+  ready: 'green',
+  deployed: 'green',
+  completed: 'green',
+  success: 'green',
+  succeeded: 'green',
+  normal: 'green',
+  admitted: 'green',
+  bound: 'blue',
+  pending: 'yellow',
+  waiting: 'yellow',
+  terminating: 'yellow',
+  warning: 'yellow',
+  init: 'yellow',
+  degraded: 'yellow',
+  superseded: 'yellow',
+  crashloopbackoff: 'red',
+  error: 'red',
+  failed: 'red',
+  unhealthy: 'red',
+  notready: 'red',
+  unknown: 'red',
+  evicted: 'red',
+};
+
+const BYTE_SIZES = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+const LN1024 = Math.log(1024);
+
 export function formatAge(dateStringOrSeconds: string | Date | number | undefined): string {
   if (!dateStringOrSeconds) return '-';
   
-  let date: Date;
+  let timeMs: number;
   if (typeof dateStringOrSeconds === 'number') {
-    date = new Date(dateStringOrSeconds);
+    timeMs = dateStringOrSeconds;
   } else if (typeof dateStringOrSeconds === 'string') {
-    date = new Date(dateStringOrSeconds);
+    timeMs = Date.parse(dateStringOrSeconds);
+  } else if (dateStringOrSeconds instanceof Date) {
+    timeMs = dateStringOrSeconds.getTime();
   } else {
-    date = dateStringOrSeconds;
+    return '-';
   }
 
-  if (isNaN(date.getTime())) return '-';
+  if (isNaN(timeMs) || timeMs <= 0) return '-';
 
-  const diffMs = Date.now() - date.getTime();
+  const diffMs = Date.now() - timeMs;
   if (diffMs < 0) return '0s';
 
-  const diffSeconds = Math.floor(diffMs / 1000);
+  const diffSeconds = (diffMs / 1000) | 0;
   if (diffSeconds < 60) return `${diffSeconds}s`;
 
-  const diffMinutes = Math.floor(diffSeconds / 60);
+  const diffMinutes = (diffSeconds / 60) | 0;
   if (diffMinutes < 60) return `${diffMinutes}m`;
 
-  const diffHours = Math.floor(diffMinutes / 60);
+  const diffHours = (diffMinutes / 60) | 0;
   if (diffHours < 24) return `${diffHours}h`;
 
-  const diffDays = Math.floor(diffHours / 24);
+  const diffDays = (diffHours / 24) | 0;
   if (diffDays < 7) return `${diffDays}d`;
 
-  const diffWeeks = Math.floor(diffDays / 7);
+  const diffWeeks = (diffDays / 7) | 0;
   if (diffWeeks < 52) return `${diffWeeks}w`;
 
-  const diffYears = Math.floor(diffDays / 365);
+  const diffYears = (diffDays / 365) | 0;
   return `${diffYears}y`;
 }
 
 export function formatBytes(bytes?: number): string {
   if (bytes === undefined || bytes === null || isNaN(bytes)) return '-';
   if (bytes === 0) return '0 B';
+  if (bytes < 0) return '-';
 
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  const i = Math.min(Math.floor(Math.log(bytes) / LN1024), BYTE_SIZES.length - 1);
+  const val = bytes / Math.pow(1024, i);
 
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+  return `${Number(val.toFixed(1))} ${BYTE_SIZES[i]}`;
 }
 
 export function getStatusColor(status: string): 'green' | 'red' | 'yellow' | 'blue' | 'gray' | 'magenta' | 'cyan' {
-  const s = (status || '').toLowerCase();
-  if (s === 'running' || s === 'active' || s === 'ready' || s === 'deployed' || s === 'completed' || s === 'success') {
-    return 'green';
-  }
+  if (!status) return 'gray';
+  const s = status.toLowerCase();
+  const direct = EXACT_STATUS_COLORS[s];
+  if (direct) return direct;
+
   if (s.includes('crash') || s.includes('error') || s.includes('failed') || s.includes('unhealthy') || s.includes('unknown') || s.includes('evicted')) {
     return 'red';
   }
@@ -71,5 +104,5 @@ export function truncate(str: string, maxLength: number): string {
 export function padRight(str: string, length: number): string {
   const s = str || '';
   if (s.length >= length) return s.slice(0, length);
-  return s + ' '.repeat(length - s.length);
+  return s.padEnd(length, ' ');
 }
