@@ -10,6 +10,8 @@ export interface IpcApi {
   switchProject: (projectName: string) => Promise<boolean>;
   getClusterInfo: () => Promise<any>;
   getResources: (kind: string, namespace: string) => Promise<{ items: any[]; error?: string; isUnauthorized?: boolean }>;
+  getResourceCounts: (namespace: string) => Promise<Record<string, number>>;
+  preloadAllResources: (namespace: string, activeKind?: string) => Promise<{ activeResources: any; topologyData?: any; counts: Record<string, number> }>;
   describeResource: (kind: string, name: string, namespace: string) => Promise<string>;
   getYaml: (kind: string, name: string, namespace: string) => Promise<string>;
   applyYaml: (yamlContent: string, namespace: string) => Promise<{ success: boolean; message: string }>;
@@ -92,6 +94,8 @@ const api: IpcApi = {
   switchProject: (proj) => ipcRenderer.invoke('kube:switchProject', proj),
   getClusterInfo: () => ipcRenderer.invoke('kube:getClusterInfo'),
   getResources: (kind, ns) => ipcRenderer.invoke('kube:getResources', kind, ns),
+  getResourceCounts: (ns) => ipcRenderer.invoke('kube:getResourceCounts', ns),
+  preloadAllResources: (ns, activeKind) => ipcRenderer.invoke('kube:preloadAllResources', ns, activeKind),
   describeResource: (kind, name, ns) => ipcRenderer.invoke('kube:describeResource', kind, name, ns),
   getYaml: (kind, name, ns) => ipcRenderer.invoke('kube:getYaml', kind, name, ns),
   applyYaml: (yaml, ns) => ipcRenderer.invoke('kube:applyYaml', yaml, ns),

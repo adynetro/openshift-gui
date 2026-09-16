@@ -27,6 +27,7 @@ const BatchDeleteModal = lazy(() => import('./components/BatchDeleteModal.js').t
 const ImageRegistryPrunerModal = lazy(() => import('./components/ImageRegistryPrunerModal.js').then((m) => ({ default: m.ImageRegistryPrunerModal })));
 
 import { ResourceKind, ResourceItem, KubeContext, ServerInfo, ProjectInfo, ImageStreamResource } from '../types/k8s.js';
+import { PreloaderAnimation, PreloadStep } from './components/PreloaderAnimation.js';
 import { FuzzyMatcher } from '../utils/fuzzy.js';
 import { CheckCircle2, AlertTriangle } from 'lucide-react';
 
@@ -84,6 +85,28 @@ export const App: React.FC = () => {
   const [statusNotification, setStatusNotification] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [selectedPodIds, setSelectedPodIds] = useState<Set<string>>(new Set());
   const [batchDeleteModalOpen, setBatchDeleteModalOpen] = useState<boolean>(false);
+  const [topologyPreloadData, setTopologyPreloadData] = useState<any>(null);
+
+  // High-Tech Preloader Animation State for smooth context & project switches
+  const [preloaderState, setPreloaderState] = useState<{
+    isActive: boolean;
+    mode: 'context' | 'project' | 'initial';
+    title: string;
+    subtitle?: string;
+    target: string;
+    subTarget?: string;
+    progress: number;
+    currentStage: string;
+    steps: PreloadStep[];
+  }>({
+    isActive: false,
+    mode: 'context',
+    title: '',
+    target: '',
+    progress: 0,
+    currentStage: '',
+    steps: [],
+  });
 
   // Modal Navigation Stack for deep child modal back navigation
   const [modalMode, setModalMode] = useState<ModalMode>('none');
@@ -136,13 +159,13 @@ export const App: React.FC = () => {
       const projList = await api.getProjects();
       setProjects(projList || []);
 
-      if (preferredProject !== undefined) {
-        setCurrentProject(preferredProject);
-      } else {
-        const currNs = info?.namespace || (await api.getCurrentNamespace()) || 'all-projects';
-        if (currNs) {
-          setCurrentProject(currNs);
-        }
+      const targetNs = preferredProject !== undefined ? preferredProject : (info?.namespace || (await api.getCurrentNamespace()) || 'all-projects');
+      if (targetNs) {
+        setCurrentProject(targetNs);
+        // Preload sidebar badge counts in background
+        api.getResourceCounts(targetNs).then((c: any) => {
+          if (c) setCounts((prev) => ({ ...prev, ...c }));
+        }).catch(() => {});
       }
     } catch (e) {
       console.error('Error in loadKubeInfo:', e);
@@ -297,81 +320,248 @@ export const App: React.FC = () => {
     setBatchDeleteModalOpen(true);
   };
 
-  // Handle Switch Context & Server with automatic project refresh
+  // Handle Switch Context & Server with automatic data preloading & live loading animation
   const handleSwitchContext = async (contextName: string) => {
     closeModal();
     const api = (window as any).electronAPI;
     if (!api) return;
 
+    const initialSteps: PreloadStep[] = [
+      { id: 'auth', label: 'Cluster API Handshake', status: 'in-progress' },
+      { id: 'projects', label: 'Projects & Namespaces', status: 'pending' },
+      { id: 'workloads', label: 'Workload Manifests', status: 'pending' },
+      { id: 'networking', label: 'Networking & Storage', status: 'pending' },
+      { id: 'active', label: 'Receiving Target Objects', status: 'pending' },
+    ];
+
+    setPreloaderState({
+      isActive: true,
+      mode: 'context',
+      title: 'Switching Server Context',
+      subtitle: 'Connecting to cluster and preloading manifests...',
+      target: contextName,
+      subTarget: '',
+      progress: 15,
+      currentStage: 'Connecting to cluster API server...',
+      steps: initialSteps,
+    });
+    setLoading(true);
+
     try {
-      setLoading(true);
+      // 1. Switch context in kubeconfig / cluster client
       const ok = await api.switchContext(contextName);
-      if (ok) {
-        setCurrentContext(contextName);
-
-        // 1. Fetch cluster info for the new server
-        const info = await api.getClusterInfo();
-        setClusterInfo(info);
-
-        // 2. Refresh project list for the new server
-        const projList = await api.getProjects();
-        setProjects(projList || []);
-
-        // 3. Set active project for the new server
-        const newNs = info?.namespace || (await api.getCurrentNamespace()) || 'all-projects';
-        setCurrentProject(newNs);
-
-        // 4. Reset table state, search query, and selections
-        setSelectedItem(null);
-        setSelectedPodIds(new Set());
-        setCounts({});
-        setResources([]);
-
-        showToast(`Switched server to ${info?.server || contextName}`);
-
-        // 5. Fetch resources for the new server and new project
-        if (currentKind !== 'topology') {
-          try {
-            const res = await api.getResources(currentKind, newNs);
-            if (res && res.items) {
-              setResources(res.items);
-              setCounts((prev) => ({ ...prev, [currentKind]: res.items.length }));
-              setFetchError(res.error || null);
-              setIsUnauthorized(!!res.isUnauthorized);
-            } else if (Array.isArray(res)) {
-              setResources(res);
-              setCounts((prev) => ({ ...prev, [currentKind]: res.length }));
-              setFetchError(null);
-              setIsUnauthorized(false);
-            }
-          } catch (err: any) {
-            setFetchError(err.message || 'Failed to fetch resources');
-          }
-        }
-
-        // Full kube info sync in background
-        loadKubeInfo(newNs);
-      } else {
-        showToast(`Failed to switch context to ${contextName}`, 'error');
+      if (!ok) {
+        throw new Error(`Failed to switch context to ${contextName}`);
       }
+
+      setCurrentContext(contextName);
+      setPreloaderState((prev) => ({
+        ...prev,
+        progress: 35,
+        currentStage: 'Discovering cluster projects & metadata...',
+        steps: prev.steps.map((s) =>
+          s.id === 'auth' ? { ...s, status: 'completed' } : s.id === 'projects' ? { ...s, status: 'in-progress' } : s
+        ),
+      }));
+
+      // 2. Fetch cluster info and projects for the new server
+      const [info, projList] = await Promise.all([
+        api.getClusterInfo(),
+        api.getProjects(),
+      ]);
+
+      setClusterInfo(info);
+      setProjects(projList || []);
+
+      const newNs = info?.namespace || (await api.getCurrentNamespace()) || 'all-projects';
+      setCurrentProject(newNs);
+      setSelectedItem(null);
+      setSelectedPodIds(new Set());
+      setQuery('');
+
+      setPreloaderState((prev) => ({
+        ...prev,
+        target: info?.server || contextName,
+        subTarget: newNs === 'all-projects' ? 'All Projects (Cluster-Wide)' : newNs,
+        progress: 60,
+        currentStage: `Preloading objects and manifest counts for ${newNs}...`,
+        steps: prev.steps.map((s) =>
+          s.id === 'projects' ? { ...s, status: 'completed' } : s.id === 'workloads' || s.id === 'networking' ? { ...s, status: 'in-progress' } : s
+        ),
+      }));
+
+      // 3. Preload active view resources + counts across all kinds in parallel
+      const [countsRes, activeRes, topologyRes] = await Promise.all([
+        api.getResourceCounts(newNs).catch(() => ({})),
+        currentKind !== 'topology'
+          ? api.getResources(currentKind, newNs).catch((e: any) => ({ items: [], error: e.message }))
+          : Promise.resolve({ items: [] }),
+        currentKind === 'topology'
+          ? api.getTopologyData(newNs).catch(() => ({ data: null }))
+          : Promise.resolve({ data: null }),
+      ]);
+
+      if (countsRes) {
+        setCounts(countsRes);
+      }
+
+      if (currentKind === 'topology') {
+        if (topologyRes?.data) {
+          setTopologyPreloadData(topologyRes.data);
+        }
+      } else {
+        if (activeRes && activeRes.items) {
+          setResources(activeRes.items);
+          setCounts((prev) => ({ ...prev, [currentKind]: activeRes.items.length, ...(countsRes || {}) }));
+          setFetchError(activeRes.error || null);
+          setIsUnauthorized(!!activeRes.isUnauthorized);
+        } else if (Array.isArray(activeRes)) {
+          setResources(activeRes);
+          setCounts((prev) => ({ ...prev, [currentKind]: activeRes.length, ...(countsRes || {}) }));
+          setFetchError(null);
+          setIsUnauthorized(false);
+        }
+      }
+
+      // 4. Mark all steps completed & 100%
+      setPreloaderState((prev) => ({
+        ...prev,
+        progress: 100,
+        currentStage: 'All objects received successfully!',
+        steps: prev.steps.map((s) => ({ ...s, status: 'completed' })),
+      }));
+
+      showToast(`Switched server to ${info?.server || contextName}`);
+
+      // Smooth completion transition
+      setTimeout(() => {
+        setPreloaderState((prev) => ({ ...prev, isActive: false }));
+        setLoading(false);
+      }, 350);
+
+      // Background context sync
+      loadKubeInfo(newNs);
     } catch (err: any) {
+      setPreloaderState((prev) => ({
+        ...prev,
+        currentStage: err.message || 'Failed to switch context',
+        steps: prev.steps.map((s) => (s.status === 'in-progress' ? { ...s, status: 'error' } : s)),
+      }));
       showToast(err.message || `Failed to switch context to ${contextName}`, 'error');
-    } finally {
-      setLoading(false);
+      setTimeout(() => {
+        setPreloaderState((prev) => ({ ...prev, isActive: false }));
+        setLoading(false);
+      }, 1000);
     }
   };
 
-  // Handle Switch Project
+  // Handle Switch Project with automatic data preloading & live loading animation
   const handleSwitchProject = async (projectName: string) => {
     closeModal();
     const api = (window as any).electronAPI;
-    const ok = await api.switchProject(projectName);
-    if (ok) {
+    if (!api) return;
+
+    const isAll = projectName === 'all-projects' || projectName === '__all__';
+    const displayTarget = isAll ? 'All Projects (Cluster-Wide)' : projectName;
+
+    const initialSteps: PreloadStep[] = [
+      { id: 'namespace', label: 'Namespace Context Switch', status: 'in-progress' },
+      { id: 'workloads', label: 'Workloads & Pods', status: 'pending' },
+      { id: 'networking', label: 'Routes & Services', status: 'pending' },
+      { id: 'config', label: 'Config & Storage Manifests', status: 'pending' },
+      { id: 'active', label: 'Syncing Active View', status: 'pending' },
+    ];
+
+    setPreloaderState({
+      isActive: true,
+      mode: 'project',
+      title: 'Switching OpenShift Project',
+      subtitle: 'Switching namespace and preloading objects...',
+      target: displayTarget,
+      subTarget: clusterInfo?.server || currentContext || '',
+      progress: 20,
+      currentStage: `Switching namespace context to ${projectName}...`,
+      steps: initialSteps,
+    });
+    setLoading(true);
+
+    try {
+      const ok = await api.switchProject(projectName);
+      if (!ok) {
+        throw new Error(`Failed to switch project to ${projectName}`);
+      }
+
       setCurrentProject(projectName);
-      showToast(projectName === 'all-projects' ? 'Switched to All Projects' : `Switched to project ${projectName}`);
-      fetchResources(false);
-    } else {
-      showToast(`Failed to switch project to ${projectName}`, 'error');
+      setSelectedItem(null);
+      setSelectedPodIds(new Set());
+      setQuery('');
+
+      setPreloaderState((prev) => ({
+        ...prev,
+        progress: 55,
+        currentStage: `Preloading cluster objects for ${displayTarget}...`,
+        steps: prev.steps.map((s) =>
+          s.id === 'namespace' ? { ...s, status: 'completed' } : s.id === 'workloads' || s.id === 'networking' ? { ...s, status: 'in-progress' } : s
+        ),
+      }));
+
+      // Preload active view resources + counts across all kinds in parallel
+      const [countsRes, activeRes, topologyRes] = await Promise.all([
+        api.getResourceCounts(projectName).catch(() => ({})),
+        currentKind !== 'topology'
+          ? api.getResources(currentKind, projectName).catch((e: any) => ({ items: [], error: e.message }))
+          : Promise.resolve({ items: [] }),
+        currentKind === 'topology'
+          ? api.getTopologyData(projectName).catch(() => ({ data: null }))
+          : Promise.resolve({ data: null }),
+      ]);
+
+      if (countsRes) {
+        setCounts(countsRes);
+      }
+
+      if (currentKind === 'topology') {
+        if (topologyRes?.data) {
+          setTopologyPreloadData(topologyRes.data);
+        }
+      } else {
+        if (activeRes && activeRes.items) {
+          setResources(activeRes.items);
+          setCounts((prev) => ({ ...prev, [currentKind]: activeRes.items.length, ...(countsRes || {}) }));
+          setFetchError(activeRes.error || null);
+          setIsUnauthorized(!!activeRes.isUnauthorized);
+        } else if (Array.isArray(activeRes)) {
+          setResources(activeRes);
+          setCounts((prev) => ({ ...prev, [currentKind]: activeRes.length, ...(countsRes || {}) }));
+          setFetchError(null);
+          setIsUnauthorized(false);
+        }
+      }
+
+      setPreloaderState((prev) => ({
+        ...prev,
+        progress: 100,
+        currentStage: 'All objects received successfully!',
+        steps: prev.steps.map((s) => ({ ...s, status: 'completed' })),
+      }));
+
+      showToast(isAll ? 'Switched to All Projects' : `Switched to project ${projectName}`);
+
+      setTimeout(() => {
+        setPreloaderState((prev) => ({ ...prev, isActive: false }));
+        setLoading(false);
+      }, 300);
+    } catch (err: any) {
+      setPreloaderState((prev) => ({
+        ...prev,
+        currentStage: err.message || 'Failed to switch project',
+        steps: prev.steps.map((s) => (s.status === 'in-progress' ? { ...s, status: 'error' } : s)),
+      }));
+      showToast(err.message || `Failed to switch project to ${projectName}`, 'error');
+      setTimeout(() => {
+        setPreloaderState((prev) => ({ ...prev, isActive: false }));
+        setLoading(false);
+      }, 1000);
     }
   };
 
@@ -559,7 +749,10 @@ export const App: React.FC = () => {
         />
 
         {/* Center Main Content Area */}
-        <main className="flex-1 flex flex-col overflow-hidden bg-[var(--bg-main)] transition-colors duration-150">
+        <main className="flex-1 flex flex-col overflow-hidden bg-[var(--bg-main)] transition-colors duration-150 relative">
+          {/* Preloader Animation Overlay during Context & Project switching */}
+          <PreloaderAnimation {...preloaderState} />
+
           {/* Toast Notification Banner */}
           {statusNotification && (
             <div
@@ -580,6 +773,7 @@ export const App: React.FC = () => {
           {currentKind === 'topology' ? (
             <TopologyView
               currentProject={currentProject}
+              initialData={topologyPreloadData}
               onSelectWorkload={(item) => openModal('workload-details', item)}
               onOpenWorkloadLogs={(item) => openModal('logs', item)}
               onOpenWorkloadYaml={(item) => openModal('edit-yaml', item)}

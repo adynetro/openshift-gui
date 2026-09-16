@@ -46,6 +46,7 @@ interface TopologyViewProps {
   onOpenExternal: (url: string) => void;
   onOpenPodTerminal?: (item: ResourceItem) => void;
   onOpenPodLogs?: (item: ResourceItem) => void;
+  initialData?: TopologyData | null;
 }
 
 export const TopologyView: React.FC<TopologyViewProps> = ({
@@ -58,8 +59,9 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
   onOpenExternal,
   onOpenPodTerminal,
   onOpenPodLogs,
+  initialData,
 }) => {
-  const [data, setData] = useState<TopologyData | null>(null);
+  const [data, setData] = useState<TopologyData | null>(initialData || null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -94,12 +96,17 @@ export const TopologyView: React.FC<TopologyViewProps> = ({
   );
 
   useEffect(() => {
-    fetchTopology(false);
+    if (initialData) {
+      setData(initialData);
+      setLoading(false);
+    } else {
+      fetchTopology(false);
+    }
     const interval = setInterval(() => {
       fetchTopology(true);
     }, 3500);
     return () => clearInterval(interval);
-  }, [currentProject]);
+  }, [currentProject, initialData]);
 
   // Group workloads by application
   const groupedWorkloads = useMemo(() => {

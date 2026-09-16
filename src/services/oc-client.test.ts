@@ -12,4 +12,20 @@ describe("OcClient.sanitizeRegistryUrl", () => {
     assert.equal(OcClient.sanitizeRegistryUrl(''), '');
     assert.equal(OcClient.sanitizeRegistryUrl(undefined), '');
   });
+
+  it("should return a counts object with numeric values for getResourceCounts", async () => {
+    const counts = await OcClient.getResourceCounts("test-namespace");
+    assert.ok(typeof counts === 'object');
+    // Ensure all defined counts are numbers
+    for (const [k, v] of Object.entries(counts)) {
+      assert.equal(typeof v, 'number');
+    }
+  });
+
+  it("should handle preloadAllResources returning activeResources and counts", async () => {
+    const res = await OcClient.preloadAllResources("test-namespace", "pods");
+    assert.ok(res.activeResources);
+    assert.ok(Array.isArray(res.activeResources.items));
+    assert.ok(typeof res.counts === 'object');
+  });
 });

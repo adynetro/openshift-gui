@@ -54,6 +54,14 @@ export function registerIpcHandlers(mainWindow: electron.BrowserWindow): void {
     return await OcClient.getResources(kind, namespace);
   });
 
+  ipcMain.handle('kube:getResourceCounts', async (_event, namespace: string) => {
+    return await OcClient.getResourceCounts(namespace);
+  });
+
+  ipcMain.handle('kube:preloadAllResources', async (_event, namespace: string, activeKind?: ResourceKind) => {
+    return await OcClient.preloadAllResources(namespace, activeKind);
+  });
+
   ipcMain.handle('kube:describeResource', async (_event, kind: string, name: string, namespace: string) => {
     return await OcClient.describe(kind, name, namespace);
   });

@@ -2190,4 +2190,76 @@ spec:
       return { error: err.message || 'Failed to retrieve node diagnostics' };
     }
   }
+
+  /**
+   * Preloads resource counts across all major resource kinds in parallel for a namespace.
+   */
+  static async getResourceCounts(namespace: string): Promise<Partial<Record<ResourceKind, number>>> {
+    const counts: Partial<Record<ResourceKind, number>> = {};
+    const kinds: ResourceKind[] = [
+      'pods',
+      'deployments',
+      'deploymentconfigs',
+      'statefulsets',
+      'daemonsets',
+      'routes',
+      'services',
+      'networkpolicies',
+      'pvc',
+      'pv',
+      'configmaps',
+      'secrets',
+      'imagestreams',
+      'crd',
+      'nodes',
+      'clusteroperators',
+      'events',
+    ];
+
+    const results = await Promise.allSettled(
+      kinds.map(async (kind) => {
+        const res = await this.getResources(kind, namespace);
+        return { kind, count: res.items ? res.items.length : 0 };
+      })
+    );
+
+    for (const r of results) {
+      if (r.status === 'fulfilled') {
+        counts[r.value.kind] = r.value.count;
+      }
+    }
+
+    try {
+      const { HelmService } = await import('./helm.js');
+      const helmRes = await HelmService.getReleases(namespace);
+      counts['helm'] = helmRes.items ? helmRes.items.length : 0;
+    } catch {}
+
+    return counts;
+  }
+
+  /**
+   * Preloads all resources and metadata for a namespace in parallel.
+   */
+  static async preloadAllResources(
+    namespace: string,
+    activeKind: ResourceKind = 'pods'
+  ): Promise<{
+    activeResources: { items: ResourceItem[]; error?: string; isUnauthorized?: boolean };
+    topologyData?: TopologyData;
+    counts: Partial<Record<ResourceKind, number>>;
+  }> {
+    const [counts, activeRes, topologyRes] = await Promise.all([
+      this.getResourceCounts(namespace),
+      activeKind !== 'topology' ? this.getResources(activeKind, namespace) : Promise.resolve({ items: [] }),
+      activeKind === 'topology' ? this.getTopologyData(namespace) : Promise.resolve({ data: undefined }),
+    ]);
+
+    return {
+      activeResources: activeRes,
+      topologyData: topologyRes?.data,
+      counts,
+    };
+  }
 }
+

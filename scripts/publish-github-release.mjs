@@ -10,9 +10,25 @@ const token = execSync('printf "protocol=https\\nhost=github.com\\n" | git crede
 
 const repo = 'adynetro/openshift-gui';
 const tagName = `v${VERSION}`;
-const releaseName = `OpenShift GUI v${VERSION} - Active Server Discovery, Automatic Project Refresh & Resilient Kubeconfig Parser`;
+const releaseName = `OpenShift GUI v${VERSION} - Live Loading Animation, Radar Scanner & Parallel Data Preloading`;
 
 const releaseBody = `## 🚀 OpenShift GUI v${VERSION} - Feature & Enhancement Release
+
+### 🛰️ Live Loading Animation & Radar Scanner
+- **High-Tech Animated Preloader**: Seamless orbital radar scanner with counter-rotating rings and glowing center hub displayed during **Server / Context** and **Project / Namespace** switches.
+- **Dynamic Shimmer Progress Bar**: Smooth real-time progress bar (0% ➔ 100%) with animated light sweep indicating active synchronization stages.
+- **Interactive Stage Checklist**:
+  - ⚡ *Cluster API Handshake & Session Verification*
+  - 📂 *Projects & Namespaces Discovery*
+  - 📦 *Workload Manifests (Pods, Deployments, StatefulSets...)*
+  - 🌐 *Networking & Ingress (Routes, Services, Policies)*
+  - 💾 *Storage, Config & Target Objects*
+- **Zero-Flicker Transitions**: Prevents flashing empty states ("No pods found") by holding the smooth preloader until all objects and counts have been received.
+
+### ⚡ Comprehensive Parallel Data Preloading
+- **Concurrent REST Queries**: Preloads active view manifests, topology graphs, and all sidebar badge counts across all kinds (**Pods, Deployments, StatefulSets, DaemonSets, Routes, Services, NetworkPolicies, PVCs, ConfigMaps, Secrets, ImageStreams, Helm Releases**) in parallel over Keep-Alive HTTPS.
+- **Topology Graph Instant Preload**: Preloads full application topology in the background so navigating or switching projects in the **Topology** view displays instantly without secondary spinners.
+- **Initial Startup Preload**: Background preloading populates sidebar counts immediately upon cluster connection.
 
 ### 🖥️ Kubeconfig Startup Parsing & Active Server Discovery
 - **Display Only Servers with Active Contexts**: Automatically parses \`~/.kube/config\` at startup, maps cluster server endpoints, and displays only servers that have active/valid contexts.
