@@ -4,7 +4,215 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import { KubeConfigService } from "./kubeconfig.js";
+import { KubeConfigService, parseKubeConfig, groupServersWithContexts } from "./kubeconfig.js";
+
+describe("parseKubeConfig & groupServersWithContexts", () => {
+  const standardConfig = {
+    apiVersion: "v1",
+    kind: "Config",
+    "current-context": "default/ocp-prod/admin",
+    clusters: [
+      {
+        name: "ocp-prod",
+        cluster: {
+          server: "https://api.ocp-prod.example.com:6443",
+          "insecure-skip-tls-verify": true,
+        },
+      },
+      {
+        name: "ocp-stage",
+        cluster: {
+          server: "https://api.ocp-stage.example.com:6443",
+        },
+      },
+      {
+        name: "unused-cluster-without-contexts",
+        cluster: {
+          server: "https://api.unused.example.com:6443",
+        },
+      },
+    ],
+    contexts: [
+      {
+        name: "default/ocp-prod/admin",
+        context: {
+          cluster: "ocp-prod",
+          user: "admin-prod",
+          namespace: "default",
+        },
+      },
+      {
+        name: "frontend/ocp-prod/admin",
+        context: {
+          cluster: "ocp-prod",
+          user: "admin-prod",
+          namespace: "frontend",
+        },
+      },
+      {
+        name: "backend/ocp-prod/admin",
+        context: {
+          cluster: "ocp-prod",
+          user: "admin-prod",
+          namespace: "backend",
+        },
+      },
+      {
+        name: "stage-context",
+        context: {
+          cluster: "ocp-stage",
+          user: "developer-stage",
+          namespace: "stage-ns",
+        },
+      },
+    ],
+    users: [
+      { name: "admin-prod", user: { token: "token-prod" } },
+      { name: "developer-stage", user: { token: "token-stage" } },
+    ],
+  };
+
+  it("should correctly parse standard kubeconfig, resolve server URLs, and group servers with active contexts", () => {
+    const yamlString = stringifyYaml(standardConfig);
+    const result = parseKubeConfig(yamlString);
+
+    assert.equal(result.contexts.length, 4);
+    assert.equal(result.currentContext, "default/ocp-prod/admin");
+
+    // Check context fields and server resolution
+    const prodDefault = result.contexts.find((c) => c.name === "default/ocp-prod/admin");
+    assert.ok(prodDefault);
+    assert.equal(prodDefault.server, "https://api.ocp-prod.example.com:6443");
+    assert.equal(prodDefault.isCurrent, true);
+    assert.equal(prodDefault.cluster, "ocp-prod");
+
+    const stageCtx = result.contexts.find((c) => c.name === "stage-context");
+    assert.ok(stageCtx);
+    assert.equal(stageCtx.server, "https://api.ocp-stage.example.com:6443");
+    assert.equal(stageCtx.isCurrent, false);
+
+    // Check server grouping - should ONLY contain servers with active contexts (2 servers, unused cluster omitted)
+    assert.equal(result.servers.length, 2);
+
+    // Active current server should be first
+    const firstServer = result.servers[0];
+    assert.ok(firstServer);
+    assert.equal(firstServer.server, "https://api.ocp-prod.example.com:6443");
+    assert.equal(firstServer.clusterName, "ocp-prod");
+    assert.equal(firstServer.isCurrent, true);
+    assert.equal(firstServer.activeContextName, "default/ocp-prod/admin");
+    assert.equal(firstServer.contextCount, 3);
+    assert.equal(firstServer.contexts.length, 3);
+
+    const secondServer = result.servers[1];
+    assert.ok(secondServer);
+    assert.equal(secondServer.server, "https://api.ocp-stage.example.com:6443");
+    assert.equal(secondServer.clusterName, "ocp-stage");
+    assert.equal(secondServer.isCurrent, false);
+    assert.equal(secondServer.activeContextName, "stage-context");
+    assert.equal(secondServer.contextCount, 1);
+  });
+
+  it("should handle very messed up and corrupted kubeconfig structures gracefully", () => {
+    // 1. Invalid YAML syntax
+    const badYaml = "contexts: [unclosed bracket :: invalid yaml {{{";
+    const resBadYaml = parseKubeConfig(badYaml);
+    assert.deepEqual(resBadYaml, { contexts: [], currentContext: null, servers: [] });
+
+    // 2. Empty string & whitespace
+    assert.deepEqual(parseKubeConfig(""), { contexts: [], currentContext: null, servers: [] });
+    assert.deepEqual(parseKubeConfig("   \n\t  "), { contexts: [], currentContext: null, servers: [] });
+
+    // 3. Scalar values & null
+    assert.deepEqual(parseKubeConfig(null), { contexts: [], currentContext: null, servers: [] });
+    assert.deepEqual(parseKubeConfig(undefined), { contexts: [], currentContext: null, servers: [] });
+    assert.deepEqual(parseKubeConfig("hello world"), { contexts: [], currentContext: null, servers: [] });
+
+    // 4. Heavily messed up object with corrupted contexts array
+    const messedUpConfig = {
+      apiVersion: "v1",
+      kind: "Config",
+      "current-context": "non-existent-ctx",
+      clusters: [
+        null,
+        "invalid-string",
+        {},
+        { name: "valid-cluster", cluster: { server: "https://api.valid.com:6443" } },
+        { name: "cluster-without-server-obj", cluster: null },
+      ],
+      contexts: [
+        null,
+        undefined,
+        12345,
+        "string-instead-of-object",
+        {},
+        { name: "" },
+        { name: "   " },
+        {
+          name: "dangling-cluster-ctx",
+          context: {
+            cluster: "non-existent-cluster",
+            user: "some-user",
+          },
+        },
+        {
+          name: "valid-ctx-1",
+          context: {
+            cluster: "valid-cluster",
+            user: "user-1",
+            namespace: "custom-ns",
+          },
+        },
+        // Duplicate context name
+        {
+          name: "valid-ctx-1",
+          context: {
+            cluster: "valid-cluster",
+            user: "user-1",
+            namespace: "custom-ns",
+          },
+        },
+        {
+          name: "ctx-with-missing-context-obj",
+        },
+      ],
+      users: null,
+    };
+
+    const resMessed = parseKubeConfig(stringifyYaml(messedUpConfig));
+
+    // Should extract the 3 non-empty named contexts (deduplicating valid-ctx-1)
+    assert.equal(resMessed.contexts.length, 3);
+    const names = resMessed.contexts.map((c) => c.name);
+    assert.ok(names.includes("dangling-cluster-ctx"));
+    assert.ok(names.includes("valid-ctx-1"));
+    assert.ok(names.includes("ctx-with-missing-context-obj"));
+
+    // Server fallback for dangling cluster reference
+    const dangling = resMessed.contexts.find((c) => c.name === "dangling-cluster-ctx");
+    assert.ok(dangling);
+    assert.equal(dangling.server, "non-existent-cluster");
+
+    // Valid cluster server resolved
+    const valid = resMessed.contexts.find((c) => c.name === "valid-ctx-1");
+    assert.ok(valid);
+    assert.equal(valid.server, "https://api.valid.com:6443");
+    assert.equal(valid.namespace, "custom-ns");
+
+    // Missing context obj handled with safe defaults
+    const missingCtxObj = resMessed.contexts.find((c) => c.name === "ctx-with-missing-context-obj");
+    assert.ok(missingCtxObj);
+    assert.equal(missingCtxObj.namespace, "default");
+    assert.equal(missingCtxObj.user, "");
+
+    // Current context fallback: since 'non-existent-ctx' was invalid, it defaults to the first valid context
+    assert.ok(resMessed.currentContext);
+    assert.equal(resMessed.currentContext, resMessed.contexts[0]?.name);
+
+    // Servers list should be cleanly populated
+    assert.ok(resMessed.servers.length >= 2);
+  });
+});
 
 describe("KubeConfigService.cleanContexts", () => {
   const sampleConfig = {
@@ -115,4 +323,29 @@ describe("KubeConfigService.cleanContexts", () => {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
+
+  it("should get servers with active contexts and getClusterInfo", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "kube-test-"));
+    const tmpKubeConfig = path.join(tmpDir, "config");
+    fs.writeFileSync(tmpKubeConfig, stringifyYaml(sampleConfig), "utf8");
+
+    const originalEnv = process.env["KUBECONFIG"];
+    process.env["KUBECONFIG"] = tmpKubeConfig;
+
+    try {
+      const serverRes = await KubeConfigService.getServers();
+      assert.ok(serverRes.servers.length >= 3);
+      assert.equal(serverRes.currentContext, "active-cluster/admin");
+      assert.equal(serverRes.currentServer, "https://active.example.com:6443");
+
+      const clusterInfo = await KubeConfigService.getClusterInfo();
+      assert.equal(clusterInfo.server, "https://active.example.com:6443");
+      assert.equal(clusterInfo.context, "active-cluster/admin");
+      assert.equal(clusterInfo.connected, true);
+    } finally {
+      process.env["KUBECONFIG"] = originalEnv;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
 });
+

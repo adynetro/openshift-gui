@@ -22,6 +22,10 @@ export function registerIpcHandlers(mainWindow: electron.BrowserWindow): void {
     return await KubeConfigService.getContexts();
   });
 
+  ipcMain.handle('kube:getServers', async () => {
+    return await KubeConfigService.getServers();
+  });
+
   ipcMain.handle('kube:switchContext', async (_event, contextName: string) => {
     return await KubeConfigService.switchContext(contextName);
   });

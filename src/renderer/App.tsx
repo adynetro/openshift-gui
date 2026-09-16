@@ -4,7 +4,6 @@ import { Sidebar } from './components/Sidebar.js';
 import { SearchBar } from './components/SearchBar.js';
 import { ResourceTable } from './components/ResourceTable.js';
 import { TopologyView } from './components/TopologyView.js';
-
 // Lazy-loaded modal components to split heavy dependencies (CodeMirror, Xterm, Wizard, Netpol Designer)
 const LogViewer = lazy(() => import('./components/LogViewer.js').then((m) => ({ default: m.LogViewer })));
 const YamlModal = lazy(() => import('./components/YamlModal.js').then((m) => ({ default: m.YamlModal })));
@@ -27,7 +26,7 @@ const HelpModal = lazy(() => import('./components/HelpModal.js').then((m) => ({ 
 const BatchDeleteModal = lazy(() => import('./components/BatchDeleteModal.js').then((m) => ({ default: m.BatchDeleteModal })));
 const ImageRegistryPrunerModal = lazy(() => import('./components/ImageRegistryPrunerModal.js').then((m) => ({ default: m.ImageRegistryPrunerModal })));
 
-import { ResourceKind, ResourceItem, KubeContext, ProjectInfo, ImageStreamResource } from '../types/k8s.js';
+import { ResourceKind, ResourceItem, KubeContext, ServerInfo, ProjectInfo, ImageStreamResource } from '../types/k8s.js';
 import { FuzzyMatcher } from '../utils/fuzzy.js';
 import { CheckCircle2, AlertTriangle } from 'lucide-react';
 
@@ -63,8 +62,9 @@ interface ModalStackEntry {
 }
 
 export const App: React.FC = () => {
-  // Context & Project State
+  // Context, Server & Project State
   const [contexts, setContexts] = useState<KubeContext[]>([]);
+  const [servers, setServers] = useState<ServerInfo[]>([]);
   const [currentContext, setCurrentContext] = useState<string | null>(null);
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
   const [currentProject, setCurrentProject] = useState<string>('all-projects');
@@ -116,8 +116,8 @@ export const App: React.FC = () => {
     }, 4000);
   };
 
-  // Load Kubeconfig contexts and active project
-  const loadKubeInfo = useCallback(async () => {
+  // Load Kubeconfig contexts, servers, and active project
+  const loadKubeInfo = useCallback(async (preferredProject?: string) => {
     try {
       const api = (window as any).electronAPI;
       if (!api) return;
@@ -125,7 +125,9 @@ export const App: React.FC = () => {
       const res = await api.getContexts();
       const ctxList = res?.contexts || [];
       const currCtx = res?.currentContext || null;
+      const srvList = res?.servers || [];
       setContexts(ctxList);
+      setServers(srvList);
       setCurrentContext(currCtx);
 
       const info = await api.getClusterInfo();
@@ -133,6 +135,15 @@ export const App: React.FC = () => {
 
       const projList = await api.getProjects();
       setProjects(projList || []);
+
+      if (preferredProject !== undefined) {
+        setCurrentProject(preferredProject);
+      } else {
+        const currNs = info?.namespace || (await api.getCurrentNamespace()) || 'all-projects';
+        if (currNs) {
+          setCurrentProject(currNs);
+        }
+      }
     } catch (e) {
       console.error('Error in loadKubeInfo:', e);
     }
@@ -286,18 +297,67 @@ export const App: React.FC = () => {
     setBatchDeleteModalOpen(true);
   };
 
-  // Handle Switch Context
+  // Handle Switch Context & Server with automatic project refresh
   const handleSwitchContext = async (contextName: string) => {
     closeModal();
     const api = (window as any).electronAPI;
-    const ok = await api.switchContext(contextName);
-    if (ok) {
-      showToast(`Switched context to ${contextName}`);
-      setCurrentContext(contextName);
-      loadKubeInfo();
-      fetchResources(false);
-    } else {
-      showToast(`Failed to switch context to ${contextName}`, 'error');
+    if (!api) return;
+
+    try {
+      setLoading(true);
+      const ok = await api.switchContext(contextName);
+      if (ok) {
+        setCurrentContext(contextName);
+
+        // 1. Fetch cluster info for the new server
+        const info = await api.getClusterInfo();
+        setClusterInfo(info);
+
+        // 2. Refresh project list for the new server
+        const projList = await api.getProjects();
+        setProjects(projList || []);
+
+        // 3. Set active project for the new server
+        const newNs = info?.namespace || (await api.getCurrentNamespace()) || 'all-projects';
+        setCurrentProject(newNs);
+
+        // 4. Reset table state, search query, and selections
+        setSelectedItem(null);
+        setSelectedPodIds(new Set());
+        setCounts({});
+        setResources([]);
+
+        showToast(`Switched server to ${info?.server || contextName}`);
+
+        // 5. Fetch resources for the new server and new project
+        if (currentKind !== 'topology') {
+          try {
+            const res = await api.getResources(currentKind, newNs);
+            if (res && res.items) {
+              setResources(res.items);
+              setCounts((prev) => ({ ...prev, [currentKind]: res.items.length }));
+              setFetchError(res.error || null);
+              setIsUnauthorized(!!res.isUnauthorized);
+            } else if (Array.isArray(res)) {
+              setResources(res);
+              setCounts((prev) => ({ ...prev, [currentKind]: res.length }));
+              setFetchError(null);
+              setIsUnauthorized(false);
+            }
+          } catch (err: any) {
+            setFetchError(err.message || 'Failed to fetch resources');
+          }
+        }
+
+        // Full kube info sync in background
+        loadKubeInfo(newNs);
+      } else {
+        showToast(`Failed to switch context to ${contextName}`, 'error');
+      }
+    } catch (err: any) {
+      showToast(err.message || `Failed to switch context to ${contextName}`, 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -588,6 +648,7 @@ export const App: React.FC = () => {
           <ContextModal
             mode="context"
             contexts={contexts}
+            servers={servers}
             projects={projects}
             currentContext={currentContext}
             currentProject={currentProject}
@@ -603,6 +664,7 @@ export const App: React.FC = () => {
           <ContextModal
             mode="project"
             contexts={contexts}
+            servers={servers}
             projects={projects}
             currentContext={currentContext}
             currentProject={currentProject}

@@ -10,12 +10,27 @@ const token = execSync('printf "protocol=https\\nhost=github.com\\n" | git crede
 
 const repo = 'adynetro/openshift-gui';
 const tagName = `v${VERSION}`;
-const releaseName = `OpenShift GUI v${VERSION} - Synchronized UI Versioning, Direct HTTPS REST Engine & Multi-Platform Packages`;
+const releaseName = `OpenShift GUI v${VERSION} - Active Server Discovery, Automatic Project Refresh & Resilient Kubeconfig Parser`;
 
-const releaseBody = `## 🚀 OpenShift GUI v${VERSION} - Patch Release
+const releaseBody = `## 🚀 OpenShift GUI v${VERSION} - Feature & Enhancement Release
+
+### 🖥️ Kubeconfig Startup Parsing & Active Server Discovery
+- **Display Only Servers with Active Contexts**: Automatically parses \`~/.kube/config\` at startup, maps cluster server endpoints, and displays only servers that have active/valid contexts.
+- **Server Grouping & Deduplication**: Groups multiple contexts belonging to the same cluster server endpoint (e.g. per-project OpenShift contexts) under a unified server card with active context and user badges.
+- **Sub-Context Selector**: Quick-switch buttons and pill list to select specific namespaces/contexts under a server without UI clutter.
+
+### 🔄 Automatic Project Refresh on Server Change
+- **Instant Project Sync**: Automatically switches and refreshes the projects/namespaces list whenever a server or context is changed.
+- **Auto-Select Active Namespace**: Automatically selects the new server's active namespace (or cluster-wide \`All Projects\`), preventing stale/orphaned namespace queries.
+- **Immediate Resource Reload**: Clears stale resource cache and re-fetches resources for the active project on the newly selected server.
+
+### 🛡️ Resilient Kubeconfig Parser & Edge-Case Protection
+- **Fault-Tolerant Parsing**: Handles heavily corrupted, malformed, or incomplete kubeconfig files (dangling cluster references, missing user objects, null arrays, duplicate names, invalid YAML syntax).
+- **Safe Fallbacks**: Automatically falls back to atomic direct updates if CLI \`oc config\` commands fail.
+- **Safe Automatic Backups**: Continues to create automatic timestamped backups at \`~/.kube/config.bak-<timestamp>\` before writing any changes.
 
 ### 🏷️ Dynamic Version Synchronization
-- **Automated UI Versioning**: The version indicator on the bottom-left sidebar is now dynamically bound via compile-time injection (\`__APP_VERSION__\`) directly from \`package.json\`, ensuring the UI footer always accurately reflects the installed desktop release version.
+- **Automated UI Versioning**: The version indicator on the bottom-left sidebar is dynamically bound via compile-time injection (\`__APP_VERSION__\`) directly from \`package.json\`, ensuring the UI footer always accurately reflects the installed desktop release version.
 
 ---
 

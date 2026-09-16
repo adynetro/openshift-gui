@@ -55,21 +55,21 @@ export const TopNav: React.FC<TopNavProps> = ({
         {/* Vertical Divider */}
         <div className="h-6 w-px bg-slate-800" />
 
-        {/* Context Selector Button */}
+        {/* Server & Context Selector Button */}
         <button
           onClick={onOpenContextModal}
-          className="no-drag flex items-center gap-2.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 hover:border-cyan-500/50 transition-all text-left group"
-          title="Click to switch Kubernetes / OpenShift Context (or press 'c')"
+          className="no-drag flex items-center gap-2.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 hover:border-cyan-500/50 transition-all text-left group cursor-pointer"
+          title={`Active Server: ${clusterServer || 'None'}\nActive Context: ${currentContext || 'None'}\nClick to switch Server or Context (press 'c')`}
         >
           <div className="w-6 h-6 rounded bg-cyan-500/10 flex items-center justify-center text-cyan-400 group-hover:text-cyan-300">
-            <Layers size={14} />
+            <Server size={14} />
           </div>
           <div>
             <div className="text-[10px] uppercase font-bold text-cyan-400 tracking-wider flex items-center gap-1">
-              Context <span className="bg-slate-900 px-1 py-0.2 rounded text-[9px] text-slate-400">c</span>
+              Server / Context <span className="bg-slate-900 px-1 py-0.2 rounded text-[9px] text-slate-400">c</span>
             </div>
             <div className="text-xs font-semibold text-slate-200 truncate max-w-[240px]">
-              {currentContext || 'Select Context...'}
+              {clusterServer || currentContext || 'Select Server...'}
             </div>
           </div>
         </button>

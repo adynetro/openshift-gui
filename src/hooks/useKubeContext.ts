@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { KubeConfigService } from '../services/kubeconfig.js';
-import { KubeContext, ProjectInfo, ClusterInfo } from '../types/k8s.js';
+import { KubeContext, ServerInfo, ProjectInfo, ClusterInfo } from '../types/k8s.js';
 
 export function useKubeContext() {
   const [contexts, setContexts] = useState<KubeContext[]>([]);
+  const [servers, setServers] = useState<ServerInfo[]>([]);
   const [currentContext, setCurrentContext] = useState<string | null>(null);
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
   const [currentProject, setCurrentProject] = useState<string>('default');
@@ -14,8 +15,9 @@ export function useKubeContext() {
   const refresh = useCallback(async () => {
     try {
       setLoading(true);
-      const { contexts: ctxList, currentContext: currCtx } = await KubeConfigService.getContexts();
+      const { contexts: ctxList, currentContext: currCtx, servers: srvList } = await KubeConfigService.getContexts();
       setContexts(ctxList);
+      setServers(srvList || []);
       setCurrentContext(currCtx);
 
       const currNs = await KubeConfigService.getCurrentNamespace();
@@ -59,6 +61,7 @@ export function useKubeContext() {
 
   return {
     contexts,
+    servers,
     currentContext,
     projects,
     currentProject,
