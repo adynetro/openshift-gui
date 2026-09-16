@@ -18,13 +18,18 @@ import {
   Square,
   RefreshCw,
   Shield,
+  Radio,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
-import { KubeContext, ProjectInfo } from '../../types/k8s.js';
+import { KubeContext, ProjectInfo, ServerInfo } from '../../types/k8s.js';
+import { groupServersWithContexts } from '../../utils/kube-utils.js';
 import { FuzzyMatcher } from '../../utils/fuzzy.js';
 
 interface ContextModalProps {
   mode: 'context' | 'project';
   contexts: KubeContext[];
+  servers?: ServerInfo[];
   projects: ProjectInfo[];
   currentContext: string | null;
   currentProject: string;
@@ -37,6 +42,7 @@ interface ContextModalProps {
 export const ContextModal: React.FC<ContextModalProps> = ({
   mode,
   contexts,
+  servers: propServers,
   projects,
   currentContext,
   currentProject,
@@ -49,27 +55,46 @@ export const ContextModal: React.FC<ContextModalProps> = ({
   const [query, setQuery] = useState<string>('');
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
   const [selectedToDelete, setSelectedToDelete] = useState<string[]>([]);
+  const [expandedServers, setExpandedServers] = useState<Set<string>>(new Set());
   const [pruneDangling, setPruneDangling] = useState<boolean>(true);
   const [isCleaning, setIsCleaning] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
 
+  const serverList = useMemo(() => {
+    if (propServers && propServers.length > 0) return propServers;
+    return groupServersWithContexts(contexts, currentContext);
+  }, [propServers, contexts, currentContext]);
+
   const items = useMemo(() => {
     if (mode === 'context') {
-      if (!query.trim()) return contexts;
-      const matcher = new FuzzyMatcher(contexts, ['name', 'cluster', 'user']);
-      return matcher.search(query);
+      if (viewMode === 'clean') {
+        if (!query.trim()) return contexts;
+        const matcher = new FuzzyMatcher(contexts, ['name', 'cluster', 'user', 'server']);
+        return matcher.search(query);
+      } else {
+        // Display only servers with active contexts
+        if (!query.trim()) return serverList;
+        const matcher = new FuzzyMatcher(serverList, [
+          'server',
+          'clusterName',
+          'activeContextName',
+          'user',
+          'namespace',
+        ]);
+        return matcher.search(query);
+      }
     } else {
       if (!query.trim()) return projects;
       const matcher = new FuzzyMatcher(projects, ['name', 'displayName']);
       return matcher.search(query);
     }
-  }, [mode, contexts, projects, query]);
+  }, [mode, viewMode, contexts, serverList, projects, query]);
 
   // Reset selected index when query or filtered items change
   useEffect(() => {
     setSelectedIndex(0);
-  }, [query]);
+  }, [query, viewMode]);
 
   // Scroll active item into view
   useEffect(() => {
@@ -81,6 +106,16 @@ export const ContextModal: React.FC<ContextModalProps> = ({
     }
   }, [selectedIndex]);
 
+  const toggleExpandServer = (e: React.MouseEvent, serverKey: string) => {
+    e.stopPropagation();
+    setExpandedServers((prev) => {
+      const next = new Set(prev);
+      if (next.has(serverKey)) next.delete(serverKey);
+      else next.add(serverKey);
+      return next;
+    });
+  };
+
   const selectItem = (item: any) => {
     if (!item) return;
     if (viewMode === 'clean' && mode === 'context') {
@@ -90,8 +125,13 @@ export const ContextModal: React.FC<ContextModalProps> = ({
       }
       return;
     }
-    if (mode === 'context') onSelectContext(item.name);
-    else onSelectProject(item.name);
+    if (mode === 'context') {
+      // If it's a ServerInfo object, select its activeContextName
+      const targetCtx = item.activeContextName || item.name;
+      onSelectContext(targetCtx);
+    } else {
+      onSelectProject(item.name);
+    }
   };
 
   const toggleSelectContext = (name: string) => {
@@ -226,9 +266,9 @@ export const ContextModal: React.FC<ContextModalProps> = ({
     mode === 'context'
       ? viewMode === 'clean'
         ? 'Clean & Prune Kubernetes Contexts'
-        : 'Switch Kubernetes / OpenShift Context'
+        : 'Switch Server & Active Context'
       : 'Switch Project / Namespace';
-  const Icon = mode === 'context' ? (viewMode === 'clean' ? Flame : Layers) : FolderGit2;
+  const Icon = mode === 'context' ? (viewMode === 'clean' ? Flame : Server) : FolderGit2;
 
   const inactiveCount = contexts.filter((c) => c.name !== currentContext).length;
 
@@ -276,7 +316,9 @@ export const ContextModal: React.FC<ContextModalProps> = ({
               </h2>
               <p className="text-xs text-slate-400">
                 {mode === 'context'
-                  ? `Total Contexts: ${contexts.length} • Active: ${currentContext || 'None'}`
+                  ? viewMode === 'clean'
+                    ? `Total Contexts: ${contexts.length} • Stale to Clean: ${inactiveCount}`
+                    : `Active Servers: ${serverList.length} • Total Contexts: ${contexts.length} • Active: ${currentContext || 'None'}`
                   : `Available Projects: ${projects.length}`}
               </p>
             </div>
@@ -295,8 +337,8 @@ export const ContextModal: React.FC<ContextModalProps> = ({
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  <Layers size={12} />
-                  <span>Switch</span>
+                  <Server size={12} />
+                  <span>Servers ({serverList.length})</span>
                 </button>
                 <button
                   type="button"
@@ -449,9 +491,11 @@ export const ContextModal: React.FC<ContextModalProps> = ({
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={
-                viewMode === 'clean'
-                  ? 'Filter contexts to clean...'
-                  : `Search and filter ${mode}s... (use ↑ / ↓ arrows and ↵ Enter)`
+                mode === 'context'
+                  ? viewMode === 'clean'
+                    ? 'Filter contexts to clean...'
+                    : 'Search and filter active servers & contexts... (use ↑ / ↓ arrows and ↵ Enter)'
+                  : 'Search and filter projects... (use ↑ / ↓ arrows and ↵ Enter)'
               }
               className="w-full pl-10 pr-4 py-2 border rounded-lg text-xs placeholder-slate-500 shadow-inner focus:outline-none font-mono"
               style={{
@@ -466,27 +510,33 @@ export const ContextModal: React.FC<ContextModalProps> = ({
         {/* Items List */}
         <div className="flex-1 overflow-auto p-3 space-y-1.5 divide-y divide-slate-800/40 font-sans">
           {items.length === 0 ? (
-            <div className="p-8 text-center text-slate-500 text-xs">No matching {mode}s found.</div>
+            <div className="p-8 text-center text-slate-500 text-xs">
+              No matching {mode === 'context' ? (viewMode === 'clean' ? 'contexts' : 'servers with active contexts') : 'projects'} found.
+            </div>
           ) : (
             items.map((item: any, idx: number) => {
-              const isCurrent =
-                mode === 'context'
-                  ? item.name === currentContext
-                  : item.name === currentProject ||
-                    (item.name === 'all-projects' && (!currentProject || currentProject === 'all-projects'));
+              const isServerItem = mode === 'context' && viewMode === 'switch';
+              const isCurrent = isServerItem
+                ? item.isCurrent
+                : mode === 'context'
+                ? item.name === currentContext
+                : item.name === currentProject ||
+                  (item.name === 'all-projects' && (!currentProject || currentProject === 'all-projects'));
               const isAllProjects = mode === 'project' && item.name === 'all-projects';
               const isHighlighted = idx === selectedIndex && viewMode === 'switch';
               const isChecked = selectedToDelete.includes(item.name);
+              const serverKey = item.server || item.clusterName || item.name;
+              const isExpanded = expandedServers.has(serverKey);
 
               return (
                 <div
-                  key={item.name}
+                  key={isServerItem ? `${item.server}-${item.clusterName}-${idx}` : item.name}
                   ref={(el) => {
                     itemRefs.current[idx] = el;
                   }}
                   onClick={() => selectItem(item)}
                   onMouseEnter={() => setSelectedIndex(idx)}
-                  className={`w-full flex items-center justify-between p-3 rounded-lg text-left transition-all cursor-pointer group ${
+                  className={`w-full flex flex-col p-3 rounded-lg text-left transition-all cursor-pointer group ${
                     viewMode === 'clean' && isChecked
                       ? 'bg-rose-950/40 border border-rose-500/60 shadow-sm'
                       : isHighlighted
@@ -498,115 +548,238 @@ export const ContextModal: React.FC<ContextModalProps> = ({
                       : 'hover:bg-slate-800/70 border border-transparent'
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    {/* Checkbox in clean mode */}
-                    {mode === 'context' && viewMode === 'clean' && (
-                      <div
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleSelectContext(item.name);
-                        }}
-                        className="p-1 cursor-pointer"
-                      >
-                        {isCurrent ? (
-                          <div title="Current active context is protected">
-                            <Shield size={16} className="text-amber-400" />
-                          </div>
-                        ) : isChecked ? (
-                          <CheckSquare size={16} className="text-rose-400" />
-                        ) : (
-                          <Square size={16} className="text-slate-500 hover:text-slate-300" />
-                        )}
-                      </div>
-                    )}
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-3 min-w-0">
+                      {/* Checkbox in clean mode */}
+                      {mode === 'context' && viewMode === 'clean' && (
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleSelectContext(item.name);
+                          }}
+                          className="p-1 cursor-pointer shrink-0"
+                        >
+                          {isCurrent ? (
+                            <div title="Current active context is protected">
+                              <Shield size={16} className="text-amber-400" />
+                            </div>
+                          ) : isChecked ? (
+                            <CheckSquare size={16} className="text-rose-400" />
+                          ) : (
+                            <Square size={16} className="text-slate-500 hover:text-slate-300" />
+                          )}
+                        </div>
+                      )}
 
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        {isAllProjects && <Globe size={15} className="text-purple-400 shrink-0" />}
-                        <span
-                          className={`font-mono text-sm font-semibold transition-colors ${
+                      {/* Left icon for server */}
+                      {isServerItem && (
+                        <div
+                          className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border ${
                             isCurrent
-                              ? 'text-cyan-300 font-bold'
-                              : isHighlighted
-                              ? 'text-cyan-300 font-bold'
-                              : isAllProjects
-                              ? 'text-purple-300 group-hover:text-purple-200'
-                              : 'text-white group-hover:text-cyan-300'
+                              ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                              : 'bg-slate-800 text-slate-400 border-slate-700'
                           }`}
                         >
-                          {item.displayName || item.name}
-                        </span>
-                        {isAllProjects && (
-                          <span className="px-2 py-0.2 rounded bg-purple-950 text-purple-300 border border-purple-800 text-[10px] font-mono">
-                            Cluster-Wide
-                          </span>
-                        )}
-                        {isCurrent && (
-                          <span className="px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800 text-[10px] font-bold flex items-center gap-1 font-mono">
-                            <CheckCircle2 size={10} /> Active (Keep)
-                          </span>
+                          <Server size={16} />
+                        </div>
+                      )}
+
+                      <div className="space-y-1 min-w-0">
+                        {/* Server Switch View */}
+                        {isServerItem ? (
+                          <>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span
+                                className={`font-mono text-sm font-semibold transition-colors truncate max-w-[340px] ${
+                                  isCurrent
+                                    ? 'text-cyan-300 font-bold'
+                                    : isHighlighted
+                                    ? 'text-cyan-300 font-bold'
+                                    : 'text-white group-hover:text-cyan-300'
+                                }`}
+                                title={item.server}
+                              >
+                                {item.server}
+                              </span>
+
+                              {isCurrent && (
+                                <span className="px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800 text-[10px] font-bold flex items-center gap-1 font-mono shrink-0">
+                                  <CheckCircle2 size={10} /> Active Server
+                                </span>
+                              )}
+
+                              <span className="px-1.5 py-0.2 rounded bg-slate-900 text-slate-400 border border-slate-800 text-[10px] font-mono shrink-0">
+                                {item.contextCount} context{item.contextCount > 1 ? 's' : ''}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-3 text-[11px] text-slate-400 font-mono flex-wrap">
+                              <span className="flex items-center gap-1 text-slate-300">
+                                <Layers size={11} className="text-cyan-400" />
+                                <span className="font-semibold text-cyan-200 truncate max-w-[220px]">
+                                  {item.activeContextName}
+                                </span>
+                              </span>
+
+                              {item.user && (
+                                <span className="flex items-center gap-1">
+                                  <User size={11} className="text-slate-500" />
+                                  <span className="truncate max-w-[140px]">{item.user}</span>
+                                </span>
+                              )}
+
+                              {item.clusterName && item.clusterName !== item.server && (
+                                <span className="text-[10px] text-slate-500 truncate max-w-[140px]">
+                                  cluster: {item.clusterName}
+                                </span>
+                              )}
+                            </div>
+                          </>
+                        ) : (
+                          /* Context Clean View or Project View */
+                          <>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {isAllProjects && <Globe size={15} className="text-purple-400 shrink-0" />}
+                              <span
+                                className={`font-mono text-sm font-semibold transition-colors ${
+                                  isCurrent
+                                    ? 'text-cyan-300 font-bold'
+                                    : isHighlighted
+                                    ? 'text-cyan-300 font-bold'
+                                    : isAllProjects
+                                    ? 'text-purple-300 group-hover:text-purple-200'
+                                    : 'text-white group-hover:text-cyan-300'
+                                }`}
+                              >
+                                {item.displayName || item.name}
+                              </span>
+                              {isAllProjects && (
+                                <span className="px-2 py-0.2 rounded bg-purple-950 text-purple-300 border border-purple-800 text-[10px] font-mono">
+                                  Cluster-Wide
+                                </span>
+                              )}
+                              {isCurrent && (
+                                <span className="px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800 text-[10px] font-bold flex items-center gap-1 font-mono">
+                                  <CheckCircle2 size={10} /> Active (Keep)
+                                </span>
+                              )}
+                            </div>
+
+                            {mode === 'context' ? (
+                              <div className="flex items-center gap-3 text-[11px] text-slate-400 font-mono flex-wrap">
+                                {item.server && (
+                                  <span className="flex items-center gap-1 text-slate-300">
+                                    <Server size={11} className="text-cyan-400" />
+                                    <span className="truncate max-w-[200px]">{item.server}</span>
+                                  </span>
+                                )}
+                                {item.cluster && (
+                                  <span className="text-[10px] text-slate-500 truncate max-w-[150px]">
+                                    cluster: {item.cluster}
+                                  </span>
+                                )}
+                                {item.user && (
+                                  <span className="flex items-center gap-1">
+                                    <User size={11} className="text-slate-500" />
+                                    <span className="truncate max-w-[140px]">{item.user}</span>
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="text-[11px] text-slate-400 font-mono">
+                                {isAllProjects ? (
+                                  <span className="text-purple-400">View all resources across all namespaces</span>
+                                ) : (
+                                  <>
+                                    Status: <span className="text-emerald-400">{item.status || 'Active'}</span>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
+                    </div>
 
-                      {mode === 'context' ? (
-                        <div className="flex items-center gap-3 text-[11px] text-slate-400 font-mono">
-                          {item.cluster && (
-                            <span className="flex items-center gap-1">
-                              <Server size={11} className="text-slate-500" />
-                              <span className="truncate max-w-[220px]">{item.cluster}</span>
-                            </span>
-                          )}
-                          {item.user && (
-                            <span className="flex items-center gap-1">
-                              <User size={11} className="text-slate-500" />
-                              <span className="truncate max-w-[160px]">{item.user}</span>
-                            </span>
-                          )}
-                        </div>
+                    {/* Right side actions */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {isServerItem && item.contextCount > 1 && (
+                        <button
+                          type="button"
+                          onClick={(e) => toggleExpandServer(e, serverKey)}
+                          className="p-1 rounded bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer text-[10px] font-mono flex items-center gap-1"
+                          title="View all contexts for this server"
+                        >
+                          <span>{isExpanded ? 'Hide' : 'All'} Contexts</span>
+                          {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                        </button>
+                      )}
+
+                      {mode === 'context' && viewMode === 'clean' ? (
+                        !isCurrent && (
+                          <button
+                            type="button"
+                            onClick={(e) => handleDeleteSingle(e, item.name)}
+                            className="p-1.5 rounded bg-slate-800 hover:bg-rose-600 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                            title={`Delete context '${item.name}'`}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )
                       ) : (
-                        <div className="text-[11px] text-slate-400 font-mono">
-                          {isAllProjects ? (
-                            <span className="text-purple-400">View all resources across all namespaces</span>
-                          ) : (
-                            <>
-                              Status: <span className="text-emerald-400">{item.status || 'Active'}</span>
-                            </>
+                        <>
+                          {isHighlighted && (
+                            <span className="px-1.5 py-0.5 rounded bg-cyan-500 text-slate-950 text-[10px] font-bold font-mono">
+                              ↵ Enter
+                            </span>
                           )}
-                        </div>
+                          <div
+                            className={`transition-colors ${
+                              isHighlighted ? 'text-cyan-300' : 'text-slate-500 group-hover:text-cyan-400'
+                            }`}
+                          >
+                            <ArrowRight size={16} />
+                          </div>
+                        </>
                       )}
                     </div>
                   </div>
 
-                  {/* Right side actions */}
-                  <div className="flex items-center gap-2">
-                    {mode === 'context' && viewMode === 'clean' ? (
-                      !isCurrent && (
-                        <button
-                          type="button"
-                          onClick={(e) => handleDeleteSingle(e, item.name)}
-                          className="p-1.5 rounded bg-slate-800 hover:bg-rose-600 text-slate-400 hover:text-white transition-colors cursor-pointer"
-                          title={`Delete context '${item.name}'`}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )
-                    ) : (
-                      <>
-                        {isHighlighted && (
-                          <span className="px-1.5 py-0.5 rounded bg-cyan-500 text-slate-950 text-[10px] font-bold font-mono">
-                            ↵ Enter
-                          </span>
-                        )}
-                        <div
-                          className={`transition-colors ${
-                            isHighlighted ? 'text-cyan-300' : 'text-slate-500 group-hover:text-cyan-400'
-                          }`}
-                        >
-                          <ArrowRight size={16} />
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  {/* Expanded Sub-Contexts List for Server */}
+                  {isServerItem && isExpanded && item.contexts && item.contexts.length > 0 && (
+                    <div
+                      className="mt-2.5 pt-2 border-t border-slate-800/80 space-y-1 pl-11"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="text-[10px] text-slate-400 font-mono uppercase tracking-wider mb-1">
+                        Available Contexts for this Server:
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {item.contexts.map((subCtx: KubeContext) => {
+                          const isSubCurrent = subCtx.name === currentContext;
+                          return (
+                            <button
+                              key={subCtx.name}
+                              type="button"
+                              onClick={() => onSelectContext(subCtx.name)}
+                              className={`px-2 py-1 rounded text-xs font-mono flex items-center gap-1.5 border transition-all cursor-pointer ${
+                                isSubCurrent
+                                  ? 'bg-cyan-950 text-cyan-300 border-cyan-500 shadow-sm'
+                                  : 'bg-slate-900/90 text-slate-300 border-slate-700/80 hover:border-cyan-400 hover:text-white'
+                              }`}
+                            >
+                              <Layers size={11} className={isSubCurrent ? 'text-cyan-400' : 'text-slate-500'} />
+                              <span>{subCtx.name}</span>
+                              {subCtx.namespace && (
+                                <span className="text-[10px] text-slate-500">({subCtx.namespace})</span>
+                              )}
+                              {isSubCurrent && <CheckCircle2 size={10} className="text-cyan-400" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })

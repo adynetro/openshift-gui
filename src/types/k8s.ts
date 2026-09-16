@@ -140,6 +140,18 @@ export interface KubeContext {
   user: string;
   namespace: string;
   isCurrent: boolean;
+  server?: string;
+}
+
+export interface ServerInfo {
+  server: string;
+  clusterName: string;
+  activeContextName: string;
+  user: string;
+  namespace: string;
+  contextCount: number;
+  contexts: KubeContext[];
+  isCurrent: boolean;
 }
 
 export interface ProjectInfo {

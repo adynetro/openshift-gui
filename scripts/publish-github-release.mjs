@@ -10,31 +10,24 @@ const token = execSync('printf "protocol=https\\nhost=github.com\\n" | git crede
 
 const repo = 'adynetro/openshift-gui';
 const tagName = `v${VERSION}`;
-const releaseName = `OpenShift GUI v${VERSION} - Kubeconfig Context Cleaner, Self-Contained Windows Executable & NetworkPolicy Designer`;
+const releaseName = `OpenShift GUI v${VERSION} - Active Server Discovery, Automatic Project Refresh & Resilient Kubeconfig Parser`;
 
 const releaseBody = `## 🚀 What's New in OpenShift GUI v${VERSION}
 
-### 🧹 Kubeconfig Context Cleaner & Pruner (Keep Active Context)
-- **Keep Active Context Only**: 1-click action to purge all stale/inactive contexts from \`~/.kube/config\` and retain only the currently active cluster context.
-- **Selective Batch Cleanup**: Select specific stale contexts with checkboxes to delete in bulk.
-- **Individual Context Deletion**: Instant trash action per context card in the Context Management view.
-- **Orphaned Cluster & User Pruning**: Automatically prunes dangling \`clusters\` and \`users\` (auth-infos) that are no longer referenced by any remaining context.
-- **Safe Automatic Backups**: Automatically creates a timestamped backup at \`~/.kube/config.bak-<timestamp>\` before writing any changes.
+### 🖥️ Kubeconfig Startup Parsing & Active Server Discovery
+- **Display Only Servers with Active Contexts**: Automatically parses \`~/.kube/config\` at startup, maps cluster server endpoints, and displays only servers that have active/valid contexts.
+- **Server Grouping & Deduplication**: Groups multiple contexts belonging to the same cluster server endpoint (e.g. per-project OpenShift contexts) under a unified server card with active context and user badges.
+- **Sub-Context Selector**: Quick-switch buttons and pill list to select specific namespaces/contexts under a server without UI clutter.
 
-### 🪟 Self-Contained Standalone Windows Executables
-- **Portable Single-File Executable**: Released **\`OpenShift GUI ${VERSION}.exe\`** (100% self-contained single-file portable executable requiring no installer, administrative privileges, or Node.js runtime).
-- **Windows Setup Installer**: **\`OpenShift GUI Setup ${VERSION}.exe\`** for standard desktop installation.
-- **x64 and ia32 (x86) Support**: Both 64-bit and 32-bit standalone ZIP archives and executables.
+### 🔄 Automatic Project Refresh on Server Change
+- **Instant Project Sync**: Automatically switches and refreshes the projects/namespaces list whenever a server or context is changed.
+- **Auto-Select Active Namespace**: Automatically selects the new server's active namespace (or cluster-wide \`All Projects\`), preventing stale/orphaned namespace queries.
+- **Immediate Resource Reload**: Clears stale resource cache and re-fetches resources for the active project on the newly selected server.
 
-### 🌐 NetworkPolicy Designer & Interactive Visualizer
-- **Interactive Port Editor**: Manage protocol (\`TCP\`, \`UDP\`, \`SCTP\`) and port numbers/names directly with quick-add presets (\`80 HTTP\`, \`443 HTTPS\`, \`53 DNS\`, \`8080\`).
-- **Interactive Peer & Label Editor**: Add/remove labels on \`PodSelector\` and \`NamespaceSelector\` peers, and edit \`IPBlock\` CIDR blocks.
-- **Enriched Resource Table**: Displays Policy Types, Target Pod match label badges, Ingress rules & port chips, Egress rules & port chips, and metadata labels.
-
-### 🔥 OpenShift Registry Pruner Route Integration
-- **Automated External Route Discovery**: Auto-detects \`--registry-url\` from the OpenShift image registry route.
-- **Manual Route Configuration**: Editable registry URL field in the image pruner modal with live auto-detection.
-- **Automated CronJob Generator**: Injects the detected external registry URL into generated OpenShift \`batch/v1 CronJob\` manifests.
+### 🛡️ Resilient Kubeconfig Parser & Edge-Case Protection
+- **Fault-Tolerant Parsing**: Handles heavily corrupted, malformed, or incomplete kubeconfig files (dangling cluster references, missing user objects, null arrays, duplicate names, invalid YAML syntax).
+- **Safe Fallbacks**: Automatically falls back to atomic direct updates if CLI \`oc config\` commands fail.
+- **Safe Automatic Backups**: Continues to create automatic timestamped backups at \`~/.kube/config.bak-<timestamp>\` before writing any changes.
 
 ---
 

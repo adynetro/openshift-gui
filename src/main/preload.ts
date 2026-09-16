@@ -2,7 +2,8 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 export interface IpcApi {
   openExternal: (url: string) => Promise<void>;
-  getContexts: () => Promise<{ contexts: any[]; currentContext: string | null }>;
+  getContexts: () => Promise<{ contexts: any[]; currentContext: string | null; servers: any[] }>;
+  getServers: () => Promise<{ servers: any[]; currentServer: string | null; currentContext: string | null }>;
   switchContext: (contextName: string) => Promise<boolean>;
   getProjects: () => Promise<any[]>;
   getCurrentNamespace: () => Promise<string>;
@@ -84,6 +85,7 @@ export interface IpcApi {
 const api: IpcApi = {
   openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
   getContexts: () => ipcRenderer.invoke('kube:getContexts'),
+  getServers: () => ipcRenderer.invoke('kube:getServers'),
   switchContext: (ctx) => ipcRenderer.invoke('kube:switchContext', ctx),
   getProjects: () => ipcRenderer.invoke('kube:getProjects'),
   getCurrentNamespace: () => ipcRenderer.invoke('kube:getCurrentNamespace'),

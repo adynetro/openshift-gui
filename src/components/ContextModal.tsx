@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { KubeContext, ProjectInfo } from '../types/k8s.js';
+import { groupServersWithContexts } from '../services/kubeconfig.js';
 import { FuzzyMatcher } from '../utils/fuzzy.js';
 import { theme } from '../utils/theme.js';
 import { padRight, truncate } from '../utils/formatters.js';
@@ -32,20 +33,24 @@ export const ContextModal: React.FC<ContextModalProps> = ({
 
   const items = useMemo(() => {
     if (mode === 'context') {
-      const raw = contexts.map((c) => ({
-        id: c.name,
-        name: c.name,
-        cluster: c.cluster,
-        user: c.user,
-        isCurrent: c.name === currentContext,
+      const serverList = groupServersWithContexts(contexts, currentContext);
+      const raw = serverList.map((s) => ({
+        id: s.server,
+        name: s.server,
+        activeContextName: s.activeContextName,
+        cluster: s.clusterName,
+        user: s.user,
+        contextCount: s.contextCount,
+        isCurrent: s.isCurrent,
       }));
       if (!query.trim()) return raw;
-      const matcher = new FuzzyMatcher(raw, ['name', 'cluster', 'user']);
+      const matcher = new FuzzyMatcher(raw, ['name', 'activeContextName', 'cluster', 'user']);
       return matcher.search(query);
     } else {
       const raw = projects.map((p) => ({
         id: p.name,
         name: p.name,
+        activeContextName: p.name,
         displayName: p.displayName,
         status: p.status,
         isCurrent: p.name === currentProject,
@@ -73,7 +78,7 @@ export const ContextModal: React.FC<ContextModalProps> = ({
       const selected = items[selectedIndex];
       if (selected) {
         if (mode === 'context') {
-          onSelectContext(selected.name);
+          onSelectContext(selected.activeContextName || selected.name);
         } else {
           onSelectProject(selected.name);
         }
@@ -88,7 +93,7 @@ export const ContextModal: React.FC<ContextModalProps> = ({
   }
   const visibleItems = items.slice(startIdx, startIdx + maxVisible);
 
-  const title = mode === 'context' ? 'Switch Kubernetes / OpenShift Context' : 'Switch Project / Namespace';
+  const title = mode === 'context' ? 'Switch Server & Active Context' : 'Switch Project / Namespace';
 
   return (
     <Box
@@ -123,7 +128,7 @@ export const ContextModal: React.FC<ContextModalProps> = ({
       {/* List */}
       <Box flexDirection="column">
         {visibleItems.length === 0 ? (
-          <Text color="gray">No matching {mode}s found.</Text>
+          <Text color="gray">No matching {mode === 'context' ? 'servers' : 'projects'} found.</Text>
         ) : (
           visibleItems.map((item, idx) => {
             const actualIdx = startIdx + idx;
@@ -134,7 +139,7 @@ export const ContextModal: React.FC<ContextModalProps> = ({
               <Box key={item.id} paddingX={0}>
                 <Text color={isSelected ? 'cyan' : 'white'} bold={isSelected}>
                   {pointer}
-                  {padRight(truncate(item.name, 40), 45)}
+                  {padRight(truncate(item.name, 38), 40)}
                 </Text>
                 {item.isCurrent ? (
                   <Text color="green" bold>
@@ -144,7 +149,12 @@ export const ContextModal: React.FC<ContextModalProps> = ({
                 ) : (
                   <Text color="gray"> </Text>
                 )}
-                {'cluster' in item && <Text color="gray">{truncate((item as any).cluster || '', 30)}</Text>}
+                {'activeContextName' in item && item.activeContextName !== item.name && (
+                  <Text color="cyan"> ctx:{truncate(item.activeContextName, 25)}</Text>
+                )}
+                {'user' in item && item.user ? (
+                  <Text color="gray"> ({item.user})</Text>
+                ) : null}
               </Box>
             );
           })
@@ -153,7 +163,7 @@ export const ContextModal: React.FC<ContextModalProps> = ({
 
       <Box marginTop={1} justifyContent="space-between">
         <Text color="gray">
-          Total: {items.length} {mode}s
+          Total: {items.length} {mode === 'context' ? 'servers with active contexts' : 'projects'}
         </Text>
       </Box>
     </Box>

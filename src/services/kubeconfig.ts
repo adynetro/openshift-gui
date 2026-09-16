@@ -4,10 +4,126 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
-import { KubeContext, ProjectInfo, ClusterInfo } from '../types/k8s.js';
+import { KubeContext, ProjectInfo, ClusterInfo, ServerInfo } from '../types/k8s.js';
 import { getExecEnv } from './oc-client.js';
+import { groupServersWithContexts } from '../utils/kube-utils.js';
+
+export { groupServersWithContexts };
 
 const execAsync = promisify(exec);
+
+/**
+ * Parses raw YAML string or parsed JSON object into sanitized contexts and servers.
+ * Handles messy, partially corrupted, or malformed kubeconfig structures safely.
+ */
+export function parseKubeConfig(rawInput: any): {
+  contexts: KubeContext[];
+  currentContext: string | null;
+  servers: ServerInfo[];
+} {
+  let config: any = rawInput;
+
+  if (typeof rawInput === 'string') {
+    if (!rawInput.trim()) {
+      return { contexts: [], currentContext: null, servers: [] };
+    }
+    try {
+      config = parseYaml(rawInput);
+    } catch (err: any) {
+      console.warn('[KubeConfigService] YAML parse error:', err.message);
+      return { contexts: [], currentContext: null, servers: [] };
+    }
+  }
+
+  if (!config || typeof config !== 'object') {
+    return { contexts: [], currentContext: null, servers: [] };
+  }
+
+  // 1. Build cluster server lookup map
+  const clusterMap = new Map<string, { server: string; insecureSkipTlsVerify?: boolean }>();
+  if (Array.isArray(config.clusters)) {
+    for (const cl of config.clusters) {
+      if (cl && typeof cl === 'object' && typeof cl.name === 'string' && cl.name.trim()) {
+        const clName = cl.name.trim();
+        const clObj = cl.cluster && typeof cl.cluster === 'object' ? cl.cluster : {};
+        const serverUrl = typeof clObj.server === 'string' ? clObj.server.trim() : '';
+        clusterMap.set(clName, {
+          server: serverUrl,
+          insecureSkipTlsVerify: !!clObj['insecure-skip-tls-verify'],
+        });
+      }
+    }
+  }
+
+  // 2. Extract current-context
+  const rawCurrent = typeof config['current-context'] === 'string' ? config['current-context'].trim() : null;
+
+  // 3. Extract and sanitize contexts
+  const contextMap = new Map<string, KubeContext>();
+
+  if (Array.isArray(config.contexts)) {
+    for (const rawCtx of config.contexts) {
+      if (!rawCtx || typeof rawCtx !== 'object') continue;
+
+      const name = typeof rawCtx.name === 'string' ? rawCtx.name.trim() : '';
+      if (!name) continue;
+
+      const ctxInner = rawCtx.context && typeof rawCtx.context === 'object' ? rawCtx.context : {};
+      const clusterName = typeof ctxInner.cluster === 'string' ? ctxInner.cluster.trim() : '';
+      const userName = typeof ctxInner.user === 'string' ? ctxInner.user.trim() : '';
+      const namespace = typeof ctxInner.namespace === 'string' && ctxInner.namespace.trim() ? ctxInner.namespace.trim() : 'default';
+
+      // Resolve server URL from clusterMap
+      const clusterEntry = clusterMap.get(clusterName);
+      let serverUrl = clusterEntry?.server || '';
+      if (!serverUrl && (clusterName.startsWith('http://') || clusterName.startsWith('https://'))) {
+        serverUrl = clusterName;
+      }
+      if (!serverUrl) {
+        serverUrl = clusterName || name;
+      }
+
+      const isCurrent = name === rawCurrent;
+
+      const kubeContext: KubeContext = {
+        name,
+        cluster: clusterName,
+        user: userName,
+        namespace,
+        isCurrent,
+        server: serverUrl,
+      };
+
+      // De-duplicate if context already seen (keep current one if duplicate)
+      const existing = contextMap.get(name);
+      if (!existing || isCurrent) {
+        contextMap.set(name, kubeContext);
+      }
+    }
+  }
+
+  const contexts = Array.from(contextMap.values());
+
+  // 4. Validate current-context
+  let currentContext = rawCurrent;
+  if (currentContext && !contextMap.has(currentContext)) {
+    // If raw current context is not in valid contexts, point to the first available
+    currentContext = contexts.length > 0 ? contexts[0]?.name || null : null;
+    if (currentContext && contexts.length > 0) {
+      contexts[0]!.isCurrent = true;
+    }
+  } else if (!currentContext && contexts.length > 0) {
+    currentContext = contexts[0]?.name || null;
+    if (currentContext && contexts.length > 0) {
+      contexts[0]!.isCurrent = true;
+    }
+  }
+
+  // 5. Group servers with active contexts
+  const servers = groupServersWithContexts(contexts, currentContext);
+
+  return { contexts, currentContext, servers };
+}
 
 export class KubeConfigService {
   /**
@@ -39,28 +155,24 @@ export class KubeConfigService {
   }
 
   /**
-   * Reads raw kubeconfig directly from disk file.
+   * Reads raw kubeconfig directly from disk file and parses contexts and servers.
+   * Displays only servers with active contexts.
    */
-  static async getContexts(): Promise<{ contexts: KubeContext[]; currentContext: string | null }> {
+  static async getContexts(): Promise<{
+    contexts: KubeContext[];
+    currentContext: string | null;
+    servers: ServerInfo[];
+  }> {
     const kubePath = this.getKubeconfigPath();
 
     // 1. Direct synchronous file read and parse
     try {
       if (fs.existsSync(kubePath)) {
         const fileContent = fs.readFileSync(kubePath, 'utf8');
-        const config = parseYaml(fileContent);
+        const parsed = parseKubeConfig(fileContent);
 
-        if (config && Array.isArray(config.contexts) && config.contexts.length > 0) {
-          const current = config['current-context'] || null;
-          const contexts: KubeContext[] = config.contexts.map((ctx: any) => ({
-            name: ctx.name,
-            cluster: ctx.context?.cluster || '',
-            user: ctx.context?.user || '',
-            namespace: ctx.context?.namespace || 'default',
-            isCurrent: ctx.name === current,
-          }));
-
-          return { contexts, currentContext: current };
+        if (parsed.contexts.length > 0) {
+          return parsed;
         }
       }
     } catch (err: any) {
@@ -74,40 +186,73 @@ export class KubeConfigService {
         maxBuffer: 20 * 1024 * 1024,
       });
       if (stdout.trim()) {
-        const config = JSON.parse(stdout);
-        const current = config['current-context'] || null;
-        const contexts: KubeContext[] = (config.contexts || []).map((ctx: any) => ({
-          name: ctx.name,
-          cluster: ctx.context?.cluster || '',
-          user: ctx.context?.user || '',
-          namespace: ctx.context?.namespace || 'default',
-          isCurrent: ctx.name === current,
-        }));
-
-        if (contexts.length > 0) {
-          return { contexts, currentContext: current };
+        const parsed = parseKubeConfig(JSON.parse(stdout));
+        if (parsed.contexts.length > 0) {
+          return parsed;
         }
       }
     } catch (error: any) {
       console.error('[KubeConfigService] Fallback oc config view failed:', error.message);
     }
 
-    return { contexts: [], currentContext: null };
+    return { contexts: [], currentContext: null, servers: [] };
+  }
+
+  /**
+   * Retrieves servers with active contexts.
+   */
+  static async getServers(): Promise<{
+    servers: ServerInfo[];
+    currentServer: string | null;
+    currentContext: string | null;
+  }> {
+    const { contexts, currentContext, servers } = await this.getContexts();
+    const currentServerInfo = servers.find((s) => s.isCurrent);
+    return {
+      servers,
+      currentServer: currentServerInfo?.server || null,
+      currentContext,
+    };
   }
 
   /**
    * Switches active context in kubeconfig.
+   * Supports both oc CLI and direct kubeconfig file atomic update as fallback.
    */
   static async switchContext(contextName: string): Promise<boolean> {
+    if (!contextName || !contextName.trim()) return false;
+    const target = contextName.trim();
+
+    // 1. Try oc CLI
     try {
-      await execAsync(`oc config use-context "${contextName}"`, {
+      await execAsync(`oc config use-context "${target}"`, {
         env: getExecEnv(),
       });
       return true;
     } catch (error) {
-      console.error('Failed to switch context:', error);
-      return false;
+      console.warn('[KubeConfigService] oc config use-context failed, falling back to direct update:', error);
     }
+
+    // 2. Direct kubeconfig update fallback
+    try {
+      const kubePath = this.getKubeconfigPath();
+      if (fs.existsSync(kubePath)) {
+        const rawContent = fs.readFileSync(kubePath, 'utf8');
+        const config = parseYaml(rawContent);
+        if (config && Array.isArray(config.contexts)) {
+          const match = config.contexts.find((c: any) => c && c.name === target);
+          if (match) {
+            config['current-context'] = target;
+            fs.writeFileSync(kubePath, stringifyYaml(config), { encoding: 'utf8', mode: 0o600 });
+            return true;
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error('[KubeConfigService] Direct context switch fallback failed:', err.message);
+    }
+
+    return false;
   }
 
   /**
@@ -226,21 +371,28 @@ export class KubeConfigService {
   }
 
   /**
-   * Gets cluster metadata.
+   * Gets cluster metadata including resolved server URL.
    */
   static async getClusterInfo(): Promise<ClusterInfo> {
-    const { contexts, currentContext } = await this.getContexts();
+    const { contexts, currentContext, servers } = await this.getContexts();
     const active = contexts.find((c) => c.isCurrent || c.name === currentContext);
+    const activeServer = servers.find((s) => s.isCurrent || (active && s.contexts.some((c) => c.name === active.name)));
     const ns = await this.getCurrentNamespace();
 
-    let clusterUser = active?.user || '';
+    let clusterUser = active?.user || activeServer?.user || '';
     try {
       const { stdout } = await execAsync('oc whoami', { env: getExecEnv() });
       if (stdout.trim()) clusterUser = stdout.trim();
     } catch (e) {}
 
+    let serverUrl = active?.server || activeServer?.server || active?.cluster || 'Unknown Cluster';
+    try {
+      const { stdout } = await execAsync('oc whoami --show-server', { env: getExecEnv() });
+      if (stdout.trim()) serverUrl = stdout.trim();
+    } catch (e) {}
+
     return {
-      server: active?.cluster || 'Unknown Cluster',
+      server: serverUrl,
       user: clusterUser || active?.user || 'Unknown User',
       context: currentContext || 'None',
       namespace: ns || 'all-projects',
