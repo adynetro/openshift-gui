@@ -173,7 +173,7 @@ async function publishRelease() {
     );
   });
 
-  // Fetch existing assets to delete duplicates before re-uploading
+  // Fetch existing assets to check which ones are already uploaded
   const assetsRes = await fetch(`https://api.github.com/repos/${repo}/releases/${releaseData.id}/assets?per_page=100`, {
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -182,12 +182,13 @@ async function publishRelease() {
     },
   });
   const existingAssets = await assetsRes.json();
-  const normalize = (s) => (s || '').toLowerCase().replace(/[\s.-]+/g, '.');
+  const normalize = (s) => (s || '').toLowerCase().replace(/[\s_.-]+/g, '.');
   const assetMap = new Map();
   if (Array.isArray(existingAssets)) {
     for (const asset of existingAssets) {
-      assetMap.set(asset.name, asset.id);
-      assetMap.set(normalize(asset.name), asset.id);
+      assetMap.set(asset.name, asset);
+      assetMap.set(normalize(asset.name), asset);
+      assetMap.set(asset.name.replace(/\./g, ' '), asset);
     }
   }
 
@@ -198,22 +199,32 @@ async function publishRelease() {
       continue;
     }
 
-    const normName = normalize(filename);
-    const existingAssetId = assetMap.get(filename) || assetMap.get(normName);
-    if (existingAssetId) {
-      console.log(`Replacing existing asset ${filename} (ID: ${existingAssetId})...`);
-      await fetch(`https://api.github.com/repos/${repo}/releases/assets/${existingAssetId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/vnd.github+json',
-          'User-Agent': 'openshift-gui-builder',
-        },
-      });
+    const size = fs.statSync(filePath).size;
+    const existingAsset = assetMap.get(filename) || assetMap.get(normalize(filename)) || assetMap.get(filename.replace(/\s+/g, '.'));
+
+    if (existingAsset && existingAsset.size === size && existingAsset.state === 'uploaded') {
+      console.log(`⏩ ${filename} already uploaded (${(size / (1024 * 1024)).toFixed(2)} MB), skipping.`);
+      continue;
+    }
+
+    if (existingAsset) {
+      console.log(`Replacing existing asset ${filename} (ID: ${existingAsset.id})...`);
+      try {
+        await fetch(`https://api.github.com/repos/${repo}/releases/assets/${existingAsset.id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/vnd.github+json',
+            'User-Agent': 'openshift-gui-builder',
+          },
+        });
+        await new Promise((r) => setTimeout(r, 1500));
+      } catch (err) {
+        console.warn(`Could not delete asset ${filename}:`, err.message);
+      }
     }
 
     const fileBuffer = fs.readFileSync(filePath);
-    const size = fs.statSync(filePath).size;
     console.log(`Uploading ${filename} (${(size / (1024 * 1024)).toFixed(2)} MB)...`);
 
     let contentType = 'application/octet-stream';
@@ -222,27 +233,45 @@ async function publishRelease() {
     else if (filename.endsWith('.exe')) contentType = 'application/vnd.microsoft.portable-executable';
     else if (filename.endsWith('.txt')) contentType = 'text/plain';
 
-    const uploadRes = await fetch(`${uploadUrlTemplate}?name=${encodeURIComponent(filename)}`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/vnd.github+json',
-        'Content-Type': contentType,
-        'Content-Length': size,
-        'User-Agent': 'openshift-gui-builder',
-      },
-      body: fileBuffer,
-    });
+    let success = false;
+    for (let attempt = 1; attempt <= 4; attempt++) {
+      try {
+        const uploadRes = await fetch(`${uploadUrlTemplate}?name=${encodeURIComponent(filename)}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/vnd.github+json',
+            'Content-Type': contentType,
+            'Content-Length': size,
+            'User-Agent': 'openshift-gui-builder',
+          },
+          body: fileBuffer,
+        });
 
-    const uploadData = await uploadRes.json();
-    if (!uploadData.id) {
-      console.error(`Failed to upload ${filename}:`, uploadData);
-    } else {
-      console.log(`✅ Uploaded ${filename} (Asset ID: ${uploadData.id})`);
+        const uploadData = await uploadRes.json();
+        if (uploadData && uploadData.id) {
+          console.log(`✅ Uploaded ${filename} (Asset ID: ${uploadData.id})`);
+          success = true;
+          break;
+        } else {
+          console.warn(`Attempt ${attempt} failed for ${filename}:`, uploadData?.message || uploadData);
+        }
+      } catch (err) {
+        console.warn(`Attempt ${attempt} encountered error for ${filename}: ${err.message}`);
+      }
+
+      if (attempt < 4) {
+        console.log(`Retrying ${filename} in 5 seconds...`);
+        await new Promise((r) => setTimeout(r, 5000));
+      }
+    }
+
+    if (!success) {
+      console.error(`❌ Failed to upload ${filename} after 4 attempts.`);
     }
   }
 
-  console.log(`\n🎉 All release assets successfully attached to ${releaseData.html_url}`);
+  console.log(`\n🎉 All release assets processed for ${releaseData.html_url}`);
 }
 
 publishRelease().catch((err) => {
