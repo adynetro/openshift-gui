@@ -102,7 +102,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   counts,
   onOpenHelp,
 }) => {
-  const displayVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.0.3';
+  const displayVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.0.4';
 
   return (
     <aside

@@ -212,10 +212,10 @@ export const App: React.FC = () => {
     setSelectedItem(null);
     setStatusFilter('ALL');
     setSelectedPodIds(new Set());
-    if (currentKind !== 'topology') {
+    if (currentKind !== 'topology' && !preloaderState.isActive) {
       fetchResources(false);
     }
-  }, [fetchResources, currentKind]);
+  }, [fetchResources, currentKind, preloaderState.isActive]);
 
   // Auto-polling interval
   useEffect(() => {
@@ -355,6 +355,9 @@ export const App: React.FC = () => {
       }
 
       setCurrentContext(contextName);
+      setContexts((prev) => prev.map((c) => ({ ...c, isCurrent: c.name === contextName })));
+      setServers((prev) => prev.map((s) => ({ ...s, isCurrent: s.contexts.some((c) => c.name === contextName) })));
+
       setPreloaderState((prev) => ({
         ...prev,
         progress: 35,
@@ -437,10 +440,7 @@ export const App: React.FC = () => {
       setTimeout(() => {
         setPreloaderState((prev) => ({ ...prev, isActive: false }));
         setLoading(false);
-      }, 350);
-
-      // Background context sync
-      loadKubeInfo(newNs);
+      }, 300);
     } catch (err: any) {
       setPreloaderState((prev) => ({
         ...prev,
@@ -492,6 +492,7 @@ export const App: React.FC = () => {
       }
 
       setCurrentProject(projectName);
+      setProjects((prev) => prev.map((p) => ({ ...p, isCurrent: p.name === projectName })));
       setSelectedItem(null);
       setSelectedPodIds(new Set());
       setQuery('');
