@@ -10,13 +10,20 @@ const token = execSync('printf "protocol=https\\nhost=github.com\\n" | git crede
 
 const repo = 'adynetro/openshift-gui';
 const tagName = `v${VERSION}`;
-const releaseName = `OpenShift GUI v${VERSION} - Zero CLI Dependence, Native Rancher Cluster Support & WebSocket Exec`;
+const releaseName = `OpenShift GUI v${VERSION} - Resilient Multi-Container Log Streaming, CrashLoop Recovery & Zero CLI Dependence`;
 
-const releaseBody = `## 🚀 OpenShift GUI v${VERSION} - 100% Standalone Native REST & Rancher Release
+const releaseBody = `## 🚀 OpenShift GUI v${VERSION} - Multi-Container Log Streaming & CrashLoop Recovery
+
+### 📜 Resilient Multi-Container Log Streaming & CrashLoop Recovery
+- **Automatic Multi-Container Discovery**: Automatically discovers and streams all containers for multi-container pods and workloads without requiring manual selection.
+- **CrashLoopBackOff & Waiting Container Recovery**: When a container is waiting or crashlooping, displays the waiting state inline and automatically fetches previous container termination logs (\`previous=true\`).
+- **Comprehensive Workload Log Support**: Streams aggregated logs seamlessly for Deployments, DeploymentConfigs, StatefulSets, DaemonSets, ReplicaSets, and Jobs.
+- **Fail-Safe Error Reporting**: Captures API errors and JSON status messages safely without uncaught emitter exceptions, displaying diagnostic errors directly in the terminal log view.
+- **Dynamic Container Selector**: The UI container selector automatically populates with all active containers detected in the live log stream.
 
 ### ⚡ 100% Standalone Native REST & WebSocket Engine (Zero \`oc\` / \`kubectl\` Dependence)
-- **Zero CLI Binary Requirement**: OpenShift GUI no longer requires \`oc\` or \`kubectl\` binaries installed on the host operating system.
-- **Direct HTTPS REST API**: All operations (manifest loading, filtering, resource creation, YAML apply, scaling, rollout restarts, PVC resizing, secrets editing, and multi-pod deletion) execute directly via native HTTPS Keep-Alive connections to the Kubernetes API server.
+- **Zero CLI Binary Requirement**: OpenShift GUI does not require \`oc\` or \`kubectl\` binaries installed on the host operating system.
+- **Direct HTTPS REST API**: All operations execute directly via native HTTPS Keep-Alive connections to the Kubernetes API server.
 - **Native WebSocket Terminal Exec**: Integrated interactive terminal shell (\`TerminalService\`) communicates directly over Kubernetes WebSocket Exec endpoint using \`v4.channel.k8s.io\` subprotocol with full bidirectional stdin/stdout/stderr multiplexing and terminal resizing.
 - **Native HTTPS Log Streaming**: Live container log streaming (\`LogStreamer\`) operates via persistent chunked HTTP transfer with automatic multi-pod aggregation, timestamp parsing, and zero subprocess overhead.
 

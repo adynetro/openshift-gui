@@ -32,10 +32,36 @@ export const LogViewer: React.FC<LogViewerProps> = ({
     streamerRef.current = streamer;
 
     streamer.on('update', (allLogs: LogEntry[]) => {
-      setLogs(allLogs);
+      setLogs([...allLogs]);
     });
 
-    streamer.start();
+    streamer.on('lines', (batch: LogEntry[]) => {
+      setLogs((prev) => [...prev, ...batch].slice(-3000));
+    });
+
+    streamer.on('line', (entry: LogEntry) => {
+      setLogs((prev) => [...prev, entry].slice(-3000));
+    });
+
+    streamer.on('error', (err: Error) => {
+      setLogs((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          raw: `[Error: ${err.message}]`,
+        },
+      ]);
+    });
+
+    streamer.start().catch((err: Error) => {
+      setLogs((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          raw: `[Failed to start log stream: ${err.message}]`,
+        },
+      ]);
+    });
 
     return () => {
       streamer.stop();

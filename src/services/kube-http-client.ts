@@ -566,7 +566,9 @@ export class KubeHttpClient {
     if (options.container) params.set('container', options.container);
     if (options.sinceSeconds) params.set('sinceSeconds', options.sinceSeconds.toString());
 
-    const apiPath = `/api/v1/namespaces/${ns}/pods/${podName}/log?${params.toString()}`;
+    const safeNs = encodeURIComponent(ns);
+    const safePod = encodeURIComponent(podName);
+    const apiPath = `/api/v1/namespaces/${safeNs}/pods/${safePod}/log?${params.toString()}`;
     const urlInfo = buildKubeUrl(config.server, apiPath);
     const agent = this.cachedAgent || this.createAgent(config);
 
@@ -594,7 +596,16 @@ export class KubeHttpClient {
       if (res.statusCode && res.statusCode >= 400) {
         let errBuf = '';
         res.on('data', (d) => (errBuf += d.toString()));
-        res.on('end', () => onError(new Error(errBuf || `Log stream failed with status ${res.statusCode}`)));
+        res.on('end', () => {
+          let cleanErrMsg = errBuf.trim();
+          try {
+            const parsed = JSON.parse(errBuf);
+            if (parsed.message) {
+              cleanErrMsg = parsed.message;
+            }
+          } catch {}
+          onError(new Error(cleanErrMsg || `Log stream failed with status ${res.statusCode}`));
+        });
         return;
       }
 

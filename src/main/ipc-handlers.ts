@@ -183,11 +183,47 @@ export function registerIpcHandlers(mainWindow: electron.BrowserWindow): void {
       }
     });
 
+    streamer.on('line', (entry: LogEntry) => {
+      if (pendingLines.length === 0 && !flushTimer) {
+        pendingLines.push(entry);
+        flushTimer = setTimeout(flushLogs, 25);
+      }
+    });
+
     streamer.on('end', () => {
       flushLogs();
     });
 
-    streamer.start();
+    streamer.on('error', (err: Error) => {
+      if (!mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('logs:line', {
+          streamId,
+          lines: [
+            {
+              id: Date.now(),
+              pod: targetName,
+              raw: `[Log Error: ${err.message || 'Stream failed'}]`,
+            },
+          ],
+        });
+      }
+      flushLogs();
+    });
+
+    streamer.start().catch((err: Error) => {
+      if (!mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('logs:line', {
+          streamId,
+          lines: [
+            {
+              id: Date.now(),
+              pod: targetName,
+              raw: `[Failed to start log stream: ${err.message || 'Unknown error'}]`,
+            },
+          ],
+        });
+      }
+    });
     activeStreamers.set(streamId, streamer);
     return streamId;
   });

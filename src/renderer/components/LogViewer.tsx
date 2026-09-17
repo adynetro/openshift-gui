@@ -118,6 +118,14 @@ export const LogViewer: React.FC<LogViewerProps> = ({ item, namespace, onClose }
     }
   }, [logs, autoScroll]);
 
+  const availableContainers = useMemo(() => {
+    const set = new Set<string>(containers);
+    for (const l of logs) {
+      if (l.container) set.add(l.container);
+    }
+    return Array.from(set).sort();
+  }, [containers, logs]);
+
   // Discover all unique active pods in this stream
   const activePods = useMemo(() => {
     const set = new Set<string>();
@@ -338,7 +346,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ item, namespace, onClose }
             )}
 
             {/* Container Selector */}
-            {containers.length > 1 && (
+            {availableContainers.length > 1 && (
               <div
                 className="flex items-center gap-1.5 text-xs px-2 py-1 rounded border"
                 style={{
@@ -360,7 +368,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ item, namespace, onClose }
                   <option value="" style={{ backgroundColor: "var(--bg-input, #0f172a)", color: "var(--text-main, #f8fafc)" }}>
                     All Containers
                   </option>
-                  {containers.map((c) => (
+                  {availableContainers.map((c) => (
                     <option key={c} value={c} style={{ backgroundColor: "var(--bg-input, #0f172a)", color: "var(--text-main, #f8fafc)" }}>
                       {c}
                     </option>

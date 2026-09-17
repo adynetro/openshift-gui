@@ -1949,18 +1949,24 @@ spec:
   ): Promise<{ diagnostics?: PodDebugDiagnostics; error?: string }> {
     try {
       const ns = namespace && namespace !== 'all-projects' ? namespace : 'default';
-      const [podRes, prevLogsRes, curLogsRes, eventsRes] = await Promise.all([
-        KubeHttpClient.getResource('pods', podName, ns),
-        KubeHttpClient.requestRaw(`/api/v1/namespaces/${ns}/pods/${podName}/log?previous=true&tailLines=100`).catch(() => ({ data: '' })),
-        KubeHttpClient.requestRaw(`/api/v1/namespaces/${ns}/pods/${podName}/log?tailLines=100`).catch(() => ({ data: '' })),
-        KubeHttpClient.getResourceList('events', ns).catch(() => ({ items: [] })),
-      ]);
+      const podRes = await KubeHttpClient.getResource('pods', podName, ns);
 
       if (!podRes.data) {
         return { error: podRes.error || `Failed to fetch pod ${podName}` };
       }
 
       const podJson = podRes.data;
+      const firstContainer = podJson.spec?.containers?.[0]?.name;
+      const containerQuery = firstContainer ? `&container=${encodeURIComponent(firstContainer)}` : '';
+      const safeNs = encodeURIComponent(ns);
+      const safePod = encodeURIComponent(podName);
+
+      const [prevLogsRes, curLogsRes, eventsRes] = await Promise.all([
+        KubeHttpClient.requestRaw(`/api/v1/namespaces/${safeNs}/pods/${safePod}/log?previous=true&tailLines=100${containerQuery}`).catch(() => ({ data: '', statusCode: 0 })),
+        KubeHttpClient.requestRaw(`/api/v1/namespaces/${safeNs}/pods/${safePod}/log?tailLines=100${containerQuery}`).catch(() => ({ data: '', statusCode: 0 })),
+        KubeHttpClient.getResourceList('events', ns).catch(() => ({ items: [] })),
+      ]);
+
       const phase = podJson.status?.phase || 'Unknown';
       const nodeName = podJson.spec?.nodeName || '-';
       const podIP = podJson.status?.podIP || '-';
@@ -2034,8 +2040,8 @@ spec:
         podJson.status?.initContainerStatuses || []
       );
 
-      const previousLogs = prevLogsRes.data || '';
-      const recentLogs = curLogsRes.data || '';
+      const previousLogs = (prevLogsRes.statusCode >= 200 && prevLogsRes.statusCode < 300) ? prevLogsRes.data : '';
+      const recentLogs = (curLogsRes.statusCode >= 200 && curLogsRes.statusCode < 300) ? curLogsRes.data : '';
 
       const events: any[] = [];
       for (const item of eventsRes.items || []) {
