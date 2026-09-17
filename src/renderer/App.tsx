@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense, lazy } from 'react';
 import { TopNav } from './components/TopNav.js';
 import { Sidebar } from './components/Sidebar.js';
 import { SearchBar } from './components/SearchBar.js';
@@ -86,6 +86,8 @@ export const App: React.FC = () => {
   const [selectedPodIds, setSelectedPodIds] = useState<Set<string>>(new Set());
   const [batchDeleteModalOpen, setBatchDeleteModalOpen] = useState<boolean>(false);
   const [topologyPreloadData, setTopologyPreloadData] = useState<any>(null);
+  const resourceCacheRef = useRef<Map<string, ResourceItem[]>>(new Map());
+  const getClientCacheKey = (ns: string, kind: string) => `${ns || 'default'}::${kind}`;
 
   // High-Tech Preloader Animation State for smooth context & project switches
   const [preloaderState, setPreloaderState] = useState<{
@@ -162,33 +164,66 @@ export const App: React.FC = () => {
       const targetNs = preferredProject !== undefined ? preferredProject : (info?.namespace || (await api.getCurrentNamespace()) || 'all-projects');
       if (targetNs) {
         setCurrentProject(targetNs);
-        // Preload sidebar badge counts in background
-        api.getResourceCounts(targetNs).then((c: any) => {
-          if (c) setCounts((prev) => ({ ...prev, ...c }));
+        // Preload all resources in background into client cache
+        api.preloadAllResources(targetNs, currentKind).then((preloadRes: any) => {
+          if (preloadRes) {
+            if (preloadRes.counts) setCounts((prev) => ({ ...prev, ...preloadRes.counts }));
+            if (preloadRes.itemsByKind) {
+              Object.entries(preloadRes.itemsByKind).forEach(([k, items]) => {
+                resourceCacheRef.current.set(getClientCacheKey(targetNs, k), items as ResourceItem[]);
+              });
+              const active = preloadRes.itemsByKind[currentKind];
+              if (Array.isArray(active) && active.length > 0) {
+                setResources(active);
+              }
+            }
+          }
         }).catch(() => {});
       }
     } catch (e) {
       console.error('Error in loadKubeInfo:', e);
     }
-  }, []);
+  }, [currentKind]);
 
-  // Fetch resources for active kind and project
+  // Fetch resources for active kind and project with instant cache lookup
   const fetchResources = useCallback(
-    async (isBackground = false) => {
+    async (isBackground = false, force = false) => {
       if (currentKind === 'topology') return;
       const api = (window as any).electronAPI;
       if (!api) return;
 
-      if (!isBackground) setLoading(true);
+      const cacheKey = getClientCacheKey(currentProject, currentKind);
+      const cached = resourceCacheRef.current.get(cacheKey);
+
+      // Instant 0ms render from memory cache if available
+      if (cached && !isBackground && !force) {
+        setResources(cached);
+        setLoading(false);
+        // Silent background revalidation
+        api.getResources(currentKind, currentProject).then((res: any) => {
+          if (res && res.items) {
+            setResources(res.items);
+            resourceCacheRef.current.set(cacheKey, res.items);
+            setCounts((prev) => ({ ...prev, [currentKind]: res.items.length }));
+            setFetchError(res.error || null);
+            setIsUnauthorized(!!res.isUnauthorized);
+          }
+        }).catch(() => {});
+        return;
+      }
+
+      if (!isBackground && !cached) setLoading(true);
       try {
         const res = await api.getResources(currentKind, currentProject);
         if (res && res.items) {
           setResources(res.items);
+          resourceCacheRef.current.set(cacheKey, res.items);
           setCounts((prev) => ({ ...prev, [currentKind]: res.items.length }));
           setFetchError(res.error || null);
           setIsUnauthorized(!!res.isUnauthorized);
         } else if (Array.isArray(res)) {
           setResources(res);
+          resourceCacheRef.current.set(cacheKey, res);
           setCounts((prev) => ({ ...prev, [currentKind]: res.length }));
           setFetchError(null);
           setIsUnauthorized(false);
@@ -393,37 +428,28 @@ export const App: React.FC = () => {
         ),
       }));
 
-      // 3. Preload active view resources + counts across all kinds in parallel
-      const [countsRes, activeRes, topologyRes] = await Promise.all([
-        api.getResourceCounts(newNs).catch(() => ({})),
-        currentKind !== 'topology'
-          ? api.getResources(currentKind, newNs).catch((e: any) => ({ items: [], error: e.message }))
-          : Promise.resolve({ items: [] }),
-        currentKind === 'topology'
-          ? api.getTopologyData(newNs).catch(() => ({ data: null }))
-          : Promise.resolve({ data: null }),
-      ]);
+      // 3. Preload active view resources + counts across all kinds in a single accelerated call
+      const preloadRes = await api.preloadAllResources(newNs, currentKind).catch(() => ({ counts: {}, itemsByKind: {}, activeResources: { items: [] } }));
 
-      if (countsRes) {
-        setCounts(countsRes);
+      if (preloadRes.counts) {
+        setCounts(preloadRes.counts);
+      }
+
+      if (preloadRes.itemsByKind) {
+        Object.entries(preloadRes.itemsByKind).forEach(([k, items]) => {
+          resourceCacheRef.current.set(getClientCacheKey(newNs, k), items as ResourceItem[]);
+        });
       }
 
       if (currentKind === 'topology') {
-        if (topologyRes?.data) {
-          setTopologyPreloadData(topologyRes.data);
+        if (preloadRes.topologyData) {
+          setTopologyPreloadData(preloadRes.topologyData);
         }
       } else {
-        if (activeRes && activeRes.items) {
-          setResources(activeRes.items);
-          setCounts((prev) => ({ ...prev, [currentKind]: activeRes.items.length, ...(countsRes || {}) }));
-          setFetchError(activeRes.error || null);
-          setIsUnauthorized(!!activeRes.isUnauthorized);
-        } else if (Array.isArray(activeRes)) {
-          setResources(activeRes);
-          setCounts((prev) => ({ ...prev, [currentKind]: activeRes.length, ...(countsRes || {}) }));
-          setFetchError(null);
-          setIsUnauthorized(false);
-        }
+        const activeItems = preloadRes.activeResources?.items || (preloadRes.itemsByKind && preloadRes.itemsByKind[currentKind]) || [];
+        setResources(activeItems);
+        setFetchError(preloadRes.activeResources?.error || null);
+        setIsUnauthorized(!!preloadRes.activeResources?.isUnauthorized);
       }
 
       // 4. Mark all steps completed & 100%
@@ -506,37 +532,28 @@ export const App: React.FC = () => {
         ),
       }));
 
-      // Preload active view resources + counts across all kinds in parallel
-      const [countsRes, activeRes, topologyRes] = await Promise.all([
-        api.getResourceCounts(projectName).catch(() => ({})),
-        currentKind !== 'topology'
-          ? api.getResources(currentKind, projectName).catch((e: any) => ({ items: [], error: e.message }))
-          : Promise.resolve({ items: [] }),
-        currentKind === 'topology'
-          ? api.getTopologyData(projectName).catch(() => ({ data: null }))
-          : Promise.resolve({ data: null }),
-      ]);
+      // Preload active view resources + counts across all kinds in a single accelerated call
+      const preloadRes = await api.preloadAllResources(projectName, currentKind).catch(() => ({ counts: {}, itemsByKind: {}, activeResources: { items: [] } }));
 
-      if (countsRes) {
-        setCounts(countsRes);
+      if (preloadRes.counts) {
+        setCounts(preloadRes.counts);
+      }
+
+      if (preloadRes.itemsByKind) {
+        Object.entries(preloadRes.itemsByKind).forEach(([k, items]) => {
+          resourceCacheRef.current.set(getClientCacheKey(projectName, k), items as ResourceItem[]);
+        });
       }
 
       if (currentKind === 'topology') {
-        if (topologyRes?.data) {
-          setTopologyPreloadData(topologyRes.data);
+        if (preloadRes.topologyData) {
+          setTopologyPreloadData(preloadRes.topologyData);
         }
       } else {
-        if (activeRes && activeRes.items) {
-          setResources(activeRes.items);
-          setCounts((prev) => ({ ...prev, [currentKind]: activeRes.items.length, ...(countsRes || {}) }));
-          setFetchError(activeRes.error || null);
-          setIsUnauthorized(!!activeRes.isUnauthorized);
-        } else if (Array.isArray(activeRes)) {
-          setResources(activeRes);
-          setCounts((prev) => ({ ...prev, [currentKind]: activeRes.length, ...(countsRes || {}) }));
-          setFetchError(null);
-          setIsUnauthorized(false);
-        }
+        const activeItems = preloadRes.activeResources?.items || (preloadRes.itemsByKind && preloadRes.itemsByKind[currentKind]) || [];
+        setResources(activeItems);
+        setFetchError(preloadRes.activeResources?.error || null);
+        setIsUnauthorized(!!preloadRes.activeResources?.isUnauthorized);
       }
 
       setPreloaderState((prev) => ({
@@ -1023,7 +1040,7 @@ export const App: React.FC = () => {
             onClose={closeModal}
             onSuccess={(msg) => {
               showToast(msg, 'success');
-              fetchResources(false);
+              fetchResources(false, true);
             }}
           />
         )}
@@ -1035,7 +1052,7 @@ export const App: React.FC = () => {
             onClose={closeModal}
             onSuccess={(msg) => {
               showToast(msg, 'success');
-              fetchResources(false);
+              fetchResources(false, true);
             }}
           />
         )}
@@ -1048,7 +1065,7 @@ export const App: React.FC = () => {
             onClose={closeModal}
             onSuccess={(msg) => {
               showToast(msg, 'success');
-              fetchResources(false);
+              fetchResources(false, true);
             }}
           />
         )}
@@ -1061,7 +1078,7 @@ export const App: React.FC = () => {
             onClose={closeModal}
             onSuccess={(msg) => {
               showToast(msg, 'success');
-              fetchResources(false);
+              fetchResources(false, true);
             }}
           />
         )}
@@ -1074,7 +1091,7 @@ export const App: React.FC = () => {
             onClose={closeModal}
             onSuccess={(msg) => {
               showToast(msg, 'success');
-              fetchResources(false);
+              fetchResources(false, true);
             }}
           />
         )}
@@ -1105,7 +1122,7 @@ export const App: React.FC = () => {
             imageStream={selectedItem as ImageStreamResource}
             namespace={selectedItem.namespace || currentProject}
             onClose={closeModal}
-            onRefresh={() => fetchResources(false)}
+            onRefresh={() => fetchResources(false, true)}
           />
         )}
 
@@ -1113,7 +1130,7 @@ export const App: React.FC = () => {
         {modalMode === 'prune-image-blobs' && (
           <ImageRegistryPrunerModal
             onClose={closeModal}
-            onRefresh={() => fetchResources(false)}
+            onRefresh={() => fetchResources(false, true)}
           />
         )}
 
@@ -1123,7 +1140,7 @@ export const App: React.FC = () => {
             release={selectedItem}
             namespace={selectedItem.namespace || currentProject}
             onClose={closeModal}
-            onRefresh={() => fetchResources(false)}
+            onRefresh={() => fetchResources(false, true)}
           />
         )}
 
@@ -1137,7 +1154,7 @@ export const App: React.FC = () => {
             onSuccess={(msg) => {
               closeModal();
               showToast(msg, 'success');
-              fetchResources(false);
+              fetchResources(false, true);
             }}
             onError={(msg) => {
               closeModal();
@@ -1161,7 +1178,7 @@ export const App: React.FC = () => {
               setBatchDeleteModalOpen(false);
               showToast(msg, 'success');
               setSelectedPodIds(new Set());
-              fetchResources(false);
+              fetchResources(false, true);
             }}
             onError={(msg) => {
               setBatchDeleteModalOpen(false);

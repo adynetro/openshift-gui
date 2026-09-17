@@ -59,6 +59,43 @@ export function getExecEnv(): NodeJS.ProcessEnv {
 
 const clusterCountsCache = new Map<string, { counts: Partial<Record<ResourceKind, number>>; timestamp: number }>();
 
+interface CachedResourceEntry {
+  items: ResourceItem[];
+  timestamp: number;
+}
+
+const resourceItemCache = new Map<string, CachedResourceEntry>();
+const CACHE_TTL_MS = 60 * 1000; // 60s TTL
+
+export function getResourceCacheKey(clusterServer: string, namespace: string, kind: string): string {
+  const ns = !namespace || namespace === 'all-projects' || namespace === '__all__' ? '__all__' : namespace;
+  return `${clusterServer}::${ns}::${kind}`;
+}
+
+export function invalidateResourceCache(namespace?: string, kind?: string): void {
+  if (!namespace && !kind) {
+    resourceItemCache.clear();
+    clusterCountsCache.clear();
+    return;
+  }
+  const ns = !namespace || namespace === 'all-projects' || namespace === '__all__' ? '__all__' : namespace;
+  for (const key of resourceItemCache.keys()) {
+    if (kind && namespace) {
+      if (key.includes(`::${ns}::${kind}`)) {
+        resourceItemCache.delete(key);
+      }
+    } else if (namespace) {
+      if (key.includes(`::${ns}::`)) {
+        resourceItemCache.delete(key);
+      }
+    } else if (kind) {
+      if (key.endsWith(`::${kind}`)) {
+        resourceItemCache.delete(key);
+      }
+    }
+  }
+}
+
 export class OcClient {
   /**
    * Run a CLI command safely with timeout and error handling.
@@ -85,10 +122,22 @@ export class OcClient {
    */
   static async getResources(
     kind: ResourceKind,
-    namespace: string
+    namespace: string,
+    options?: { forceRefresh?: boolean }
   ): Promise<{ items: ResourceItem[]; error?: string; isUnauthorized?: boolean }> {
     if (kind === 'helm' || kind === 'topology') {
       return { items: [] };
+    }
+
+    const activeConfig = await KubeHttpClient.getActiveConfig().catch(() => null);
+    const clusterKey = activeConfig?.server || 'default';
+    const cacheKey = getResourceCacheKey(clusterKey, namespace, kind);
+
+    if (!options?.forceRefresh) {
+      const cached = resourceItemCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+        return { items: cached.items };
+      }
     }
 
     // 1. Direct High-Speed HTTPS REST API Call (20-50ms, zero buffer limits)
@@ -103,6 +152,7 @@ export class OcClient {
       }
       if (httpRes.items && (httpRes.items.length > 0 || !httpRes.error)) {
         const items = this.transformResources(kind, httpRes.items, namespace);
+        resourceItemCache.set(cacheKey, { items, timestamp: Date.now() });
         return { items };
       }
     } catch {}
@@ -156,6 +206,7 @@ export class OcClient {
       const json = JSON.parse(stdout);
       const rawItems = json.items || (json.kind && json.metadata ? [json] : []);
       const items = this.transformResources(kind, rawItems, namespace);
+      resourceItemCache.set(cacheKey, { items, timestamp: Date.now() });
       return { items };
     } catch (err: any) {
       return { items: [], error: `Failed to parse cluster response: ${err.message}` };
@@ -732,6 +783,7 @@ export class OcClient {
       if (stderr && !stdout) {
         return { success: false, message: stderr };
       }
+      invalidateResourceCache(namespace);
       return { success: true, message: stdout.trim() || 'Resource updated successfully!' };
     } catch (err: any) {
       return { success: false, message: err.message || 'Failed to apply YAML' };
@@ -750,7 +802,7 @@ export class OcClient {
     targetStatuses: string[] = ['Completed', 'Error', 'CrashLoopBackOff', 'Failed', 'Succeeded', 'Evicted']
   ): Promise<{ success: boolean; count: number; deleted: string[]; message: string }> {
     try {
-      const res = await this.getResources('pods', namespace);
+      const res = await this.getResources('pods', namespace, { forceRefresh: true });
       if (res.error) {
         return { success: false, count: 0, deleted: [], message: res.error };
       }
@@ -1005,6 +1057,7 @@ spec:
     if (stderr && !stdout) {
       return { success: false, message: stderr };
     }
+    invalidateResourceCache(namespace, kind);
     return { success: true, message: stdout.trim() || `Scaled ${name} to ${replicas} replicas.` };
   }
 
@@ -1025,6 +1078,7 @@ spec:
     if (stderr && !stdout) {
       return { success: false, message: stderr };
     }
+    invalidateResourceCache(namespace, kind);
     return { success: true, message: stdout.trim() || `Rollout restart initiated for ${cmdKind}/${name}.` };
   }
 
@@ -1041,11 +1095,12 @@ spec:
     if (kind === 'events') cmdKind = 'event';
 
     const nsFlag = namespace && namespace !== 'all-projects' ? `-n "${namespace}"` : '';
-    const cmd = `oc delete ${cmdKind} "${name}" ${nsFlag}"${name}" ${nsFlag}`;
+    const cmd = `oc delete ${cmdKind} "${name}" ${nsFlag}`;
     const { stdout, stderr } = await this.runCommand(cmd);
     if (stderr && !stdout) {
       return { success: false, message: stderr };
     }
+    invalidateResourceCache(namespace, kind);
     return { success: true, message: stdout.trim() || `Deleted ${kind}/${name}.` };
   }
 
@@ -1070,6 +1125,8 @@ spec:
         return { success: false, deleted: [], failed: podNames, message: stderr };
       }
 
+      invalidateResourceCache(namespace, 'pods');
+
       return {
         success: true,
         deleted: podNames,
@@ -1091,6 +1148,7 @@ spec:
     if (stderr && !stdout) {
       return { success: false, message: stderr };
     }
+    invalidateResourceCache(namespace, 'imagestreams');
     return { success: true, message: stdout.trim() || `Deleted tag ${isName}:${tag}` };
   }
 
@@ -1695,6 +1753,7 @@ spec:
       if (stderr && !stdout) {
         return { success: false, message: stderr };
       }
+      invalidateResourceCache(namespace, 'secrets');
       return { success: true, message: `Secret '${name}' saved successfully.` };
     } catch (err: any) {
       return { success: false, message: err.message || 'Failed to save secret' };
@@ -1721,11 +1780,12 @@ spec:
         },
       }).replace(/'/g, "'\\''");
 
-      const cmd = `oc patch pvc "${name}" ${nsFlag} -p '${patch}'"${name}" ${nsFlag} -p '${patch}'`;
+      const cmd = `oc patch pvc "${name}" ${nsFlag} -p '${patch}'`;
       const { stdout, stderr } = await this.runCommand(cmd);
       if (stderr && !stdout) {
         return { success: false, message: stderr };
       }
+      invalidateResourceCache(namespace, 'pvc');
       return { success: true, message: `PVC '${name}' storage resized to ${newSize}.` };
     } catch (err: any) {
       return { success: false, message: err.message || 'Failed to resize PVC' };
@@ -2194,13 +2254,21 @@ spec:
   }
 
   /**
-   * Ultra-fast parallel resource counts preloader with Keep-Alive REST and zero-CLI-bombing.
+   * Ultra-fast parallel resource counts and manifest preloader with unified cache population.
    */
-  static async getResourceCounts(namespace: string): Promise<Partial<Record<ResourceKind, number>>> {
-    const counts: Partial<Record<ResourceKind, number>> = {};
+  static async preloadAllResources(
+    namespace: string,
+    activeKind: ResourceKind = 'pods'
+  ): Promise<{
+    activeResources: { items: ResourceItem[]; error?: string; isUnauthorized?: boolean };
+    topologyData?: TopologyData;
+    counts: Partial<Record<ResourceKind, number>>;
+    itemsByKind: Partial<Record<ResourceKind, ResourceItem[]>>;
+  }> {
     const isAll = !namespace || namespace === 'all-projects' || namespace === '__all__';
+    const activeConfig = await KubeHttpClient.getActiveConfig().catch(() => null);
+    const clusterKey = activeConfig?.server || 'default';
 
-    // 1. Primary workload & networking kinds to query via direct REST
     const namespacedKinds: ResourceKind[] = [
       'pods',
       'deployments',
@@ -2215,88 +2283,92 @@ spec:
       'secrets',
       'imagestreams',
     ];
-
     const clusterKinds: ResourceKind[] = ['nodes', 'pv', 'crd', 'clusteroperators'];
+    const allKinds = [...namespacedKinds, ...clusterKinds];
 
-    // Check cluster counts cache
-    const activeConfig = await KubeHttpClient.getActiveConfig().catch(() => null);
-    const clusterKey = activeConfig?.server || 'default';
-    const cachedClusterCounts = clusterCountsCache.get(clusterKey);
+    const counts: Partial<Record<ResourceKind, number>> = {};
+    const itemsByKind: Partial<Record<ResourceKind, ResourceItem[]>> = {};
 
-    let kindsToQuery = [...namespacedKinds];
-    if (cachedClusterCounts && Date.now() - cachedClusterCounts.timestamp < 5 * 60 * 1000) {
-      Object.assign(counts, cachedClusterCounts.counts);
-    } else {
-      kindsToQuery = [...kindsToQuery, ...clusterKinds];
+    // 1. Check existing cached items first
+    const kindsToFetch: ResourceKind[] = [];
+    for (const kind of allKinds) {
+      const cacheKey = getResourceCacheKey(clusterKey, namespace, kind);
+      const cached = resourceItemCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+        itemsByKind[kind] = cached.items;
+        counts[kind] = cached.items.length;
+      } else {
+        kindsToFetch.push(kind);
+      }
     }
 
-    // Try high-speed direct REST API in parallel (15-30ms total)
-    let restSucceeded = false;
-    try {
-      const results = await Promise.allSettled(
-        kindsToQuery.map(async (kind) => {
-          const res = await KubeHttpClient.getResourceList(kind, namespace);
-          return { kind, count: res.items ? res.items.length : 0 };
-        })
-      );
-
-      for (const r of results) {
-        if (r.status === 'fulfilled') {
-          counts[r.value.kind] = r.value.count;
-          if (clusterKinds.includes(r.value.kind)) {
-            const currentCached = clusterCountsCache.get(clusterKey)?.counts || {};
-            currentCached[r.value.kind] = r.value.count;
-            clusterCountsCache.set(clusterKey, { counts: currentCached, timestamp: Date.now() });
-          }
-          restSucceeded = true;
-        }
-      }
-    } catch {}
-
-    // Fallback only if REST was completely unavailable: run a single fast summary command
-    if (!restSucceeded) {
+    // 2. Fetch any missing or stale kinds in parallel over Keep-Alive REST
+    if (kindsToFetch.length > 0) {
+      let restSucceeded = false;
       try {
-        const nsFlag = isAll ? '-A' : `-n "${namespace}"`;
-        const { stdout } = await this.runCommand(`oc get pods,deployments,services,routes ${nsFlag} --no-headers`, 3500);
-        if (stdout.trim()) {
-          const lines = stdout.trim().split('\n');
-          for (const line of lines) {
-            const parts = line.trim().split(/\s+/);
-            const rawName = isAll ? parts[1] || '' : parts[0] || '';
-            if (rawName.startsWith('pod/')) counts['pods'] = (counts['pods'] || 0) + 1;
-            else if (rawName.startsWith('deployment.apps/') || rawName.startsWith('deployment/')) counts['deployments'] = (counts['deployments'] || 0) + 1;
-            else if (rawName.startsWith('service/') || rawName.startsWith('svc/')) counts['services'] = (counts['services'] || 0) + 1;
-            else if (rawName.startsWith('route.route.openshift.io/') || rawName.startsWith('route/')) counts['routes'] = (counts['routes'] || 0) + 1;
+        const results = await Promise.allSettled(
+          kindsToFetch.map(async (kind) => {
+            const res = await KubeHttpClient.getResourceList(kind, namespace);
+            const rawItems = res.items || [];
+            const items = this.transformResources(kind, rawItems, namespace);
+            const cacheKey = getResourceCacheKey(clusterKey, namespace, kind);
+            resourceItemCache.set(cacheKey, { items, timestamp: Date.now() });
+            return { kind, items, count: items.length };
+          })
+        );
+
+        for (const r of results) {
+          if (r.status === 'fulfilled') {
+            itemsByKind[r.value.kind] = r.value.items;
+            counts[r.value.kind] = r.value.count;
+            restSucceeded = true;
           }
         }
       } catch {}
+
+      // Fallback only if REST completely failed
+      if (!restSucceeded && Object.keys(itemsByKind).length === 0) {
+        try {
+          const nsFlag = isAll ? '-A' : `-n "${namespace}"`;
+          const { stdout } = await this.runCommand(`oc get pods,deployments,services,routes ${nsFlag} --no-headers`, 3500);
+          if (stdout.trim()) {
+            const lines = stdout.trim().split('\n');
+            for (const line of lines) {
+              const parts = line.trim().split(/\s+/);
+              const rawName = isAll ? parts[1] || '' : parts[0] || '';
+              if (rawName.startsWith('pod/')) counts['pods'] = (counts['pods'] || 0) + 1;
+              else if (rawName.startsWith('deployment.apps/') || rawName.startsWith('deployment/')) counts['deployments'] = (counts['deployments'] || 0) + 1;
+              else if (rawName.startsWith('service/') || rawName.startsWith('svc/')) counts['services'] = (counts['services'] || 0) + 1;
+              else if (rawName.startsWith('route.route.openshift.io/') || rawName.startsWith('route/')) counts['routes'] = (counts['routes'] || 0) + 1;
+            }
+          }
+        } catch {}
+      }
     }
 
-    return counts;
+    // 3. Topology Data if requested
+    let topologyData: TopologyData | undefined;
+    if (activeKind === 'topology') {
+      const topoRes = await this.getTopologyData(namespace).catch(() => ({ data: undefined }));
+      topologyData = topoRes.data;
+    }
+
+    const activeItems = itemsByKind[activeKind] || [];
+
+    return {
+      activeResources: { items: activeItems },
+      topologyData,
+      counts,
+      itemsByKind,
+    };
   }
 
   /**
-   * Preloads all resources and metadata for a namespace in parallel.
+   * Retrieves resource counts across all resource kinds from preload cache.
    */
-  static async preloadAllResources(
-    namespace: string,
-    activeKind: ResourceKind = 'pods'
-  ): Promise<{
-    activeResources: { items: ResourceItem[]; error?: string; isUnauthorized?: boolean };
-    topologyData?: TopologyData;
-    counts: Partial<Record<ResourceKind, number>>;
-  }> {
-    const [counts, activeRes, topologyRes] = await Promise.all([
-      this.getResourceCounts(namespace),
-      activeKind !== 'topology' ? this.getResources(activeKind, namespace) : Promise.resolve({ items: [] }),
-      activeKind === 'topology' ? this.getTopologyData(namespace) : Promise.resolve({ data: undefined }),
-    ]);
-
-    return {
-      activeResources: activeRes,
-      topologyData: topologyRes?.data,
-      counts,
-    };
+  static async getResourceCounts(namespace: string): Promise<Partial<Record<ResourceKind, number>>> {
+    const preloadRes = await this.preloadAllResources(namespace);
+    return preloadRes.counts;
   }
 }
 

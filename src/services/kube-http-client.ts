@@ -1,6 +1,7 @@
 import https from 'node:https';
 import http from 'node:http';
 import fs from 'node:fs';
+import zlib from 'node:zlib';
 import { KubeConfigService } from './kubeconfig.js';
 import { ResourceKind } from '../types/k8s.js';
 
@@ -120,15 +121,19 @@ export class KubeHttpClient {
     if (!isHttps) {
       return new http.Agent({
         keepAlive: true,
-        keepAliveMsecs: 15000,
-        maxSockets: 60,
+        keepAliveMsecs: 60000,
+        maxSockets: 100,
+        maxFreeSockets: 50,
+        timeout: 15000,
       });
     }
 
     const agentOptions: https.AgentOptions = {
       keepAlive: true,
-      keepAliveMsecs: 15000,
-      maxSockets: 60,
+      keepAliveMsecs: 60000,
+      maxSockets: 100,
+      maxFreeSockets: 50,
+      timeout: 15000,
       rejectUnauthorized: !config.insecureSkipTlsVerify,
     };
 
@@ -190,7 +195,8 @@ export class KubeHttpClient {
 
     const headers: Record<string, string> = {
       Accept: 'application/json',
-      'User-Agent': 'OpenShiftGUI-HttpClient/1.2',
+      'Accept-Encoding': 'gzip, deflate, br',
+      'User-Agent': 'OpenShiftGUI-HttpClient/1.3',
     };
 
     if (config.token) {
@@ -226,7 +232,23 @@ export class KubeHttpClient {
         });
 
         res.on('end', () => {
-          const rawText = Buffer.concat(chunks).toString('utf8');
+          const buffer = Buffer.concat(chunks);
+          let rawText = '';
+          try {
+            const encoding = (res.headers['content-encoding'] || '').toLowerCase();
+            if (encoding === 'gzip') {
+              rawText = zlib.gunzipSync(buffer).toString('utf8');
+            } else if (encoding === 'deflate') {
+              rawText = zlib.inflateSync(buffer).toString('utf8');
+            } else if (encoding === 'br') {
+              rawText = zlib.brotliDecompressSync(buffer).toString('utf8');
+            } else {
+              rawText = buffer.toString('utf8');
+            }
+          } catch {
+            rawText = buffer.toString('utf8');
+          }
+
           const statusCode = res.statusCode || 0;
 
           if (statusCode === 401 || statusCode === 403) {
