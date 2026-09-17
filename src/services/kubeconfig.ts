@@ -1,16 +1,15 @@
-import { exec } from 'node:child_process';
-import { promisify } from 'node:util';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { KubeContext, ProjectInfo, ClusterInfo, ServerInfo } from '../types/k8s.js';
-import { getExecEnv } from './oc-client.js';
 import { groupServersWithContexts } from '../utils/kube-utils.js';
 
-export { groupServersWithContexts };
-
 const execAsync = promisify(exec);
+
+export { groupServersWithContexts };
 
 let cachedKubePath: string | null = null;
 const dynamicTokenCache = new Map<string, { token: string; timestamp: number }>();
@@ -18,7 +17,7 @@ const projectListCache = new Map<string, { projects: ProjectInfo[]; timestamp: n
 
 /**
  * Parses raw YAML string or parsed JSON object into sanitized contexts and servers.
- * Handles messy, partially corrupted, or malformed kubeconfig structures safely.
+ * Handles Rancher clusters (/k8s/clusters/...), messy, or partially corrupted kubeconfigs safely.
  */
 export function parseKubeConfig(rawInput: any): {
   contexts: KubeContext[];
@@ -140,7 +139,7 @@ export class KubeConfigService {
 
     const rawEnv = process.env['KUBECONFIG'];
     if (rawEnv) {
-      const first = rawEnv.split(':')[0];
+      const first = rawEnv.split(path.delimiter)[0];
       if (first && fs.existsSync(first)) {
         cachedKubePath = first;
         return first;
@@ -176,7 +175,6 @@ export class KubeConfigService {
   }> {
     const kubePath = this.getKubeconfigPath();
 
-    // 1. Direct synchronous file read and parse
     try {
       if (fs.existsSync(kubePath)) {
         const fileContent = fs.readFileSync(kubePath, 'utf8');
@@ -188,22 +186,6 @@ export class KubeConfigService {
       }
     } catch (err: any) {
       console.error(`[KubeConfigService] Error reading ${kubePath}:`, err.message);
-    }
-
-    // 2. CLI fallback (oc config view -o json)
-    try {
-      const { stdout } = await execAsync('oc config view -o json', {
-        env: getExecEnv(),
-        maxBuffer: 20 * 1024 * 1024,
-      });
-      if (stdout.trim()) {
-        const parsed = parseKubeConfig(JSON.parse(stdout));
-        if (parsed.contexts.length > 0) {
-          return parsed;
-        }
-      }
-    } catch (error: any) {
-      console.error('[KubeConfigService] Fallback oc config view failed:', error.message);
     }
 
     return { contexts: [], currentContext: null, servers: [] };
@@ -228,13 +210,12 @@ export class KubeConfigService {
 
   /**
    * Switches active context in kubeconfig.
-   * Performs instant direct atomic file update (< 2ms) and runs CLI sync non-blocking in background.
+   * Performs instant direct atomic file update (< 2ms) without CLI dependencies.
    */
   static async switchContext(contextName: string): Promise<boolean> {
     if (!contextName || !contextName.trim()) return false;
     const target = contextName.trim();
 
-    let updatedDirectly = false;
     try {
       const kubePath = this.getKubeconfigPath();
       if (fs.existsSync(kubePath)) {
@@ -245,38 +226,27 @@ export class KubeConfigService {
           if (match) {
             config['current-context'] = target;
             fs.writeFileSync(kubePath, stringifyYaml(config), { encoding: 'utf8', mode: 0o600 });
-            updatedDirectly = true;
           }
         }
       }
     } catch (err: any) {
       console.warn('[KubeConfigService] Direct context switch failed:', err.message);
+      return false;
     }
+
+    projectListCache.clear();
 
     try {
       const { KubeHttpClient } = await import('./kube-http-client.js');
       KubeHttpClient.reset();
     } catch {}
 
-    // Non-blocking background CLI sync
-    execAsync(`oc config use-context "${target}"`, { env: getExecEnv(), timeout: 4000 }).catch(() => {});
-
-    if (updatedDirectly) {
-      return true;
-    }
-
-    // Fallback if direct update failed
-    try {
-      await execAsync(`oc config use-context "${target}"`, { env: getExecEnv(), timeout: 6000 });
-      return true;
-    } catch {
-      return false;
-    }
+    return true;
   }
 
   /**
    * Reads raw connection details for the active cluster and user from kubeconfig.
-   * Caches dynamic tokens to avoid expensive subshell calls.
+   * Supports standard tokens, bearer auth providers, token files, and client certs.
    */
   static async getActiveClusterConfig(): Promise<{
     server: string;
@@ -300,43 +270,57 @@ export class KubeConfigService {
       } catch {}
     }
 
-    if (!config) {
-      try {
-        const { stdout } = await execAsync('oc config view --raw -o json', {
-          env: getExecEnv(),
-          timeout: 4000,
-          maxBuffer: 20 * 1024 * 1024,
-        });
-        if (stdout.trim()) {
-          config = JSON.parse(stdout);
-        }
-      } catch {}
-    }
-
-    if (!config) return null;
+    if (!config || typeof config !== 'object') return null;
 
     const current = config['current-context'];
     if (!current) return null;
 
-    const ctxObj = (config.contexts || []).find((c: any) => c.name === current)?.context;
+    const ctxObj = (config.contexts || []).find((c: any) => c && c.name === current)?.context;
     if (!ctxObj) return null;
 
-    const clusterObj = (config.clusters || []).find((c: any) => c.name === ctxObj.cluster)?.cluster;
-    const userObj = (config.users || []).find((u: any) => u.name === ctxObj.user)?.user;
+    const clusterObj = (config.clusters || []).find((c: any) => c && c.name === ctxObj.cluster)?.cluster;
+    const userObj = (config.users || []).find((u: any) => u && u.name === ctxObj.user)?.user;
 
     if (!clusterObj || !clusterObj.server) return null;
 
     let token = userObj?.token;
-    if (!token && !userObj?.['client-certificate-data'] && !userObj?.['client-certificate']) {
+
+    // Check auth-provider token (e.g. OIDC or Rancher)
+    if (!token && userObj?.['auth-provider']?.config) {
+      token = userObj['auth-provider'].config['access-token'] || userObj['auth-provider'].config['id-token'];
+    }
+
+    // Check token-file
+    if (!token) {
+      const tokenFile = userObj?.['token-file'] || userObj?.tokenFile;
+      if (tokenFile && fs.existsSync(tokenFile)) {
+        try {
+          token = fs.readFileSync(tokenFile, 'utf8').trim();
+        } catch {}
+      }
+    }
+
+    // Check exec auth plugin if configured
+    if (!token && userObj?.exec && !userObj?.['client-certificate-data'] && !userObj?.['client-certificate']) {
       const cached = dynamicTokenCache.get(current);
       if (cached && Date.now() - cached.timestamp < 10 * 60 * 1000) {
         token = cached.token;
       } else {
-        // Fast fallback to oc whoami -t if token is managed dynamically
         try {
-          const { stdout } = await execAsync('oc whoami -t', { env: getExecEnv(), timeout: 2500 });
-          if (stdout.trim()) {
-            token = stdout.trim();
+          const execCmd = userObj.exec.command;
+          const execArgs = Array.isArray(userObj.exec.args) ? userObj.exec.args.join(' ') : '';
+          const fullCmd = `${execCmd} ${execArgs}`.trim();
+          const { stdout } = await execAsync(fullCmd, {
+            env: {
+              ...process.env,
+              ...(userObj.exec.env ? Object.fromEntries(userObj.exec.env.map((e: any) => [e.name, e.value])) : {}),
+            },
+            timeout: 5000,
+          });
+          const parsed = JSON.parse(stdout);
+          const execToken = parsed?.status?.token;
+          if (execToken) {
+            token = execToken;
             dynamicTokenCache.set(current, { token, timestamp: Date.now() });
           }
         } catch {}
@@ -359,7 +343,7 @@ export class KubeConfigService {
 
   /**
    * Retrieves all available projects / namespaces in the current cluster.
-   * Uses high-speed REST API and 30s cache for instant responses.
+   * Uses high-speed direct REST API without requiring any CLI tools.
    */
   static async getProjects(): Promise<ProjectInfo[]> {
     const { contexts, currentContext } = await this.getContexts();
@@ -384,71 +368,21 @@ export class KubeConfigService {
 
     let projectList: ProjectInfo[] = [];
 
-    // Strategy 0: Direct High-Speed HTTPS REST API (15-30ms)
+    // Direct High-Speed HTTPS REST API (15-30ms)
     try {
       const { KubeHttpClient } = await import('./kube-http-client.js');
       const projectRes = await KubeHttpClient.getResourceList('projects');
       const items = projectRes.items && projectRes.items.length > 0 ? projectRes.items : (await KubeHttpClient.getResourceList('namespaces')).items;
       if (items && items.length > 0) {
         projectList = items.map((item: any) => ({
-          name: item.metadata?.name,
-          displayName: item.metadata?.annotations?.['openshift.io/display-name'] || item.metadata?.name,
+          name: item.metadata?.name || '',
+          displayName: item.metadata?.annotations?.['openshift.io/display-name'] || item.metadata?.name || '',
           status: item.status?.phase || 'Active',
           isCurrent: item.metadata?.name === currentNs,
-        }));
+        })).filter((p: ProjectInfo) => Boolean(p.name));
       }
-    } catch {}
-
-    // Strategy 1: oc get projects -o json
-    if (projectList.length === 0) {
-      try {
-        const { stdout } = await execAsync('oc get projects -o json', { env: getExecEnv(), timeout: 6000, maxBuffer: 15 * 1024 * 1024 });
-        const data = JSON.parse(stdout);
-        if (data && Array.isArray(data.items) && data.items.length > 0) {
-          projectList = data.items.map((item: any) => ({
-            name: item.metadata?.name,
-            displayName: item.metadata?.annotations?.['openshift.io/display-name'] || item.metadata?.name,
-            status: item.status?.phase || 'Active',
-            isCurrent: item.metadata?.name === currentNs,
-          }));
-        }
-      } catch (e) {}
-    }
-
-    // Strategy 2: oc projects -q
-    if (projectList.length === 0) {
-      try {
-        const { stdout } = await execAsync('oc projects -q', { env: getExecEnv(), timeout: 4000 });
-        const lines = stdout.trim().split('\n').map((l) => l.trim()).filter(Boolean);
-        if (lines.length > 0) {
-          projectList = lines.map((name) => ({
-            name,
-            displayName: name,
-            status: 'Active',
-            isCurrent: name === currentNs,
-          }));
-        }
-      } catch (e) {}
-    }
-
-    // Strategy 3: oc get namespaces -o json
-    if (projectList.length === 0) {
-      try {
-        const { stdout } = await execAsync('oc get namespaces -o json', {
-          env: getExecEnv(),
-          timeout: 6000,
-          maxBuffer: 15 * 1024 * 1024,
-        });
-        const data = JSON.parse(stdout);
-        if (data && Array.isArray(data.items) && data.items.length > 0) {
-          projectList = data.items.map((item: any) => ({
-            name: item.metadata?.name,
-            displayName: item.metadata?.name,
-            status: item.status?.phase || 'Active',
-            isCurrent: item.metadata?.name === currentNs,
-          }));
-        }
-      } catch (e) {}
+    } catch (err: any) {
+      console.warn('[KubeConfigService] Error fetching projects via REST:', err.message);
     }
 
     // Sort projects alphabetically
@@ -463,7 +397,7 @@ export class KubeConfigService {
   }
 
   /**
-   * Gets current active namespace/project directly from memory in 0ms.
+   * Gets current active namespace/project directly in 0ms.
    */
   static async getCurrentNamespace(): Promise<string> {
     try {
@@ -485,7 +419,6 @@ export class KubeConfigService {
       return true;
     }
 
-    let updatedDirectly = false;
     try {
       const kubePath = this.getKubeconfigPath();
       if (fs.existsSync(kubePath)) {
@@ -498,21 +431,18 @@ export class KubeConfigService {
             if (!match.context) match.context = {};
             match.context.namespace = projectName;
             fs.writeFileSync(kubePath, stringifyYaml(config), { encoding: 'utf8', mode: 0o600 });
-            updatedDirectly = true;
           }
         }
       }
-    } catch {}
+    } catch (err: any) {
+      console.warn('[KubeConfigService] Error switching project:', err.message);
+      return false;
+    }
 
     try {
       const { KubeHttpClient } = await import('./kube-http-client.js');
       KubeHttpClient.reset();
     } catch {}
-
-    // Run CLI in background non-blocking
-    execAsync(`oc project "${projectName}"`, { env: getExecEnv(), timeout: 4000 }).catch(() => {
-      execAsync(`oc config set-context --current --namespace="${projectName}"`, { env: getExecEnv(), timeout: 4000 }).catch(() => {});
-    });
 
     return true;
   }

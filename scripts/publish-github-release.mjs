@@ -10,32 +10,37 @@ const token = execSync('printf "protocol=https\\nhost=github.com\\n" | git crede
 
 const repo = 'adynetro/openshift-gui';
 const tagName = `v${VERSION}`;
-const releaseName = `OpenShift GUI v${VERSION} - Gzip/Deflate REST Acceleration, Instant SWR Resource Caching & Zero-Latency Tab Switching`;
+const releaseName = `OpenShift GUI v${VERSION} - Zero CLI Dependence, Native Rancher Cluster Support & WebSocket Exec`;
 
-const releaseBody = `## 🚀 OpenShift GUI v${VERSION} - Performance, Speed & Caching Release
+const releaseBody = `## 🚀 OpenShift GUI v${VERSION} - 100% Standalone Native REST & Rancher Release
 
-### ⚡ Gzip, Deflate & Brotli REST Stream Acceleration (80%-90% Payload Reduction)
+### ⚡ 100% Standalone Native REST & WebSocket Engine (Zero \`oc\` / \`kubectl\` Dependence)
+- **Zero CLI Binary Requirement**: OpenShift GUI no longer requires \`oc\` or \`kubectl\` binaries installed on the host operating system.
+- **Direct HTTPS REST API**: All operations (manifest loading, filtering, resource creation, YAML apply, scaling, rollout restarts, PVC resizing, secrets editing, and multi-pod deletion) execute directly via native HTTPS Keep-Alive connections to the Kubernetes API server.
+- **Native WebSocket Terminal Exec**: Integrated interactive terminal shell (\`TerminalService\`) communicates directly over Kubernetes WebSocket Exec endpoint using \`v4.channel.k8s.io\` subprotocol with full bidirectional stdin/stdout/stderr multiplexing and terminal resizing.
+- **Native HTTPS Log Streaming**: Live container log streaming (\`LogStreamer\`) operates via persistent chunked HTTP transfer with automatic multi-pod aggregation, timestamp parsing, and zero subprocess overhead.
+
+### 🐮 Full Rancher, K3s, RKE & Vanilla Kubernetes Compatibility
+- **Path-Based Server URL Handling**: Correctly preserves and routes API requests to Rancher cluster path prefixes (e.g. \`https://<rancher-host>/k8s/clusters/<cluster-id>\`).
+- **Seamless Namespace Fallback**: Automatically discovers and lists namespaces on clusters that do not run OpenShift-specific project APIs (\`/apis/project.openshift.io/v1/projects\` ➔ \`/api/v1/namespaces\`).
+- **Token & Auth Provider Support**: Directly extracts and authenticates with bearer tokens, auth-provider configs (OIDC, Rancher, token-file), and custom X.509 client certificates.
+- **Cross-Platform Compatibility**: Fully compatible with OpenShift 3/4, Rancher v2.x, RKE/RKE2, K3s, EKS, GKE, AKS, and standard Kubernetes clusters.
+
+### ⚡ Gzip, Deflate & Brotli REST Stream Acceleration
 - **Automatic HTTP Stream Decompression**: Enabled \`Accept-Encoding: gzip, deflate, br\` in \`KubeHttpClient\` with \`node:zlib\` fast streaming decompression.
-- **Micro-Payload API Responses**: Large cluster JSON responses (manifests, secrets, configmaps, pods) compress by 80%-90%, dramatically accelerating transfer over VPN and remote cluster networks.
-- **Enhanced Keep-Alive Socket Pooling**: Sockets maintain active TLS sessions for 60 seconds with \`maxSockets: 100\` and \`maxFreeSockets: 50\`, avoiding expensive repeated TLS handshakes.
+- **Micro-Payload API Responses**: Large cluster JSON responses compress by 80%-90%, dramatically accelerating transfer over VPN and remote cluster networks.
+- **Persistent Keep-Alive Connection Pool**: Sockets maintain active TLS sessions for 60 seconds with \`maxSockets: 100\` and \`maxFreeSockets: 50\`, avoiding expensive repeated TLS handshakes.
 
 ### 🏎️ Instant In-Memory SWR Resource Caching (0ms Tab Switching)
-- **Unified Multi-Tier Cache**: All transformed Kubernetes/OpenShift objects across all 18 kinds (\`pods\`, \`deployments\`, \`services\`, \`routes\`, \`configmaps\`, \`secrets\`, \`pvc\`, \`imagestreams\`, etc.) are cached in unified memory stores (\`resourceItemCache\` and renderer \`resourceCacheRef\`).
-- **0ms Instant Tab Transitions**: Clicking between sidebar tabs (e.g. Pods ➔ Deployments ➔ Services ➔ Routes ➔ ConfigMaps) populates the table **instantly in 0 milliseconds** without loading spinners or blank screens.
-- **Stale-While-Revalidate (SWR)**: The UI renders cached items immediately while a silent background sync updates any live cluster changes seamlessly.
-- **Single-Shot Multi-Kind Preloader**: Preloading a project now populates the entire cache across all resource kinds in a single parallel batch.
-- **Smart Mutation Invalidation**: Applying YAML, scaling replicas, restarting workloads, pruning pods, or deleting resources automatically invalidates specific cache keys to ensure fresh live state.
+- **Unified Multi-Tier Cache**: All transformed Kubernetes/OpenShift objects across all resource kinds are cached in unified memory stores.
+- **0ms Instant Tab Transitions**: Clicking between sidebar tabs populates the table **instantly in 0 milliseconds** without loading spinners.
+- **Stale-While-Revalidate (SWR)**: The UI renders cached items immediately while silent background syncs update live cluster changes seamlessly.
+- **Smart Mutation Invalidation**: Applying YAML, scaling replicas, restarting workloads, or deleting resources automatically invalidates specific cache keys.
 
 ### 🛰️ Live Loading Animation & Radar Scanner
-- **High-Tech Animated Preloader**: Seamless orbital radar scanner with counter-rotating rings and glowing center hub displayed during **Server / Context** and **Project / Namespace** switches.
-- **Dynamic Shimmer Progress Bar**: Smooth real-time progress bar (0% ➔ 100%) with animated light sweep indicating active synchronization stages.
-- **Interactive Stage Checklist**:
-  - ⚡ *Cluster API Handshake & Session Verification*
-  - 📂 *Projects & Namespaces Discovery*
-  - 📦 *Workload Manifests (Pods, Deployments, StatefulSets...)*
-  - 🌐 *Networking & Ingress (Routes, Services, Policies)*
-  - 💾 *Storage, Config & Target Objects*
-- **Zero-Flicker Transitions**: Prevents flashing empty states ("No pods found") by holding the smooth preloader until all objects and counts have been received.
+- **High-Tech Animated Preloader**: Seamless orbital radar scanner with counter-rotating rings and glowing center hub displayed during Server / Context and Project / Namespace switches.
+- **Dynamic Shimmer Progress Bar**: Smooth real-time progress bar with animated light sweep indicating active synchronization stages.
+- **Zero-Flicker Transitions**: Prevents flashing empty states by holding the smooth preloader until all objects and counts have been received.
 
 ### ⚡ Comprehensive Parallel Data Preloading
 - **Concurrent REST Queries**: Preloads active view manifests, topology graphs, and all sidebar badge counts across all kinds (**Pods, Deployments, StatefulSets, DaemonSets, Routes, Services, NetworkPolicies, PVCs, ConfigMaps, Secrets, ImageStreams, Helm Releases**) in parallel over Keep-Alive HTTPS.

@@ -347,5 +347,83 @@ describe("KubeConfigService.cleanContexts", () => {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
+
+  it("should correctly parse and preserve Rancher path-based cluster URLs and token auth", () => {
+    const rancherConfig = {
+      apiVersion: "v1",
+      kind: "Config",
+      "current-context": "rancher-dev",
+      clusters: [
+        {
+          name: "rancher-dev-cluster",
+          cluster: {
+            server: "https://rancher.corp.internal/k8s/clusters/c-m-8vx9b2qt",
+            "insecure-skip-tls-verify": true,
+          },
+        },
+        {
+          name: "rancher-prod-cluster",
+          cluster: {
+            server: "https://rancher.corp.internal/k8s/clusters/c-m-z9tk4pw7",
+          },
+        },
+      ],
+      contexts: [
+        {
+          name: "rancher-dev",
+          context: {
+            cluster: "rancher-dev-cluster",
+            user: "user-dev",
+            namespace: "cattle-system",
+          },
+        },
+        {
+          name: "rancher-prod",
+          context: {
+            cluster: "rancher-prod-cluster",
+            user: "user-prod",
+            namespace: "fleet-default",
+          },
+        },
+      ],
+      users: [
+        {
+          name: "user-dev",
+          user: {
+            token: "kubeconfig-user-dev:abcdef123456",
+          },
+        },
+        {
+          name: "user-prod",
+          user: {
+            token: "kubeconfig-user-prod:987654fedcba",
+          },
+        },
+      ],
+    };
+
+    const parsed = parseKubeConfig(stringifyYaml(rancherConfig));
+    assert.equal(parsed.contexts.length, 2);
+    assert.equal(parsed.currentContext, "rancher-dev");
+
+    const devCtx = parsed.contexts.find((c) => c.name === "rancher-dev");
+    assert.ok(devCtx);
+    assert.equal(devCtx.server, "https://rancher.corp.internal/k8s/clusters/c-m-8vx9b2qt");
+    assert.equal(devCtx.namespace, "cattle-system");
+    assert.equal(devCtx.isCurrent, true);
+
+    const prodCtx = parsed.contexts.find((c) => c.name === "rancher-prod");
+    assert.ok(prodCtx);
+    assert.equal(prodCtx.server, "https://rancher.corp.internal/k8s/clusters/c-m-z9tk4pw7");
+    assert.equal(prodCtx.namespace, "fleet-default");
+    assert.equal(prodCtx.isCurrent, false);
+
+    // Ensure servers are grouped by their respective cluster URLs
+    assert.equal(parsed.servers.length, 2);
+    assert.equal(parsed.servers[0]?.server, "https://rancher.corp.internal/k8s/clusters/c-m-8vx9b2qt");
+    assert.equal(parsed.servers[0]?.isCurrent, true);
+    assert.equal(parsed.servers[1]?.server, "https://rancher.corp.internal/k8s/clusters/c-m-z9tk4pw7");
+  });
 });
+
 

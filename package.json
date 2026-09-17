@@ -1,7 +1,7 @@
 {
   "name": "openshift-gui",
-  "version": "2.0.5",
-  "description": "Modern Graphical Desktop GUI & CLI for OpenShift and Kubernetes with Helm & SemVer ImageStream Cleanup",
+  "version": "2.0.6",
+  "description": "Modern Graphical Desktop GUI & CLI for OpenShift, Kubernetes & Rancher with Helm & SemVer ImageStream Cleanup",
   "bin": {
     "openshift-gui": "./bin/openshift-gui.js",
     "oc-gui": "./bin/openshift-gui.js"
@@ -68,6 +68,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "semver": "^7.7.1",
+    "ws": "^8.21.3",
     "yaml": "^2.7.0"
   },
   "devDependencies": {
@@ -76,6 +77,7 @@
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@types/semver": "^7.5.8",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^4.3.4",
     "electron": "^43.4.1",
     "electron-builder": "^26.15.3",
