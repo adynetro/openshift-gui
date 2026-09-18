@@ -10,13 +10,19 @@ const token = execSync('printf "protocol=https\\nhost=github.com\\n" | git crede
 
 const repo = 'adynetro/openshift-gui';
 const tagName = `v${VERSION}`;
-const releaseName = `OpenShift GUI v${VERSION} - Terminal WebSocket 400 Fix, Windows CRLF Sanitization & Live Resizing`;
+const releaseName = `OpenShift GUI v${VERSION} - Multi-Container Auto-Discovery & Interactive Container Selector for Terminal`;
 
-const releaseBody = `## 🚀 OpenShift GUI v${VERSION} - Terminal WebSocket Fix & Windows Compatibility
+const releaseBody = `## 🚀 OpenShift GUI v${VERSION} - Multi-Container Pod Terminal Auto-Discovery
+
+### 📦 Multi-Container Pod Terminal Auto-Discovery & Automatic Fallback
+- **Automatic Container Resolution**: When starting a terminal session without a container parameter on a multi-container pod, automatically detects the \`kubectl.kubernetes.io/default-container\` annotation or selects the primary container from \`spec.containers\`.
+- **Zero-Failure Error Recovery**: If the Kubernetes API server responds with \`a container name must be specified for pod ..., choose one of: [...]\`, the terminal service dynamically parses the available container names and automatically connects to the primary container without requiring user intervention.
+- **Interactive Container Selector Dropdown**: Added an interactive container dropdown in the **Pod Terminal** modal header, allowing instant 1-click switching between sidecars, controllers, and application containers (\`csi-attacher\`, \`vsphere-csi-controller\`, \`liveness-probe\`, \`vsphere-syncer\`, \`csi-provisioner\`, etc.).
+- **Dynamic Container Discovery**: Discovers all pod container names on-the-fly via pod YAML analysis and runtime terminal feedback.
 
 ### 🖥️ Native Terminal WebSocket 400 Bad Request Fix & TTY Stream Synchronization
 - **Fixed TTY / Stderr Stream Conflict**: Resolved the \`HTTP 400 Bad Request\` error (\`cannot specify stderr with tty\`) by properly adhering to the Kubernetes Exec API specification where stderr is omitted when allocating a pseudo-terminal (\`tty: true\`).
-- **Standardized Subprotocol Negotiation**: Enforced standard Kubernetes streaming subprotocols (\`v4.channel.k8s.io\`, \`v3.channel.k8s.io\`, \`v2.channel.k8s.io\`, \`channel.k8s.io\`) and removed unrecognized protocol strings that caused reverse proxies and ingress routers to reject WebSocket handshakes.
+- **Standardized Subprotocol Negotiation**: Enforced standard Kubernetes streaming subprotocols (\`v4.channel.k8s.io\`, \`v3.channel.k8s.io\`, \`v2.channel.k8s.io\`, \`channel.k8s.io\`) and removed unrecognized protocol strings.
 - **Port Normalization for Ingress & Reverse Proxies**: Avoids sending redundant \`:443\` / \`:80\` in the WebSocket \`Host\` header, preventing route host mismatch rejections in OpenShift HAProxy/Envoy routers, ALBs, and Cloudflare proxies.
 - **Rich Rejection Error Reporting**: Integrated \`unexpected-response\` stream listener in \`TerminalService\` to extract and render exact API server error reasons directly in the terminal interface.
 

@@ -46,26 +46,46 @@ export class TerminalService {
       'export TERM=xterm-256color; export PS1="[\\u@\\h \\W]\\$ "; if command -v bash >/dev/null 2>&1; then exec bash -i; elif command -v sh >/dev/null 2>&1; then exec sh -i; else exec /bin/sh -i; fi',
     ];
 
-    KubeHttpClient.createWebSocketExec(targetName, ns, {
-      container,
-      command: shellInit,
-      stdin: true,
-      stdout: true,
-      stderr: false,
-      tty: true,
-    })
-      .then((ws) => {
+    const connect = async () => {
+      let resolvedContainer = container && container.trim() ? container.trim() : undefined;
+
+      // If no container specified, fetch pod metadata to resolve default or first container
+      if (!resolvedContainer && mode === 'exec') {
+        try {
+          const podRes = await KubeHttpClient.getResource('pods', targetName, ns);
+          if (podRes.data) {
+            const defaultAnnot = podRes.data.metadata?.annotations?.['kubectl.kubernetes.io/default-container'];
+            const containers = podRes.data.spec?.containers || [];
+            if (defaultAnnot) {
+              resolvedContainer = defaultAnnot;
+            } else if (containers.length > 0 && containers[0]?.name) {
+              resolvedContainer = containers[0].name;
+            }
+          }
+        } catch {}
+      }
+
+      const attachWebSocket = async (targetCont?: string): Promise<WebSocket> => {
+        const ws = await KubeHttpClient.createWebSocketExec(targetName, ns, {
+          container: targetCont,
+          command: shellInit,
+          stdin: true,
+          stdout: true,
+          stderr: false,
+          tty: true,
+        });
+
         this.sessions.set(sessionId, {
           id: sessionId,
           ws,
           targetName,
           namespace: ns,
-          container,
+          container: targetCont,
           mode,
         });
 
         ws.on('open', () => {
-          sendData(`\x1b[32m[Connected to ${targetName}${container ? ` (${container})` : ''} in namespace ${ns}]\x1b[0m\r\n`);
+          sendData(`\x1b[32m[Connected to ${targetName}${targetCont ? ` (${targetCont})` : ''} in namespace ${ns}]\x1b[0m\r\n`);
         });
 
         ws.on('unexpected-response', (_req, res) => {
@@ -77,16 +97,32 @@ export class TerminalService {
             try {
               const parsed = JSON.parse(raw);
               if (parsed.message) {
-                msg = `${parsed.message} (HTTP ${res.statusCode})`;
+                msg = `${parsed.message}`;
               } else if (parsed.reason) {
-                msg = `${parsed.reason} (HTTP ${res.statusCode})`;
+                msg = `${parsed.reason}`;
               }
             } catch {
               if (raw.trim()) {
-                msg = `${raw.trim()} (HTTP ${res.statusCode})`;
+                msg = `${raw.trim()}`;
               }
             }
-            sendData(`\r\n\x1b[31m[WebSocket connection rejected: ${msg}]\x1b[0m\r\n`);
+
+            // Check if error is due to missing container name in multi-container pod:
+            // "a container name must be specified for pod ..., choose one of: [csi-attacher vsphere-csi-controller ...]"
+            const containerMatch = msg.match(/choose one of:\s*\[([^\]]+)\]/i);
+            if (containerMatch && !targetCont) {
+              const candidates = containerMatch[1].trim().split(/\s+/).filter(Boolean);
+              if (candidates.length > 0) {
+                const autoCont = candidates[0];
+                sendData(`\r\n\x1b[33m[Multiple containers detected in pod. Automatically connecting to primary container '${autoCont}']\x1b[0m\r\n`);
+                attachWebSocket(autoCont).catch((retryErr) => {
+                  sendData(`\r\n\x1b[31m[Retry connection error: ${retryErr.message || retryErr}]\x1b[0m\r\n`);
+                });
+                return;
+              }
+            }
+
+            sendData(`\r\n\x1b[31m[WebSocket connection rejected: ${msg} (HTTP ${res.statusCode})]\x1b[0m\r\n`);
           });
         });
 
@@ -131,11 +167,18 @@ export class TerminalService {
           sendData(`\r\n\x1b[31m[WebSocket connection error: ${err.message}]\x1b[0m\r\n`);
           this.sessions.delete(sessionId);
         });
-      })
-      .catch((err: any) => {
-        sendData(`\r\n\x1b[31m[Failed to initialize terminal session: ${err.message || err}]\x1b[0m\r\n`);
-      });
 
+        return ws;
+      };
+
+      try {
+        await attachWebSocket(resolvedContainer);
+      } catch (err: any) {
+        sendData(`\r\n\x1b[31m[Failed to initialize terminal session: ${err.message || err}]\x1b[0m\r\n`);
+      }
+    };
+
+    connect();
     return sessionId;
   }
 

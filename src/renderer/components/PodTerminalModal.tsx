@@ -37,6 +37,47 @@ export const PodTerminalModal: React.FC<PodTerminalModalProps> = ({
   const [copied, setCopied] = useState(false);
   const [activeTheme, setActiveTheme] = useState<ThemeConfig>(getStoredTheme());
 
+  const initialContainers: string[] = Array.from(
+    new Set([
+      ...(item.raw?.spec?.containers?.map((c: any) => c.name) || []),
+      ...(item.raw?.spec?.template?.spec?.containers?.map((c: any) => c.name) || []),
+      ...(container ? [container] : []),
+    ])
+  ).filter(Boolean);
+
+  const [availableContainers, setAvailableContainers] = useState<string[]>(initialContainers);
+  const [activeContainer, setActiveContainer] = useState<string>(
+    container ||
+    item.raw?.metadata?.annotations?.['kubectl.kubernetes.io/default-container'] ||
+    initialContainers[0] ||
+    ''
+  );
+
+  // Auto-fetch pod YAML to discover containers if not pre-populated in raw
+  useEffect(() => {
+    const api = (window as any).electronAPI;
+    if (api?.getYaml && availableContainers.length <= 1) {
+      api.getYaml('pods', item.name, namespace)
+        .then((yamlStr: string) => {
+          if (!yamlStr) return;
+          const nameMatches = yamlStr.matchAll(/^\s*-\s+name:\s+([a-zA-Z0-9_-]+)/gm);
+          const discovered: string[] = [];
+          for (const m of nameMatches) {
+            if (m[1] && !discovered.includes(m[1])) {
+              discovered.push(m[1]);
+            }
+          }
+          if (discovered.length > 0) {
+            setAvailableContainers((prev) => Array.from(new Set([...prev, ...discovered])));
+            if (!activeContainer) {
+              setActiveContainer(discovered[0]);
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  }, [item.name, namespace]);
+
   useEffect(() => {
     if (!terminalRef.current) return;
 
@@ -84,7 +125,7 @@ export const PodTerminalModal: React.FC<PodTerminalModalProps> = ({
     xtermInstance.current = term;
     fitAddonRef.current = fitAddon;
 
-    term.writeln('\x1b[36m⚡ Connecting to pod ' + item.name + '...\x1b[0m\r\n');
+    term.writeln('\x1b[36m⚡ Connecting to pod ' + item.name + (activeContainer ? ` (${activeContainer})` : '') + '...\x1b[0m\r\n');
 
     const sessionIdRef = { current: '' };
     const api = (window as any).electronAPI;
@@ -106,6 +147,17 @@ export const PodTerminalModal: React.FC<PodTerminalModalProps> = ({
     const removeListener = api?.onTerminalData ? api.onTerminalData((data: { sessionId: string; data: string }) => {
       if (!sessionIdRef.current || data.sessionId === sessionIdRef.current) {
         term.write(data.data);
+        // Discover container names dynamically if reported in terminal output
+        const match = data.data.match(/choose one of:\s*\[([^\]]+)\]/i);
+        if (match) {
+          const parsedConts = match[1].trim().split(/\s+/).filter(Boolean);
+          if (parsedConts.length > 0) {
+            setAvailableContainers((prev) => Array.from(new Set([...prev, ...parsedConts])));
+            if (!activeContainer || !parsedConts.includes(activeContainer)) {
+              setActiveContainer(parsedConts[0]);
+            }
+          }
+        }
       }
     }) : () => {};
 
@@ -114,7 +166,8 @@ export const PodTerminalModal: React.FC<PodTerminalModalProps> = ({
         if (!api?.startTerminal) {
           throw new Error('Terminal IPC API not available');
         }
-        const newSessionId = await api.startTerminal(item.name, namespace, container);
+        const targetCont = activeContainer || container || undefined;
+        const newSessionId = await api.startTerminal(item.name, namespace, targetCont);
         sessionIdRef.current = newSessionId;
         setSessionId(newSessionId);
         setStatus('connected');
@@ -161,7 +214,7 @@ export const PodTerminalModal: React.FC<PodTerminalModalProps> = ({
       }
       term.dispose();
     };
-  }, [item.name, namespace, container]);
+  }, [item.name, namespace, activeContainer]);
 
   const handleClear = () => {
     if (xtermInstance.current) {
@@ -235,11 +288,40 @@ export const PodTerminalModal: React.FC<PodTerminalModalProps> = ({
                 <span className="px-2 py-0.2 rounded bg-slate-800/80 border border-slate-700 text-[10px] text-slate-300 font-mono">
                   Project: {namespace}
                 </span>
-                {container && (
+                {availableContainers.length > 1 ? (
+                  <div
+                    className="flex items-center gap-1.5 text-xs px-2 py-0.5 rounded border"
+                    style={{
+                      backgroundColor: activeTheme.preview.bg,
+                      borderColor: activeTheme.cssVars['--border-subtle'] || '#334155',
+                    }}
+                  >
+                    <Box size={12} className="text-purple-400" />
+                    <span className="text-[10px] opacity-70">Container:</span>
+                    <select
+                      value={activeContainer}
+                      onChange={(e) => setActiveContainer(e.target.value)}
+                      className="bg-transparent text-[11px] font-mono font-bold text-purple-300 outline-none cursor-pointer"
+                    >
+                      {availableContainers.map((c) => (
+                        <option
+                          key={c}
+                          value={c}
+                          style={{
+                            backgroundColor: activeTheme.preview.bg,
+                            color: activeTheme.preview.text,
+                          }}
+                        >
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : activeContainer ? (
                   <span className="px-2 py-0.2 rounded bg-purple-950/60 border border-purple-800 text-[10px] text-purple-300 font-mono">
-                    Container: {container}
+                    Container: {activeContainer}
                   </span>
-                )}
+                ) : null}
               </div>
               <p className="text-[11px] font-mono opacity-60">
                 Interactive shell session • Full VT100 / xterm color emulation • {activeTheme.name}
