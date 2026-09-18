@@ -1,8 +1,19 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatAge, formatBytes, getStatusColor, padRight, truncate } from './formatters.js';
+import { formatAge, formatBytes, formatMemoryToGi, getStatusColor, padRight, truncate } from './formatters.js';
 
 describe('Formatters', () => {
+  it('should format memory to Gi correctly', () => {
+    assert.equal(formatMemoryToGi('32715784Ki'), '31.2 Gi');
+    assert.equal(formatMemoryToGi('8388608Ki'), '8 Gi');
+    assert.equal(formatMemoryToGi('1048576Ki'), '1 Gi');
+    assert.equal(formatMemoryToGi('512Mi'), '0.5 Gi');
+    assert.equal(formatMemoryToGi('16Gi'), '16 Gi');
+    assert.equal(formatMemoryToGi('2Ti'), '2048 Gi');
+    assert.equal(formatMemoryToGi('-'), '-');
+    assert.equal(formatMemoryToGi(undefined), '-');
+  });
+
   it('should format age correctly', () => {
     const now = new Date();
     assert.equal(formatAge(now.toISOString()), '0s');

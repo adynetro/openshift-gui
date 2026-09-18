@@ -230,4 +230,74 @@ export class TerminalService {
       this.sessions.delete(sessionId);
     }
   }
+
+  /**
+   * Opens an interactive pod console session in the user's system default terminal (macOS Terminal/iTerm, Windows Terminal/PowerShell/cmd, Linux terminal).
+   */
+  static async openInDefaultTerminal(
+    targetName: string,
+    namespace: string,
+    container?: string
+  ): Promise<{ success: boolean; message: string }> {
+    const { exec } = await import('node:child_process');
+    const os = await import('node:os');
+
+    let resolvedNs = namespace && namespace !== 'all-projects' && namespace !== '__all__' ? namespace : 'default';
+    let resolvedContainer = container && container.trim() ? container.trim() : undefined;
+
+    if (!resolvedContainer || !namespace || namespace === 'all-projects' || namespace === '__all__') {
+      try {
+        const podInfo = await OcClient.getPodContainers(targetName, namespace);
+        if (podInfo.resolvedNamespace) {
+          resolvedNs = podInfo.resolvedNamespace;
+        }
+        if (!resolvedContainer && podInfo.defaultContainer) {
+          resolvedContainer = podInfo.defaultContainer;
+        }
+      } catch {}
+    }
+
+    const contFlag = resolvedContainer ? `-c ${resolvedContainer}` : '';
+    const kubectlCmd = `kubectl exec -it ${targetName} -n ${resolvedNs} ${contFlag} -- /bin/sh -c "if command -v bash >/dev/null 2>&1; then exec bash -i; elif command -v sh >/dev/null 2>&1; then exec sh -i; else exec /bin/sh -i; fi" || oc rsh -n ${resolvedNs} ${contFlag} ${targetName}`;
+
+    const platform = os.platform();
+
+    return new Promise((resolve) => {
+      if (platform === 'darwin') {
+        // macOS Terminal.app or iTerm
+        const escapedCmd = kubectlCmd.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        const appleScript = `tell application "Terminal"
+          do script "${escapedCmd}"
+          activate
+        end tell`;
+        exec(`osascript -e '${appleScript.replace(/'/g, "'\\''")}'`, (err) => {
+          if (err) {
+            resolve({ success: false, message: `Failed to open Terminal: ${err.message}` });
+          } else {
+            resolve({ success: true, message: `Opened ${targetName} console in macOS Terminal` });
+          }
+        });
+      } else if (platform === 'win32') {
+        // Windows: Try Windows Terminal (wt.exe), fallback to cmd.exe or PowerShell
+        const winCmd = `start wt.exe cmd.exe /k "${kubectlCmd}" || start cmd.exe /k "${kubectlCmd}"`;
+        exec(winCmd, (err) => {
+          if (err) {
+            resolve({ success: false, message: `Failed to open Windows Terminal: ${err.message}` });
+          } else {
+            resolve({ success: true, message: `Opened ${targetName} console in Windows Terminal` });
+          }
+        });
+      } else {
+        // Linux: Try standard terminal emulators
+        const linuxCmd = `x-terminal-emulator -e '${kubectlCmd}' || gnome-terminal -- bash -c '${kubectlCmd}; exec bash' || konsole -e '${kubectlCmd}' || xfce4-terminal -e '${kubectlCmd}' || xterm -e '${kubectlCmd}'`;
+        exec(linuxCmd, (err) => {
+          if (err) {
+            resolve({ success: false, message: `Failed to open Linux terminal: ${err.message}` });
+          } else {
+            resolve({ success: true, message: `Opened ${targetName} console in System Terminal` });
+          }
+        });
+      }
+    });
+  }
 }

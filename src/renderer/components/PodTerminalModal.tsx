@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   Server,
   Box,
+  ExternalLink,
 } from 'lucide-react';
 import { ResourceItem } from '../../types/k8s.js';
 import { getStoredTheme, ThemeConfig } from '../utils/themes.js';
@@ -276,6 +277,20 @@ export const PodTerminalModal: React.FC<PodTerminalModalProps> = ({
     }
   };
 
+  const handleOpenSystemTerminal = async () => {
+    try {
+      const api = (window as any).electronAPI;
+      if (api?.openDefaultTerminal) {
+        const res = await api.openDefaultTerminal(item.name, actualNamespace, activeContainer || container || undefined);
+        if (!res.success) {
+          alert(`Failed to open default terminal: ${res.message}`);
+        }
+      }
+    } catch (err: any) {
+      alert(`Error launching terminal: ${err.message}`);
+    }
+  };
+
   return (
     <div
       onClick={(e) => {
@@ -373,6 +388,16 @@ export const PodTerminalModal: React.FC<PodTerminalModalProps> = ({
 
           {/* Action Toolbar */}
           <div className="flex items-center gap-2">
+            {/* Open in Default External Terminal */}
+            <button
+              onClick={handleOpenSystemTerminal}
+              className="px-2.5 py-1.5 rounded-lg bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 hover:text-white border border-cyan-700/80 text-xs font-mono flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+              title="Launch Pod Shell in System Default Terminal (macOS Terminal, Windows Terminal, Linux)"
+            >
+              <ExternalLink size={13} />
+              <span>System Terminal</span>
+            </button>
+
             <button
               onClick={handleCopySelection}
               className="px-2.5 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white border border-slate-700/60 text-xs font-mono flex items-center gap-1.5 transition-colors"

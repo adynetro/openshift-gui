@@ -21,9 +21,17 @@ import {
   Radio,
   ChevronDown,
   ChevronRight,
+  LogIn,
+  KeyRound,
+  Lock,
+  FileCode,
+  Terminal,
+  Eye,
+  EyeOff,
+  Plus,
 } from 'lucide-react';
 import { KubeContext, ProjectInfo, ServerInfo } from '../../types/k8s.js';
-import { groupServersWithContexts } from '../../utils/kube-utils.js';
+import { groupServersWithContexts, parseLoginInput } from '../../utils/kube-utils.js';
 import { FuzzyMatcher } from '../../utils/fuzzy.js';
 
 interface ContextModalProps {
@@ -51,7 +59,7 @@ export const ContextModal: React.FC<ContextModalProps> = ({
   onRefreshContexts,
   onClose,
 }) => {
-  const [viewMode, setViewMode] = useState<'switch' | 'clean'>('switch');
+  const [viewMode, setViewMode] = useState<'switch' | 'login' | 'clean'>('switch');
   const [query, setQuery] = useState<string>('');
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
   const [selectedToDelete, setSelectedToDelete] = useState<string[]>([]);
@@ -60,6 +68,25 @@ export const ContextModal: React.FC<ContextModalProps> = ({
   const [isCleaning, setIsCleaning] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  // Login & Import States
+  const [loginSubTab, setLoginSubTab] = useState<'command' | 'yaml'>('command');
+  const [loginCommand, setLoginCommand] = useState<string>('');
+  const [loginServer, setLoginServer] = useState<string>('');
+  const [loginAuthType, setLoginAuthType] = useState<'token' | 'basic'>('token');
+  const [loginToken, setLoginToken] = useState<string>('');
+  const [loginUsername, setLoginUsername] = useState<string>('');
+  const [loginPassword, setLoginPassword] = useState<string>('');
+  const [loginInsecure, setLoginInsecure] = useState<boolean>(true);
+  const [loginNamespace, setLoginNamespace] = useState<string>('');
+  const [loginClusterName, setLoginClusterName] = useState<string>('');
+  const [loginCa, setLoginCa] = useState<string>('');
+  const [loginShowToken, setLoginShowToken] = useState<boolean>(false);
+  const [loginShowPassword, setLoginShowPassword] = useState<boolean>(false);
+  const [showAdvancedLogin, setShowAdvancedLogin] = useState<boolean>(false);
+  const [yamlConfig, setYamlConfig] = useState<string>('');
+  const [yamlSetActive, setYamlSetActive] = useState<boolean>(true);
+  const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
 
   const serverList = useMemo(() => {
     if (propServers && propServers.length > 0) return propServers;
@@ -262,13 +289,123 @@ export const ContextModal: React.FC<ContextModalProps> = ({
     }
   };
 
+  const handleCommandChange = (val: string) => {
+    setLoginCommand(val);
+    const parsed = parseLoginInput(val);
+    if (parsed.isYamlConfig) {
+      setLoginSubTab('yaml');
+      setYamlConfig(val);
+      return;
+    }
+    if (parsed.server) setLoginServer(parsed.server);
+    if (parsed.token) {
+      setLoginToken(parsed.token);
+      setLoginAuthType('token');
+    }
+    if (parsed.username) {
+      setLoginUsername(parsed.username);
+      if (parsed.password) setLoginAuthType('basic');
+    }
+    if (parsed.password) {
+      setLoginPassword(parsed.password);
+      setLoginAuthType('basic');
+    }
+    if (parsed.insecureSkipTlsVerify !== undefined) {
+      setLoginInsecure(parsed.insecureSkipTlsVerify);
+    }
+    if (parsed.namespace) setLoginNamespace(parsed.namespace);
+    if (parsed.certificateAuthority) setLoginCa(parsed.certificateAuthority);
+  };
+
+  const handleLoginSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (loginSubTab === 'yaml') {
+      handleImportYaml();
+      return;
+    }
+
+    if (!loginServer.trim() && !loginCommand.trim()) {
+      setStatusMessage({ text: 'Please enter a server URL or paste an oc login command.', type: 'error' });
+      return;
+    }
+
+    try {
+      setIsLoggingIn(true);
+      setStatusMessage({ text: 'Connecting to cluster and configuring kubeconfig...', type: 'info' });
+
+      const res = await (window as any).electronAPI.loginCluster({
+        rawCommand: loginCommand.trim() || undefined,
+        server: loginServer.trim() || undefined,
+        token: loginAuthType === 'token' ? loginToken.trim() || undefined : undefined,
+        username: loginAuthType === 'basic' ? loginUsername.trim() || undefined : undefined,
+        password: loginAuthType === 'basic' ? loginPassword.trim() || undefined : undefined,
+        insecureSkipTlsVerify: loginInsecure,
+        namespace: loginNamespace.trim() || undefined,
+        clusterName: loginClusterName.trim() || undefined,
+        certificateAuthority: loginCa.trim() || undefined,
+        setActive: true,
+      });
+
+      if (res.success) {
+        setStatusMessage({ text: res.message, type: 'success' });
+        if (onRefreshContexts) onRefreshContexts();
+        if (res.contextName) {
+          onSelectContext(res.contextName);
+        }
+      } else {
+        setStatusMessage({ text: res.message || 'Login failed.', type: 'error' });
+      }
+    } catch (err: any) {
+      setStatusMessage({ text: err.message || 'Error during cluster login.', type: 'error' });
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleImportYaml = async () => {
+    if (!yamlConfig.trim()) {
+      setStatusMessage({ text: 'Please paste valid Kubeconfig YAML or JSON.', type: 'error' });
+      return;
+    }
+
+    try {
+      setIsLoggingIn(true);
+      setStatusMessage({ text: 'Importing and validating kubeconfig...', type: 'info' });
+
+      const res = await (window as any).electronAPI.importKubeConfig(yamlConfig.trim(), yamlSetActive);
+
+      if (res.success) {
+        setStatusMessage({ text: res.message, type: 'success' });
+        if (onRefreshContexts) onRefreshContexts();
+        if (res.activeContext) {
+          onSelectContext(res.activeContext);
+        }
+      } else {
+        setStatusMessage({ text: res.message || 'Import failed.', type: 'error' });
+      }
+    } catch (err: any) {
+      setStatusMessage({ text: err.message || 'Error importing kubeconfig.', type: 'error' });
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
   const title =
     mode === 'context'
       ? viewMode === 'clean'
         ? 'Clean & Prune Kubernetes Contexts'
+        : viewMode === 'login'
+        ? 'Login & Add Cluster'
         : 'Switch Server & Active Context'
       : 'Switch Project / Namespace';
-  const Icon = mode === 'context' ? (viewMode === 'clean' ? Flame : Server) : FolderGit2;
+  const Icon =
+    mode === 'context'
+      ? viewMode === 'clean'
+        ? Flame
+        : viewMode === 'login'
+        ? LogIn
+        : Server
+      : FolderGit2;
 
   const inactiveCount = contexts.filter((c) => c.name !== currentContext).length;
 
@@ -300,6 +437,8 @@ export const ContextModal: React.FC<ContextModalProps> = ({
               className={`w-10 h-10 rounded-lg flex items-center justify-center border ${
                 viewMode === 'clean'
                   ? 'bg-rose-500/20 text-rose-400 border-rose-500/30'
+                  : viewMode === 'login'
+                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
                   : 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
               }`}
             >
@@ -313,11 +452,18 @@ export const ContextModal: React.FC<ContextModalProps> = ({
                     Cleanup Mode
                   </span>
                 )}
+                {mode === 'context' && viewMode === 'login' && (
+                  <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 text-[10px] font-mono">
+                    Auth / Import
+                  </span>
+                )}
               </h2>
               <p className="text-xs text-slate-400">
                 {mode === 'context'
                   ? viewMode === 'clean'
                     ? `Total Contexts: ${contexts.length} • Stale to Clean: ${inactiveCount}`
+                    : viewMode === 'login'
+                    ? 'Authenticate via oc login command, Bearer Token, or paste raw Kubeconfig YAML'
                     : `Active Servers: ${serverList.length} • Total Contexts: ${contexts.length} • Active: ${currentContext || 'None'}`
                   : `Available Projects: ${projects.length}`}
               </p>
@@ -325,7 +471,7 @@ export const ContextModal: React.FC<ContextModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Toggle Switch / Clean mode for Contexts */}
+            {/* Toggle Switch / Login / Clean mode for Contexts */}
             {mode === 'context' && (
               <div className="flex items-center rounded-lg bg-slate-900 border border-slate-700 p-0.5 text-xs font-mono">
                 <button
@@ -336,9 +482,23 @@ export const ContextModal: React.FC<ContextModalProps> = ({
                       ? 'bg-cyan-600 text-white font-bold'
                       : 'text-slate-400 hover:text-white'
                   }`}
+                  title="Switch between active cluster servers and contexts"
                 >
                   <Server size={12} />
                   <span>Servers ({serverList.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('login')}
+                  className={`px-2.5 py-1 rounded-md transition-colors flex items-center gap-1.5 cursor-pointer ${
+                    viewMode === 'login'
+                      ? 'bg-emerald-600 text-white font-bold'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Login to new cluster or import kubeconfig YAML"
+                >
+                  <LogIn size={12} />
+                  <span>+ Login</span>
                 </button>
                 <button
                   type="button"
@@ -348,6 +508,7 @@ export const ContextModal: React.FC<ContextModalProps> = ({
                       ? 'bg-rose-600 text-white font-bold'
                       : 'text-slate-400 hover:text-white'
                   }`}
+                  title="Clean and prune stale inactive contexts"
                 >
                   <Trash2 size={12} />
                   <span>Clean ({inactiveCount})</span>
@@ -357,7 +518,7 @@ export const ContextModal: React.FC<ContextModalProps> = ({
 
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
               title="Close window (Esc)"
               aria-label="Close window"
             >
@@ -393,6 +554,305 @@ export const ContextModal: React.FC<ContextModalProps> = ({
             >
               ×
             </button>
+          </div>
+        )}
+
+        {/* LOGIN & IMPORT CLUSTER VIEW */}
+        {mode === 'context' && viewMode === 'login' && (
+          <div className="flex-1 overflow-auto p-5 space-y-4 font-sans">
+            {/* Sub-Tabs: oc login command vs Paste Kubeconfig YAML */}
+            <div className="flex items-center gap-2 p-1 bg-slate-900/90 rounded-lg border border-slate-700/80 text-xs font-mono">
+              <button
+                type="button"
+                onClick={() => setLoginSubTab('command')}
+                className={`flex-1 py-1.5 rounded-md flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  loginSubTab === 'command'
+                    ? 'bg-cyan-600 text-white font-bold shadow-md shadow-cyan-950/50'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Terminal size={13} />
+                <span>oc login / Token Auth</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setLoginSubTab('yaml')}
+                className={`flex-1 py-1.5 rounded-md flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  loginSubTab === 'yaml'
+                    ? 'bg-cyan-600 text-white font-bold shadow-md shadow-cyan-950/50'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <FileCode size={13} />
+                <span>Paste Kubeconfig YAML</span>
+              </button>
+            </div>
+
+            {/* TAB 1: oc login / Token Auth */}
+            {loginSubTab === 'command' && (
+              <form onSubmit={handleLoginSubmit} className="space-y-4">
+                {/* Smart Paste Command Box */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                      <Terminal size={14} className="text-cyan-400" />
+                      <span>Smart Paste (oc login command or Server URL)</span>
+                    </label>
+                    <span className="text-[10px] text-cyan-400/80 font-mono">
+                      Auto-extracts token, server, flags
+                    </span>
+                  </div>
+                  <textarea
+                    rows={2}
+                    value={loginCommand}
+                    onChange={(e) => handleCommandChange(e.target.value)}
+                    placeholder="Paste command here, e.g. oc login https://api.mycluster.domain.com:6443 --token=sha256~... --insecure-skip-tls-verify=true"
+                    className="w-full p-2.5 rounded-lg border text-xs font-mono bg-slate-950/90 border-slate-700 text-cyan-200 placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all shadow-inner"
+                  />
+                </div>
+
+                {/* Server URL Input */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-200 mb-1">
+                    Cluster API Server URL <span className="text-rose-400">*</span>
+                  </label>
+                  <div className="relative">
+                    <Globe size={14} className="absolute inset-y-0 left-3 my-auto text-slate-400" />
+                    <input
+                      type="text"
+                      required
+                      value={loginServer}
+                      onChange={(e) => setLoginServer(e.target.value)}
+                      placeholder="https://api.mycluster.domain.com:6443"
+                      className="w-full pl-9 pr-3 py-2 rounded-lg border text-xs font-mono bg-slate-950/80 border-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all"
+                    />
+                  </div>
+                </div>
+
+                {/* Auth Type Selector */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-200">
+                      Authentication Method
+                    </label>
+                    <div className="flex items-center gap-2 text-xs font-mono">
+                      <button
+                        type="button"
+                        onClick={() => setLoginAuthType('token')}
+                        className={`px-2.5 py-0.5 rounded transition-colors cursor-pointer ${
+                          loginAuthType === 'token'
+                            ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        Bearer Token (Recommended)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setLoginAuthType('basic')}
+                        className={`px-2.5 py-0.5 rounded transition-colors cursor-pointer ${
+                          loginAuthType === 'basic'
+                            ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        User & Password
+                      </button>
+                    </div>
+                  </div>
+
+                  {loginAuthType === 'token' ? (
+                    <div className="relative">
+                      <KeyRound size={14} className="absolute inset-y-0 left-3 my-auto text-slate-400" />
+                      <input
+                        type={loginShowToken ? 'text' : 'password'}
+                        value={loginToken}
+                        onChange={(e) => setLoginToken(e.target.value)}
+                        placeholder="sha256~... or Bearer JWT Token"
+                        className="w-full pl-9 pr-10 py-2 rounded-lg border text-xs font-mono bg-slate-950/80 border-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setLoginShowToken(!loginShowToken)}
+                        className="absolute inset-y-0 right-3 my-auto text-slate-400 hover:text-white transition-colors cursor-pointer"
+                        title={loginShowToken ? 'Hide token' : 'Show token'}
+                      >
+                        {loginShowToken ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="relative">
+                        <User size={14} className="absolute inset-y-0 left-3 my-auto text-slate-400" />
+                        <input
+                          type="text"
+                          value={loginUsername}
+                          onChange={(e) => setLoginUsername(e.target.value)}
+                          placeholder="Username (e.g. admin)"
+                          className="w-full pl-9 pr-3 py-2 rounded-lg border text-xs font-mono bg-slate-950/80 border-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all"
+                        />
+                      </div>
+                      <div className="relative">
+                        <Lock size={14} className="absolute inset-y-0 left-3 my-auto text-slate-400" />
+                        <input
+                          type={loginShowPassword ? 'text' : 'password'}
+                          value={loginPassword}
+                          onChange={(e) => setLoginPassword(e.target.value)}
+                          placeholder="Password"
+                          className="w-full pl-9 pr-10 py-2 rounded-lg border text-xs font-mono bg-slate-950/80 border-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setLoginShowPassword(!loginShowPassword)}
+                          className="absolute inset-y-0 right-3 my-auto text-slate-400 hover:text-white transition-colors cursor-pointer"
+                          title={loginShowPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {loginShowPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Insecure TLS Checkbox */}
+                <div className="p-2.5 rounded-lg bg-slate-900/70 border border-slate-800 flex items-center justify-between">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={loginInsecure}
+                      onChange={(e) => setLoginInsecure(e.target.checked)}
+                      className="rounded border-slate-700 text-cyan-500 focus:ring-0 cursor-pointer"
+                    />
+                    <span>Skip TLS Certificate Verification (<code className="text-cyan-400 text-[11px]">--insecure-skip-tls-verify</code>)</span>
+                  </label>
+                  <span className="text-[10px] text-slate-400 font-mono">Self-signed / dev certs</span>
+                </div>
+
+                {/* Advanced Options Accordion */}
+                <div className="border border-slate-800 rounded-lg overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvancedLogin(!showAdvancedLogin)}
+                    className="w-full p-2.5 bg-slate-900/60 hover:bg-slate-900 flex items-center justify-between text-xs text-slate-300 font-mono cursor-pointer transition-colors"
+                  >
+                    <span>Advanced Options (Namespace, Custom Cluster Alias, CA Cert)</span>
+                    {showAdvancedLogin ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                  </button>
+
+                  {showAdvancedLogin && (
+                    <div className="p-3 space-y-3 bg-slate-950/40 border-t border-slate-800">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-400 mb-1">
+                          Default Namespace / Project (<code className="text-cyan-400">-n</code>)
+                        </label>
+                        <input
+                          type="text"
+                          value={loginNamespace}
+                          onChange={(e) => setLoginNamespace(e.target.value)}
+                          placeholder="default (optional)"
+                          className="w-full px-3 py-1.5 rounded-lg border text-xs font-mono bg-slate-900 border-slate-700 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-400 mb-1">
+                          Custom Cluster Alias / Context Name
+                        </label>
+                        <input
+                          type="text"
+                          value={loginClusterName}
+                          onChange={(e) => setLoginClusterName(e.target.value)}
+                          placeholder="Auto-generated from URL hostname (optional)"
+                          className="w-full px-3 py-1.5 rounded-lg border text-xs font-mono bg-slate-900 border-slate-700 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-400 mb-1">
+                          Certificate Authority Path (<code className="text-cyan-400">--certificate-authority</code>)
+                        </label>
+                        <input
+                          type="text"
+                          value={loginCa}
+                          onChange={(e) => setLoginCa(e.target.value)}
+                          placeholder="/path/to/ca.crt (optional)"
+                          className="w-full px-3 py-1.5 rounded-lg border text-xs font-mono bg-slate-900 border-slate-700 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Submit Action */}
+                <button
+                  type="submit"
+                  disabled={isLoggingIn}
+                  className="w-full py-2.5 rounded-lg text-xs font-bold bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white shadow-lg shadow-emerald-950/60 flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50"
+                >
+                  {isLoggingIn ? <RefreshCw size={14} className="animate-spin" /> : <LogIn size={14} />}
+                  <span>{isLoggingIn ? 'Connecting to Cluster & Updating Kubeconfig...' : 'Connect & Login to Cluster'}</span>
+                </button>
+              </form>
+            )}
+
+            {/* TAB 2: Paste Kubeconfig YAML */}
+            {loginSubTab === 'yaml' && (
+              <div className="space-y-4">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                      <FileCode size={14} className="text-cyan-400" />
+                      <span>Paste Kubeconfig YAML or JSON</span>
+                    </label>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      Merges clusters, users & contexts safely
+                    </span>
+                  </div>
+                  <textarea
+                    rows={12}
+                    value={yamlConfig}
+                    onChange={(e) => setYamlConfig(e.target.value)}
+                    placeholder={`apiVersion: v1\nkind: Config\nclusters:\n- cluster:\n    server: https://api.cluster.example.com:6443\n    insecure-skip-tls-verify: true\n  name: my-cluster\ncontexts:\n- context:\n    cluster: my-cluster\n    user: my-user\n    namespace: default\n  name: default/my-cluster/my-user\ncurrent-context: default/my-cluster/my-user\nusers:\n- name: my-user\n  user:\n    token: sha256~...`}
+                    className="w-full p-3 rounded-lg border text-xs font-mono bg-slate-950/90 border-slate-700 text-cyan-200 placeholder-slate-600 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all shadow-inner leading-relaxed"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={yamlSetActive}
+                      onChange={(e) => setYamlSetActive(e.target.checked)}
+                      className="rounded border-slate-700 text-cyan-500 focus:ring-0 cursor-pointer"
+                    />
+                    <span>Set imported context as active immediately</span>
+                  </label>
+                  <span className="text-[10px] text-slate-500 font-mono">
+                    Auto-backup created in ~/.kube/config.bak-*
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setYamlConfig('')}
+                    disabled={!yamlConfig || isLoggingIn}
+                    className="px-4 py-2.5 rounded-lg text-xs font-semibold border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors disabled:opacity-30 cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleImportYaml}
+                    disabled={!yamlConfig.trim() || isLoggingIn}
+                    className="flex-1 py-2.5 rounded-lg text-xs font-bold bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-lg shadow-cyan-950/60 flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50"
+                  >
+                    {isLoggingIn ? <RefreshCw size={14} className="animate-spin" /> : <FileCode size={14} />}
+                    <span>{isLoggingIn ? 'Importing Kubeconfig...' : 'Import & Apply Kubeconfig'}</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -461,7 +921,7 @@ export const ContextModal: React.FC<ContextModalProps> = ({
                     type="checkbox"
                     checked={pruneDangling}
                     onChange={(e) => setPruneDangling(e.target.checked)}
-                    className="rounded border-slate-700 text-rose-500 focus:ring-0"
+                    className="rounded border-slate-700 text-rose-500 focus:ring-0 cursor-pointer"
                   />
                   <span>Prune Orphaned Clusters & Users</span>
                 </label>
@@ -474,41 +934,45 @@ export const ContextModal: React.FC<ContextModalProps> = ({
           </div>
         )}
 
-        {/* Autocomplete Search Input with Keyboard Navigation */}
-        <div
-          className="p-3 border-b shrink-0"
-          style={{
-            backgroundColor: 'var(--bg-card-header, #0f172a)',
-            borderColor: 'var(--border-color, #334155)',
-          }}
-        >
-          <div className="relative">
-            <Search size={16} className="absolute inset-y-0 left-3 my-auto text-slate-400 pointer-events-none" />
-            <input
-              type="text"
-              autoFocus
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={
-                mode === 'context'
-                  ? viewMode === 'clean'
-                    ? 'Filter contexts to clean...'
-                    : 'Search and filter active servers & contexts... (use ↑ / ↓ arrows and ↵ Enter)'
-                  : 'Search and filter projects... (use ↑ / ↓ arrows and ↵ Enter)'
-              }
-              className="w-full pl-10 pr-4 py-2 border rounded-lg text-xs placeholder-slate-500 shadow-inner focus:outline-none font-mono"
-              style={{
-                backgroundColor: 'var(--bg-input, #0f172a)',
-                borderColor: 'var(--border-subtle, #334155)',
-                color: 'var(--text-main, #f8fafc)',
-              }}
-            />
+        {/* Autocomplete Search Input with Keyboard Navigation (Shown for switch and clean modes) */}
+        {viewMode !== 'login' && (
+          <div
+            className="p-3 border-b shrink-0"
+            style={{
+              backgroundColor: 'var(--bg-card-header, #0f172a)',
+              borderColor: 'var(--border-color, #334155)',
+            }}
+          >
+            <div className="relative">
+              <Search size={16} className="absolute inset-y-0 left-3 my-auto text-slate-400 pointer-events-none" />
+              <input
+                type="text"
+                autoFocus
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={
+                  mode === 'context'
+                    ? viewMode === 'clean'
+                      ? 'Filter contexts to clean...'
+                      : 'Search and filter active servers & contexts... (use ↑ / ↓ arrows and ↵ Enter)'
+                    : 'Search and filter projects... (use ↑ / ↓ arrows and ↵ Enter)'
+                }
+                className="w-full pl-10 pr-4 py-2 border rounded-lg text-xs placeholder-slate-500 shadow-inner focus:outline-none font-mono"
+                style={{
+                  backgroundColor: 'var(--bg-input, #0f172a)',
+                  borderColor: 'var(--border-subtle, #334155)',
+                  color: 'var(--text-main, #f8fafc)',
+                }}
+              />
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Items List */}
+        {/* Items List (Shown for switch and clean modes) */}
+        {viewMode !== 'login' && (
         <div className="flex-1 overflow-auto p-3 space-y-1.5 divide-y divide-slate-800/40 font-sans">
+
           {items.length === 0 ? (
             <div className="p-8 text-center text-slate-500 text-xs">
               No matching {mode === 'context' ? (viewMode === 'clean' ? 'contexts' : 'servers with active contexts') : 'projects'} found.
@@ -597,14 +1061,14 @@ export const ContextModal: React.FC<ContextModalProps> = ({
                                     ? 'text-cyan-300 font-bold'
                                     : 'text-white group-hover:text-cyan-300'
                                 }`}
-                                title={item.server}
+                                title={`Cluster: ${item.clusterName || item.server}\nServer API: ${item.server}`}
                               >
-                                {item.server}
+                                {item.clusterName || item.server}
                               </span>
 
                               {isCurrent && (
                                 <span className="px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800 text-[10px] font-bold flex items-center gap-1 font-mono shrink-0">
-                                  <CheckCircle2 size={10} /> Active Server
+                                  <CheckCircle2 size={10} /> Active Cluster
                                 </span>
                               )}
 
@@ -616,21 +1080,22 @@ export const ContextModal: React.FC<ContextModalProps> = ({
                             <div className="flex items-center gap-3 text-[11px] text-slate-400 font-mono flex-wrap">
                               <span className="flex items-center gap-1 text-slate-300">
                                 <Layers size={11} className="text-cyan-400" />
-                                <span className="font-semibold text-cyan-200 truncate max-w-[220px]">
+                                <span className="font-semibold text-cyan-200 truncate max-w-[220px]" title={`Context: ${item.activeContextName}`}>
                                   {item.activeContextName}
                                 </span>
                               </span>
+
+                              {item.server && item.server !== item.clusterName && (
+                                <span className="flex items-center gap-1 text-slate-400">
+                                  <Server size={10} className="text-slate-500" />
+                                  <span className="truncate max-w-[200px]" title={item.server}>{item.server}</span>
+                                </span>
+                              )}
 
                               {item.user && (
                                 <span className="flex items-center gap-1">
                                   <User size={11} className="text-slate-500" />
                                   <span className="truncate max-w-[140px]">{item.user}</span>
-                                </span>
-                              )}
-
-                              {item.clusterName && item.clusterName !== item.server && (
-                                <span className="text-[10px] text-slate-500 truncate max-w-[140px]">
-                                  cluster: {item.clusterName}
                                 </span>
                               )}
                             </div>
@@ -785,6 +1250,7 @@ export const ContextModal: React.FC<ContextModalProps> = ({
             })
           )}
         </div>
+        )}
 
         {/* Footer with keyboard hints */}
         <div className="p-3 bg-slate-900 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400 font-mono shrink-0">

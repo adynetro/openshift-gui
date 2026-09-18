@@ -1,9 +1,11 @@
+import fs from 'node:fs';
 import electron from 'electron';
 import { KubeConfigService } from '../services/kubeconfig.js';
 import { OcClient } from '../services/oc-client.js';
 import { HelmService } from '../services/helm.js';
 import { LogStreamer, LogEntry } from '../services/log-streamer.js';
 import { TerminalService } from '../services/terminal-service.js';
+import { PortForwardService } from '../services/port-forward-service.js';
 import { ResourceKind } from '../types/k8s.js';
 
 const { ipcMain, shell } = electron;
@@ -266,6 +268,52 @@ export function registerIpcHandlers(mainWindow: electron.BrowserWindow): void {
     TerminalService.stopSession(sessionId);
   });
 
+  // External System Default Terminal
+  ipcMain.handle('terminal:openExternal', async (_event, targetName: string, namespace: string, container?: string) => {
+    return await TerminalService.openInDefaultTerminal(targetName, namespace, container);
+  });
+
+  // Complete Log Retrieval & File Download
+  ipcMain.handle('logs:getComplete', async (_event, targetName: string, namespace: string, kind?: string, container?: string) => {
+    return await OcClient.getCompleteLogs(targetName, namespace, kind, container);
+  });
+
+  ipcMain.handle('logs:downloadComplete', async (_event, targetName: string, namespace: string, kind?: string, container?: string) => {
+    const res = await OcClient.getCompleteLogs(targetName, namespace, kind, container);
+    const { canceled, filePath } = await electron.dialog.showSaveDialog(mainWindow, {
+      title: `Save Logs for ${targetName}`,
+      defaultPath: res.fileName,
+      filters: [{ name: 'Log Files', extensions: ['log', 'txt'] }],
+    });
+    if (!canceled && filePath) {
+      fs.writeFileSync(filePath, res.logs, 'utf8');
+      return { success: true, filePath, lineCount: res.lineCount, message: `Successfully saved ${res.lineCount} lines to ${filePath}` };
+    }
+    return { success: false, message: 'Download cancelled by user' };
+  });
+
+  // Port Forwarding Handlers
+  ipcMain.handle('portforward:getPorts', async (_event, kind: string, name: string, namespace: string) => {
+    return await PortForwardService.getAvailablePorts(kind, name, namespace);
+  });
+
+  ipcMain.handle('portforward:start', async (_event, kind: any, name: string, namespace: string, localPort: number, targetPort: number | string) => {
+    return await PortForwardService.startPortForward(kind, name, namespace, localPort, targetPort);
+  });
+
+  ipcMain.handle('portforward:stop', async (_event, sessionId: string) => {
+    return PortForwardService.stopPortForward(sessionId);
+  });
+
+  ipcMain.handle('portforward:stopAll', async () => {
+    PortForwardService.stopAll();
+    return true;
+  });
+
+  ipcMain.handle('portforward:list', async () => {
+    return PortForwardService.listSessions();
+  });
+
   // Image Registry Pruner Handlers
   ipcMain.handle('kube:pruneImages', async (_event, options: any) => {
     return await OcClient.pruneImages(options || {});
@@ -287,4 +335,17 @@ export function registerIpcHandlers(mainWindow: electron.BrowserWindow): void {
   ipcMain.handle('kube:deleteContext', async (_event, contextName: string, pruneDangling?: boolean) => {
     return await KubeConfigService.deleteContext(contextName, pruneDangling ?? true);
   });
+
+  ipcMain.handle('kube:login', async (_event, options: any) => {
+    return await KubeConfigService.loginCluster(options || {});
+  });
+
+  ipcMain.handle('kube:importConfig', async (_event, yamlContent: string, setActive?: boolean) => {
+    return await KubeConfigService.importKubeConfig(yamlContent, { setActive: setActive !== false });
+  });
+
+  ipcMain.handle('kube:testConnection', async () => {
+    return await KubeConfigService.testConnection();
+  });
 }
+

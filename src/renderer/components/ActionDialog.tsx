@@ -141,50 +141,100 @@ export const ActionDialog: React.FC<ActionDialogProps> = ({
                 <span>Namespace: <strong className="font-mono">{namespace}</strong></span>
               </div>
 
-              {/* Counter Input */}
+              {/* Counter Input with Direct Text Box */}
               <div
-                className="flex items-center justify-center gap-3 p-3 rounded-lg border"
+                className="flex flex-col items-center justify-center gap-3 p-4 rounded-xl border"
                 style={{
                   backgroundColor: 'var(--bg-input, #0f172a)',
                   borderColor: 'var(--border-subtle, #334155)',
                 }}
               >
-                <button
-                  onClick={() => setReplicas((prev) => Math.max(0, prev - 1))}
-                  className="w-10 h-10 rounded-lg border opacity-80 hover:opacity-100 font-bold text-lg flex items-center justify-center active:scale-95 transition-all"
-                  style={{
-                    backgroundColor: 'var(--bg-card, #1e293b)',
-                    borderColor: 'var(--border-color, #334155)',
-                  }}
-                >
-                  -
-                </button>
+                <div className="flex items-center justify-center gap-3 w-full">
+                  <button
+                    type="button"
+                    onClick={() => setReplicas((prev) => Math.max(0, prev - 1))}
+                    className="w-10 h-10 rounded-lg border opacity-80 hover:opacity-100 font-bold text-lg flex items-center justify-center active:scale-95 transition-all cursor-pointer"
+                    style={{
+                      backgroundColor: 'var(--bg-card, #1e293b)',
+                      borderColor: 'var(--border-color, #334155)',
+                    }}
+                    title="Decrease by 1"
+                  >
+                    -
+                  </button>
 
-                <div className="w-20 text-center font-mono text-2xl font-black text-cyan-300">
-                  {replicas}
+                  {/* Direct Editable Textbox for Replicas */}
+                  <div className="relative flex items-center justify-center">
+                    <input
+                      type="number"
+                      min={0}
+                      max={999}
+                      value={isNaN(replicas) ? '' : replicas}
+                      onChange={(e) => {
+                        const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10);
+                        setReplicas(isNaN(val) ? 0 : Math.max(0, val));
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !loading) {
+                          e.preventDefault();
+                          handleExecute();
+                        }
+                      }}
+                      className="w-28 h-12 text-center font-mono text-2xl font-black text-cyan-300 rounded-lg border border-cyan-500/40 bg-slate-950/80 focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 transition-all shadow-inner"
+                      title="Directly enter target number of replicas"
+                      autoFocus
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setReplicas((prev) => prev + 1)}
+                    className="w-10 h-10 rounded-lg border opacity-80 hover:opacity-100 font-bold text-lg flex items-center justify-center active:scale-95 transition-all cursor-pointer"
+                    style={{
+                      backgroundColor: 'var(--bg-card, #1e293b)',
+                      borderColor: 'var(--border-color, #334155)',
+                    }}
+                    title="Increase by 1"
+                  >
+                    +
+                  </button>
                 </div>
 
-                <button
-                  onClick={() => setReplicas((prev) => prev + 1)}
-                  className="w-10 h-10 rounded-lg border opacity-80 hover:opacity-100 font-bold text-lg flex items-center justify-center active:scale-95 transition-all"
-                  style={{
-                    backgroundColor: 'var(--bg-card, #1e293b)',
-                    borderColor: 'var(--border-color, #334155)',
-                  }}
-                >
-                  +
-                </button>
+                {/* Quick Presets */}
+                <div className="flex items-center justify-center gap-1.5 pt-1 flex-wrap">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 mr-1">Presets:</span>
+                  {[0, 1, 2, 3, 5, 10].map((count) => (
+                    <button
+                      key={count}
+                      type="button"
+                      onClick={() => setReplicas(count)}
+                      className={`px-2 py-0.5 rounded text-xs font-mono font-bold border transition-all cursor-pointer ${
+                        replicas === count
+                          ? 'bg-cyan-500/30 text-cyan-300 border-cyan-400'
+                          : 'bg-slate-800/80 text-slate-300 border-slate-700/60 hover:bg-slate-700 hover:text-white'
+                      }`}
+                    >
+                      {count === 0 ? '0 (Stop)' : count}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Slider */}
-              <input
-                type="range"
-                min={0}
-                max={20}
-                value={replicas}
-                onChange={(e) => setReplicas(Number(e.target.value))}
-                className="w-full accent-cyan-500 cursor-pointer"
-              />
+              <div className="space-y-1">
+                <input
+                  type="range"
+                  min={0}
+                  max={Math.max(20, replicas, currentDesired)}
+                  value={replicas}
+                  onChange={(e) => setReplicas(Number(e.target.value))}
+                  className="w-full accent-cyan-500 cursor-pointer"
+                />
+                <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+                  <span>0 (Scale Down)</span>
+                  <span>Max: {Math.max(20, replicas, currentDesired)}</span>
+                </div>
+              </div>
             </div>
           )}
 

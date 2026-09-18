@@ -77,6 +77,74 @@ export function formatBytes(bytes?: number): string {
   return `${Number(val.toFixed(1))} ${BYTE_SIZES[i]}`;
 }
 
+/**
+ * Normalizes and formats any Kubernetes memory value (Ki, Mi, Gi, raw bytes, etc.) into Gi units.
+ * Converts values like '32715784Ki' to '31.20 Gi', '8192000Ki' to '7.81 Gi', '512Mi' to '0.50 Gi'.
+ */
+export function formatMemoryToGi(val?: string | number): string {
+  if (val === undefined || val === null || val === '' || val === '-') return '-';
+  if (typeof val === 'number') {
+    const gi = val / (1024 * 1024 * 1024);
+    return `${Number(gi.toFixed(2))} Gi`;
+  }
+  const str = String(val).trim();
+  if (!str || str === '-') return '-';
+
+  // Parse numeric amount and unit suffix
+  const match = str.match(/^([0-9.]+)\s*([a-zA-Z]*)$/);
+  if (!match) return str;
+
+  const num = parseFloat(match[1]);
+  if (isNaN(num)) return str;
+
+  const unit = (match[2] || '').toLowerCase();
+  let bytes = 0;
+
+  switch (unit) {
+    case 'ki':
+    case 'kib':
+      bytes = num * 1024;
+      break;
+    case 'k':
+    case 'kb':
+      bytes = num * 1000;
+      break;
+    case 'mi':
+    case 'mib':
+      bytes = num * 1024 * 1024;
+      break;
+    case 'm':
+    case 'mb':
+      bytes = num * 1000 * 1000;
+      break;
+    case 'gi':
+    case 'gib':
+      bytes = num * 1024 * 1024 * 1024;
+      break;
+    case 'g':
+    case 'gb':
+      bytes = num * 1000 * 1000 * 1000;
+      break;
+    case 'ti':
+    case 'tib':
+      bytes = num * 1024 * 1024 * 1024 * 1024;
+      break;
+    case 't':
+    case 'tb':
+      bytes = num * 1000 * 1000 * 1000 * 1000;
+      break;
+    case '':
+    case 'b':
+      bytes = num;
+      break;
+    default:
+      return str;
+  }
+
+  const gi = bytes / (1024 * 1024 * 1024);
+  return `${Number(gi.toFixed(2))} Gi`;
+}
+
 export function getStatusColor(status: string): 'green' | 'red' | 'yellow' | 'blue' | 'gray' | 'magenta' | 'cyan' {
   if (!status) return 'gray';
   const s = status.toLowerCase();

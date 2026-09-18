@@ -163,6 +163,7 @@ export interface ProjectInfo {
 
 export interface ClusterInfo {
   server: string;
+  clusterName?: string;
   user: string;
   context: string;
   namespace: string;
@@ -265,4 +266,37 @@ export interface NodeDebugDiagnostics {
     type: string;
     address: string;
   }>;
+}
+
+export interface LoginOptions {
+  server?: string;
+  token?: string;
+  username?: string;
+  password?: string;
+  insecureSkipTlsVerify?: boolean;
+  namespace?: string;
+  clusterName?: string;
+  contextName?: string;
+  certificateAuthority?: string;
+  certificateAuthorityData?: string;
+  rawCommand?: string;
+  setActive?: boolean;
+}
+
+export interface LoginResult {
+  success: boolean;
+  message: string;
+  contextName?: string;
+  server?: string;
+  user?: string;
+  clusterName?: string;
+  namespace?: string;
+}
+
+export interface ImportConfigResult {
+  success: boolean;
+  message: string;
+  importedContexts: string[];
+  activeContext?: string;
+  backupPath?: string;
 }

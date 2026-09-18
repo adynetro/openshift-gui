@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import { KubeConfigService, parseKubeConfig, groupServersWithContexts } from "./kubeconfig.js";
+import { KubeConfigService, parseKubeConfig, groupServersWithContexts, parseLoginInput } from "./kubeconfig.js";
 
 describe("parseKubeConfig & groupServersWithContexts", () => {
   const standardConfig = {
@@ -423,6 +423,119 @@ describe("KubeConfigService.cleanContexts", () => {
     assert.equal(parsed.servers[0]?.server, "https://rancher.corp.internal/k8s/clusters/c-m-8vx9b2qt");
     assert.equal(parsed.servers[0]?.isCurrent, true);
     assert.equal(parsed.servers[1]?.server, "https://rancher.corp.internal/k8s/clusters/c-m-z9tk4pw7");
+  });
+});
+
+describe("parseLoginInput & KubeConfigService Login & Import", () => {
+  it("should parse standard oc login token command", () => {
+    const cmd = "oc login https://api.cluster.example.com:6443 --token=sha256~vO4test123 --insecure-skip-tls-verify=true -n my-project";
+    const res = parseLoginInput(cmd);
+
+    assert.equal(res.server, "https://api.cluster.example.com:6443");
+    assert.equal(res.token, "sha256~vO4test123");
+    assert.equal(res.insecureSkipTlsVerify, true);
+    assert.equal(res.namespace, "my-project");
+  });
+
+  it("should parse oc login with flag-separated arguments and username/password", () => {
+    const cmd = "oc login --server https://api.ocp4.internal:6443 -u admin -p s3cr3t -k";
+    const res = parseLoginInput(cmd);
+
+    assert.equal(res.server, "https://api.ocp4.internal:6443");
+    assert.equal(res.username, "admin");
+    assert.equal(res.password, "s3cr3t");
+    assert.equal(res.insecureSkipTlsVerify, true);
+  });
+
+  it("should auto-detect raw URL and domain:port", () => {
+    const res1 = parseLoginInput("https://api.crc.testing:6443");
+    assert.equal(res1.server, "https://api.crc.testing:6443");
+
+    const res2 = parseLoginInput("api.crc.testing:6443");
+    assert.equal(res2.server, "https://api.crc.testing:6443");
+  });
+
+  it("should detect raw YAML or JSON kubeconfig", () => {
+    const yaml = `apiVersion: v1\nkind: Config\nclusters:\n- cluster:\n    server: https://api.test:6443\n  name: test`;
+    const res = parseLoginInput(yaml);
+    assert.equal(res.isYamlConfig, true);
+  });
+
+  it("should import raw kubeconfig YAML and merge correctly", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "kube-test-"));
+    const tmpConfigPath = path.join(tmpDir, "config");
+    process.env["KUBECONFIG"] = tmpConfigPath;
+
+    const baseKube = {
+      apiVersion: "v1",
+      kind: "Config",
+      "current-context": "base-ctx",
+      clusters: [{ name: "base-cluster", cluster: { server: "https://base.server:6443" } }],
+      users: [{ name: "base-user", user: { token: "base-tok" } }],
+      contexts: [{ name: "base-ctx", context: { cluster: "base-cluster", user: "base-user", namespace: "default" } }],
+    };
+    fs.writeFileSync(tmpConfigPath, stringifyYaml(baseKube), "utf8");
+
+    const importedKube = `
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: https://imported.server:6443
+    insecure-skip-tls-verify: true
+  name: imported-cluster
+users:
+- name: imported-user
+  user:
+    token: sha256~imported123
+contexts:
+- context:
+    cluster: imported-cluster
+    user: imported-user
+    namespace: prod
+  name: prod/imported-cluster/imported-user
+current-context: prod/imported-cluster/imported-user
+`;
+
+    const result = await KubeConfigService.importKubeConfig(importedKube, { setActive: true });
+    assert.equal(result.success, true);
+    assert.equal(result.importedContexts.includes("prod/imported-cluster/imported-user"), true);
+    assert.equal(result.activeContext, "prod/imported-cluster/imported-user");
+
+    const saved = parseYaml(fs.readFileSync(tmpConfigPath, "utf8"));
+    assert.equal(saved.clusters.length, 2);
+    assert.equal(saved.users.length, 2);
+    assert.equal(saved.contexts.length, 2);
+    assert.equal(saved["current-context"], "prod/imported-cluster/imported-user");
+
+    // Cleanup
+    delete process.env["KUBECONFIG"];
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("should login with direct options or rawCommand", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "kube-login-test-"));
+    const tmpConfigPath = path.join(tmpDir, "config");
+    process.env["KUBECONFIG"] = tmpConfigPath;
+
+    const res = await KubeConfigService.loginCluster({
+      rawCommand: "oc login https://api.newcluster.org:6443 --token=sha256~logintest456 --insecure-skip-tls-verify=true -n test-ns",
+    });
+
+    assert.equal(res.success, true);
+    assert.ok(res.contextName);
+    assert.equal(res.server, "https://api.newcluster.org:6443");
+    assert.equal(res.namespace, "test-ns");
+
+    const saved = parseYaml(fs.readFileSync(tmpConfigPath, "utf8"));
+    assert.equal(saved["current-context"], res.contextName);
+    const cluster = saved.clusters.find((c: any) => c.cluster.server === "https://api.newcluster.org:6443");
+    assert.ok(cluster);
+    assert.equal(cluster.cluster["insecure-skip-tls-verify"], true);
+
+    // Cleanup
+    delete process.env["KUBECONFIG"];
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 });
 

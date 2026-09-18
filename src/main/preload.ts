@@ -41,6 +41,14 @@ export interface IpcApi {
   writeTerminal: (sessionId: string, data: string) => Promise<void>;
   resizeTerminal: (sessionId: string, cols: number, rows: number) => Promise<void>;
   stopTerminal: (sessionId: string) => Promise<void>;
+  openDefaultTerminal: (targetName: string, namespace: string, container?: string) => Promise<{ success: boolean; message: string }>;
+  getCompleteLogs: (targetName: string, namespace: string, kind?: string, container?: string) => Promise<{ logs: string; fileName: string; lineCount: number }>;
+  downloadCompleteLogs: (targetName: string, namespace: string, kind?: string, container?: string) => Promise<{ success: boolean; filePath?: string; lineCount?: number; message: string }>;
+  getPortForwardPorts: (kind: string, name: string, namespace: string) => Promise<{ ports: any[]; defaultLocalPort: number }>;
+  startPortForward: (kind: string, name: string, namespace: string, localPort: number, targetPort: number | string) => Promise<any>;
+  stopPortForward: (sessionId: string) => Promise<boolean>;
+  stopAllPortForwards: () => Promise<boolean>;
+  listPortForwards: () => Promise<any[]>;
   onTerminalData: (callback: (data: { sessionId: string; data: string }) => void) => () => void;
   getPodDebugInfo: (podName: string, namespace: string) => Promise<{ diagnostics?: any; error?: string }>;
   getNodeDebugInfo: (nodeName: string) => Promise<{ diagnostics?: any; error?: string }>;
@@ -92,6 +100,28 @@ export interface IpcApi {
     remainingContexts: string[];
     message: string;
   }>;
+  loginCluster: (options: any) => Promise<{
+    success: boolean;
+    message: string;
+    contextName?: string;
+    server?: string;
+    user?: string;
+    clusterName?: string;
+    namespace?: string;
+  }>;
+  importKubeConfig: (yamlContent: string, setActive?: boolean) => Promise<{
+    success: boolean;
+    message: string;
+    importedContexts: string[];
+    activeContext?: string;
+    backupPath?: string;
+  }>;
+  testConnection: () => Promise<{
+    success: boolean;
+    message: string;
+    version?: string;
+    user?: string;
+  }>;
 }
 
 const api: IpcApi = {
@@ -139,6 +169,14 @@ const api: IpcApi = {
   writeTerminal: (sessionId, data) => ipcRenderer.invoke('terminal:write', sessionId, data),
   resizeTerminal: (sessionId, cols, rows) => ipcRenderer.invoke('terminal:resize', sessionId, cols, rows),
   stopTerminal: (sessionId) => ipcRenderer.invoke('terminal:stop', sessionId),
+  openDefaultTerminal: (target, ns, container) => ipcRenderer.invoke('terminal:openExternal', target, ns, container),
+  getCompleteLogs: (target, ns, kind, container) => ipcRenderer.invoke('logs:getComplete', target, ns, kind, container),
+  downloadCompleteLogs: (target, ns, kind, container) => ipcRenderer.invoke('logs:downloadComplete', target, ns, kind, container),
+  getPortForwardPorts: (kind, name, ns) => ipcRenderer.invoke('portforward:getPorts', kind, name, ns),
+  startPortForward: (kind, name, ns, localPort, targetPort) => ipcRenderer.invoke('portforward:start', kind, name, ns, localPort, targetPort),
+  stopPortForward: (sessionId) => ipcRenderer.invoke('portforward:stop', sessionId),
+  stopAllPortForwards: () => ipcRenderer.invoke('portforward:stopAll'),
+  listPortForwards: () => ipcRenderer.invoke('portforward:list'),
   onTerminalData: (callback) => {
     const sub = (_e: any, data: any) => callback(data);
     ipcRenderer.on('terminal:data', sub);
@@ -152,6 +190,10 @@ const api: IpcApi = {
   getRegistryUrl: () => ipcRenderer.invoke('kube:getRegistryUrl'),
   cleanContexts: (options) => ipcRenderer.invoke('kube:cleanContexts', options),
   deleteContext: (contextName, pruneDangling) => ipcRenderer.invoke('kube:deleteContext', contextName, pruneDangling),
+  loginCluster: (options) => ipcRenderer.invoke('kube:login', options),
+  importKubeConfig: (yamlContent, setActive) => ipcRenderer.invoke('kube:importConfig', yamlContent, setActive),
+  testConnection: () => ipcRenderer.invoke('kube:testConnection'),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', api);
+

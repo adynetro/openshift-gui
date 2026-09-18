@@ -16,7 +16,7 @@ import {
   NodeDebugDiagnostics,
   ContainerDebugState,
 } from '../types/k8s.js';
-import { formatAge, getStatusColor } from '../utils/formatters.js';
+import { formatAge, getStatusColor, formatMemoryToGi } from '../utils/formatters.js';
 import { SemverSorter } from './semver-sorter.js';
 import { KubeHttpClient, getResourceApiPath, getApiPathForResource } from './kube-http-client.js';
 
@@ -188,10 +188,10 @@ function formatDescribeOutput(kind: string, name: string, namespace: string, dat
       }
       if (c.resources) {
         if (c.resources.requests) {
-          lines.push(`    Requests:    cpu=${c.resources.requests.cpu || '-'}, memory=${c.resources.requests.memory || '-'}`);
+          lines.push(`    Requests:    cpu=${c.resources.requests.cpu || '-'}, memory=${formatMemoryToGi(c.resources.requests.memory) || '-'}`);
         }
         if (c.resources.limits) {
-          lines.push(`    Limits:      cpu=${c.resources.limits.cpu || '-'}, memory=${c.resources.limits.memory || '-'}`);
+          lines.push(`    Limits:      cpu=${c.resources.limits.cpu || '-'}, memory=${formatMemoryToGi(c.resources.limits.memory) || '-'}`);
         }
       }
       if (c.env && c.env.length > 0) {
@@ -618,6 +618,10 @@ export class OcClient {
               version: raw.status?.nodeInfo?.kubeletVersion || '-',
               osImage: raw.status?.nodeInfo?.osImage || '-',
               internalIP: raw.status?.addresses?.find((a: any) => a.type === 'InternalIP')?.address || '-',
+              memory: formatMemoryToGi(raw.status?.capacity?.memory),
+              allocatableMemory: formatMemoryToGi(raw.status?.allocatable?.memory),
+              cpu: raw.status?.capacity?.cpu || '-',
+              allocatableCpu: raw.status?.allocatable?.cpu || '-',
             },
             labels: raw.metadata?.labels || {},
             raw,
@@ -2208,14 +2212,14 @@ spec:
 
       const capacity = {
         cpu: nodeJson.status?.capacity?.cpu || '-',
-        memory: nodeJson.status?.capacity?.memory || '-',
+        memory: formatMemoryToGi(nodeJson.status?.capacity?.memory),
         pods: nodeJson.status?.capacity?.pods || '-',
         ephemeralStorage: nodeJson.status?.capacity?.['ephemeral-storage'] || '-',
       };
 
       const allocatable = {
         cpu: nodeJson.status?.allocatable?.cpu || '-',
-        memory: nodeJson.status?.allocatable?.memory || '-',
+        memory: formatMemoryToGi(nodeJson.status?.allocatable?.memory),
         pods: nodeJson.status?.allocatable?.pods || '-',
         ephemeralStorage: nodeJson.status?.allocatable?.['ephemeral-storage'] || '-',
       };
@@ -2368,5 +2372,128 @@ spec:
   static async getResourceCounts(namespace: string): Promise<Partial<Record<ResourceKind, number>>> {
     const preloadRes = await this.preloadAllResources(namespace);
     return preloadRes.counts;
+  }
+
+  /**
+   * Fetches complete un-truncated logs for a pod or workload directly from the Kubernetes API.
+   */
+  static async getCompleteLogs(
+    targetName: string,
+    namespace: string,
+    kind: string = 'pods',
+    container?: string
+  ): Promise<{ logs: string; fileName: string; lineCount: number }> {
+    const ns = namespace && namespace !== 'all-projects' && namespace !== '__all__' ? namespace : 'default';
+    const normalizedKind = (kind || 'pods').toLowerCase();
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const fileName = `${targetName}-${container || 'all'}-${timestamp}.log`;
+
+    let fullLogs = '';
+
+    const WORKLOAD_KINDS = new Set([
+      'deployments',
+      'deployment',
+      'deploy',
+      'deploymentconfigs',
+      'deploymentconfig',
+      'dc',
+      'statefulsets',
+      'statefulset',
+      'sts',
+      'daemonsets',
+      'daemonset',
+      'ds',
+      'jobs',
+      'job',
+      'cronjobs',
+      'cronjob',
+      'cj',
+      'replicasets',
+      'replicaset',
+      'rs',
+      'replicationcontrollers',
+      'replicationcontroller',
+      'rc',
+    ]);
+
+    if (WORKLOAD_KINDS.has(normalizedKind)) {
+      const podListRes = await KubeHttpClient.getResourceList('pods', ns);
+      const matchingPods = (podListRes.items || []).filter((pod: any) => {
+        const podName = pod.metadata?.name || '';
+        const generateName = pod.metadata?.generateName || '';
+        const labels = pod.metadata?.labels || {};
+        const ownerRefs = pod.metadata?.ownerReferences || [];
+
+        if (podName === targetName) return true;
+        if (ownerRefs.some((ref: any) => ref.name === targetName || ref.name.startsWith(`${targetName}-`))) return true;
+        if (
+          labels.app === targetName ||
+          labels['app.kubernetes.io/name'] === targetName ||
+          labels['app.kubernetes.io/instance'] === targetName ||
+          labels.deploymentconfig === targetName ||
+          labels.deployment === targetName ||
+          labels.statefulset === targetName ||
+          labels.daemonset === targetName ||
+          labels['job-name'] === targetName
+        ) {
+          return true;
+        }
+        if (podName.startsWith(`${targetName}-`) || generateName.startsWith(`${targetName}-`)) return true;
+        return false;
+      });
+
+      if (matchingPods.length === 0) {
+        return {
+          logs: `[No running pods found for ${kind}/${targetName} in namespace ${ns}]`,
+          fileName,
+          lineCount: 1,
+        };
+      }
+
+      const logSections: string[] = [];
+      for (const pod of matchingPods) {
+        const pName = pod.metadata?.name;
+        if (!pName) continue;
+        const containers = (pod.spec?.containers || []).map((c: any) => c.name);
+        if (container) {
+          const res = await KubeHttpClient.requestRaw(
+            `/api/v1/namespaces/${encodeURIComponent(ns)}/pods/${encodeURIComponent(pName)}/log?timestamps=true&container=${encodeURIComponent(container)}`
+          );
+          if (res.data) {
+            logSections.push(`=== Pod: ${pName} | Container: ${container} ===\n${res.data}`);
+          }
+        } else if (containers.length > 1) {
+          for (const c of containers) {
+            const res = await KubeHttpClient.requestRaw(
+              `/api/v1/namespaces/${encodeURIComponent(ns)}/pods/${encodeURIComponent(pName)}/log?timestamps=true&container=${encodeURIComponent(c)}`
+            );
+            if (res.data) {
+              logSections.push(`=== Pod: ${pName} | Container: ${c} ===\n${res.data}`);
+            }
+          }
+        } else {
+          const res = await KubeHttpClient.requestRaw(
+            `/api/v1/namespaces/${encodeURIComponent(ns)}/pods/${encodeURIComponent(pName)}/log?timestamps=true`
+          );
+          if (res.data) {
+            logSections.push(`=== Pod: ${pName} ===\n${res.data}`);
+          }
+        }
+      }
+      fullLogs = logSections.join('\n\n');
+    } else {
+      const contParam = container ? `&container=${encodeURIComponent(container)}` : '';
+      const res = await KubeHttpClient.requestRaw(
+        `/api/v1/namespaces/${encodeURIComponent(ns)}/pods/${encodeURIComponent(targetName)}/log?timestamps=true${contParam}`
+      );
+      fullLogs = res.data || '';
+    }
+
+    const lines = fullLogs.split('\n');
+    return {
+      logs: fullLogs,
+      fileName,
+      lineCount: lines.length,
+    };
   }
 }

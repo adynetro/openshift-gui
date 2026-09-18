@@ -4,12 +4,12 @@ import os from 'node:os';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
-import { KubeContext, ProjectInfo, ClusterInfo, ServerInfo } from '../types/k8s.js';
-import { groupServersWithContexts } from '../utils/kube-utils.js';
+import { KubeContext, ProjectInfo, ClusterInfo, ServerInfo, LoginOptions, LoginResult, ImportConfigResult } from '../types/k8s.js';
+import { groupServersWithContexts, parseLoginInput } from '../utils/kube-utils.js';
 
 const execAsync = promisify(exec);
 
-export { groupServersWithContexts };
+export { groupServersWithContexts, parseLoginInput };
 
 let cachedKubePath: string | null = null;
 const dynamicTokenCache = new Map<string, { token: string; timestamp: number }>();
@@ -133,17 +133,16 @@ export class KubeConfigService {
    * Finds the exact path to kubeconfig file.
    */
   static getKubeconfigPath(): string {
-    if (cachedKubePath && fs.existsSync(cachedKubePath)) {
-      return cachedKubePath;
+    const rawEnv = process.env['KUBECONFIG'];
+    if (rawEnv && rawEnv.trim()) {
+      const first = rawEnv.split(path.delimiter)[0];
+      if (first && first.trim()) {
+        return first.trim();
+      }
     }
 
-    const rawEnv = process.env['KUBECONFIG'];
-    if (rawEnv) {
-      const first = rawEnv.split(path.delimiter)[0];
-      if (first && fs.existsSync(first)) {
-        cachedKubePath = first;
-        return first;
-      }
+    if (cachedKubePath && fs.existsSync(cachedKubePath)) {
+      return cachedKubePath;
     }
 
     const home = process.env['HOME'] || os.homedir();
@@ -477,9 +476,11 @@ export class KubeConfigService {
     const ns = active?.namespace || 'all-projects';
     const clusterUser = active?.user || activeServer?.user || 'Unknown User';
     const serverUrl = active?.server || activeServer?.server || active?.cluster || 'Unknown Cluster';
+    const clusterName = activeServer?.clusterName || active?.cluster || currentContext || 'Cluster';
 
     return {
       server: serverUrl,
+      clusterName,
       user: clusterUser,
       context: currentContext || 'None',
       namespace: ns,
@@ -665,4 +666,439 @@ export class KubeConfigService {
       pruneDangling,
     });
   }
+
+  /**
+   * Imports or creates a new cluster login directly in kubeconfig.
+   * Supports:
+   * 1. Parsing raw `oc login` command strings or server URL with token.
+   * 2. Direct YAML/JSON kubeconfig pasting.
+   * 3. Username/Password with automatic direct configuration.
+   */
+  static async loginCluster(options: LoginOptions): Promise<LoginResult> {
+    let server = options.server;
+    let token = options.token;
+    let username = options.username;
+    let password = options.password;
+    let insecureSkipTlsVerify = options.insecureSkipTlsVerify;
+    let namespace = options.namespace;
+    let certificateAuthority = options.certificateAuthority;
+    let certificateAuthorityData = options.certificateAuthorityData;
+    let clusterName = options.clusterName;
+    let contextName = options.contextName;
+
+    // 1. If rawCommand is passed, parse it
+    if (options.rawCommand && options.rawCommand.trim()) {
+      const parsed = parseLoginInput(options.rawCommand);
+      if (parsed.isYamlConfig) {
+        const importRes = await this.importKubeConfig(options.rawCommand, { setActive: options.setActive !== false });
+        if (!importRes.success) {
+          return { success: false, message: importRes.message };
+        }
+        return {
+          success: true,
+          message: importRes.message,
+          contextName: importRes.activeContext,
+          namespace: namespace || 'default',
+        };
+      }
+      if (parsed.server && !server) server = parsed.server;
+      if (parsed.token && !token) token = parsed.token;
+      if (parsed.username && !username) username = parsed.username;
+      if (parsed.password && !password) password = parsed.password;
+      if (parsed.insecureSkipTlsVerify !== undefined && insecureSkipTlsVerify === undefined) {
+        insecureSkipTlsVerify = parsed.insecureSkipTlsVerify;
+      }
+      if (parsed.namespace && !namespace) namespace = parsed.namespace;
+      if (parsed.certificateAuthority && !certificateAuthority) certificateAuthority = parsed.certificateAuthority;
+    }
+
+    if (!server || !server.trim()) {
+      return {
+        success: false,
+        message: 'Server URL is required to login (e.g. https://api.cluster.domain:6443 or oc login command).',
+      };
+    }
+
+    server = server.trim();
+    if (!server.startsWith('http://') && !server.startsWith('https://')) {
+      server = `https://${server}`;
+    }
+
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(server);
+    } catch {
+      return {
+        success: false,
+        message: `Invalid server URL '${server}'. Please provide a valid HTTP/HTTPS endpoint.`,
+      };
+    }
+
+    // Default insecure skip TLS verify to true if not explicitly false and using common self-signed cluster port
+    if (insecureSkipTlsVerify === undefined) {
+      insecureSkipTlsVerify = true;
+    }
+
+    const host = parsedUrl.hostname.replace(/[^a-zA-Z0-9.-]/g, '-');
+    const portSuffix = parsedUrl.port && parsedUrl.port !== '443' && parsedUrl.port !== '80' ? `:${parsedUrl.port}` : '';
+
+    // Auto-generate clean cluster name if not provided
+    if (!clusterName || !clusterName.trim()) {
+      clusterName = `${host}${portSuffix}`;
+    } else {
+      clusterName = clusterName.trim();
+    }
+
+    // Auto-generate clean username if not provided
+    if (!username || !username.trim()) {
+      if (token) {
+        username = token.startsWith('sha256~') ? `token-user-${host.split('.')[0]}` : `user-${host.split('.')[0]}`;
+      } else {
+        username = `user-${host.split('.')[0]}`;
+      }
+    } else {
+      username = username.trim();
+    }
+
+    const targetNs = (namespace && namespace.trim()) || 'default';
+
+    // Auto-generate context name if not provided
+    if (!contextName || !contextName.trim()) {
+      contextName = `${targetNs}/${clusterName}/${username}`;
+    } else {
+      contextName = contextName.trim();
+    }
+
+    const kubePath = this.getKubeconfigPath();
+    const kubeDir = path.dirname(kubePath);
+    if (!fs.existsSync(kubeDir)) {
+      fs.mkdirSync(kubeDir, { recursive: true });
+    }
+
+    let config: any = {
+      apiVersion: 'v1',
+      kind: 'Config',
+      clusters: [],
+      users: [],
+      contexts: [],
+      'current-context': '',
+    };
+
+    if (fs.existsSync(kubePath)) {
+      try {
+        const rawContent = fs.readFileSync(kubePath, 'utf8');
+        // Create backup
+        const backupPath = `${kubePath}.bak-${Date.now()}`;
+        fs.writeFileSync(backupPath, rawContent, { encoding: 'utf8', mode: 0o600 });
+        const parsed = parseYaml(rawContent);
+        if (parsed && typeof parsed === 'object') {
+          config = parsed;
+          if (!Array.isArray(config.clusters)) config.clusters = [];
+          if (!Array.isArray(config.users)) config.users = [];
+          if (!Array.isArray(config.contexts)) config.contexts = [];
+        }
+      } catch (e: any) {
+        console.warn('[KubeConfigService] Error reading existing kubeconfig for login:', e.message);
+      }
+    }
+
+    // 1. Build cluster definition
+    const clusterDef: any = {
+      server,
+      'insecure-skip-tls-verify': Boolean(insecureSkipTlsVerify),
+    };
+    if (certificateAuthority) {
+      clusterDef['certificate-authority'] = certificateAuthority;
+    }
+    if (certificateAuthorityData) {
+      clusterDef['certificate-authority-data'] = certificateAuthorityData;
+    }
+
+    const existingClusterIdx = config.clusters.findIndex((c: any) => c && c.name === clusterName);
+    if (existingClusterIdx >= 0) {
+      config.clusters[existingClusterIdx] = { name: clusterName, cluster: clusterDef };
+    } else {
+      config.clusters.push({ name: clusterName, cluster: clusterDef });
+    }
+
+    // 2. Build user definition
+    const userDef: any = {};
+    if (token) {
+      userDef.token = token.replace(/[\r\n\s]/g, '');
+    } else if (username && password) {
+      userDef.username = username;
+      userDef.password = password;
+    }
+
+    const existingUserIdx = config.users.findIndex((u: any) => u && u.name === username);
+    if (existingUserIdx >= 0) {
+      config.users[existingUserIdx] = { name: username, user: userDef };
+    } else {
+      config.users.push({ name: username, user: userDef });
+    }
+
+    // 3. Build context definition
+    const contextDef = {
+      cluster: clusterName,
+      user: username,
+      namespace: targetNs,
+    };
+
+    const existingCtxIdx = config.contexts.findIndex((c: any) => c && c.name === contextName);
+    if (existingCtxIdx >= 0) {
+      config.contexts[existingCtxIdx] = { name: contextName, context: contextDef };
+    } else {
+      config.contexts.push({ name: contextName, context: contextDef });
+    }
+
+    if (options.setActive !== false) {
+      config['current-context'] = contextName;
+    }
+
+    // Write updated kubeconfig
+    fs.writeFileSync(kubePath, stringifyYaml(config), { encoding: 'utf8', mode: 0o600 });
+
+    // Invalidate caches
+    projectListCache.clear();
+    dynamicTokenCache.clear();
+    try {
+      const { KubeHttpClient } = await import('./kube-http-client.js');
+      KubeHttpClient.reset();
+    } catch {}
+
+    // Verify connection
+    let verifiedUser = username;
+    let connMsg = `Successfully configured and connected context '${contextName}'.`;
+    try {
+      const { KubeHttpClient } = await import('./kube-http-client.js');
+      const testRes = await KubeHttpClient.requestJson('/apis/user.openshift.io/v1/users/~');
+      if (testRes && testRes.data?.metadata?.name) {
+        verifiedUser = testRes.data.metadata.name;
+        connMsg = `Successfully connected to ${clusterName} as user '${verifiedUser}'.`;
+      } else {
+        const pingRes = await KubeHttpClient.requestJson('/api/v1');
+        if (pingRes && pingRes.data) {
+          connMsg = `Successfully connected to Kubernetes API at ${clusterName}.`;
+        }
+      }
+    } catch (testErr: any) {
+      console.warn('[KubeConfigService] Post-login probe note:', testErr.message);
+    }
+
+    return {
+      success: true,
+      message: connMsg,
+      contextName,
+      server,
+      user: verifiedUser,
+      clusterName,
+      namespace: targetNs,
+    };
+  }
+
+  /**
+   * Imports a raw YAML or JSON kubeconfig and merges it into the user's ~/.kube/config.
+   */
+  static async importKubeConfig(
+    yamlOrJson: string,
+    options?: { setActive?: boolean }
+  ): Promise<{
+    success: boolean;
+    message: string;
+    importedContexts: string[];
+    activeContext?: string;
+    backupPath?: string;
+  }> {
+    if (!yamlOrJson || !yamlOrJson.trim()) {
+      return {
+        success: false,
+        message: 'Empty kubeconfig content provided.',
+        importedContexts: [],
+      };
+    }
+
+    let parsedConfig: any;
+    try {
+      parsedConfig = parseYaml(yamlOrJson.trim());
+    } catch (err: any) {
+      return {
+        success: false,
+        message: `Invalid YAML/JSON syntax: ${err.message}`,
+        importedContexts: [],
+      };
+    }
+
+    if (!parsedConfig || typeof parsedConfig !== 'object') {
+      return {
+        success: false,
+        message: 'Parsed kubeconfig is not a valid YAML or JSON object.',
+        importedContexts: [],
+      };
+    }
+
+    if (!Array.isArray(parsedConfig.clusters) && !Array.isArray(parsedConfig.contexts)) {
+      return {
+        success: false,
+        message: 'Kubeconfig must contain at least a "clusters" or "contexts" array.',
+        importedContexts: [],
+      };
+    }
+
+    const kubePath = this.getKubeconfigPath();
+    const kubeDir = path.dirname(kubePath);
+    if (!fs.existsSync(kubeDir)) {
+      fs.mkdirSync(kubeDir, { recursive: true });
+    }
+
+    let existingConfig: any = {
+      apiVersion: 'v1',
+      kind: 'Config',
+      clusters: [],
+      users: [],
+      contexts: [],
+      'current-context': '',
+    };
+
+    let backupPath: string | undefined;
+
+    if (fs.existsSync(kubePath)) {
+      try {
+        const rawExisting = fs.readFileSync(kubePath, 'utf8');
+        backupPath = `${kubePath}.bak-${Date.now()}`;
+        fs.writeFileSync(backupPath, rawExisting, { encoding: 'utf8', mode: 0o600 });
+        const parsed = parseYaml(rawExisting);
+        if (parsed && typeof parsed === 'object') {
+          existingConfig = parsed;
+          if (!Array.isArray(existingConfig.clusters)) existingConfig.clusters = [];
+          if (!Array.isArray(existingConfig.users)) existingConfig.users = [];
+          if (!Array.isArray(existingConfig.contexts)) existingConfig.contexts = [];
+        }
+      } catch (e: any) {
+        console.warn('[KubeConfigService] Error creating backup before import:', e.message);
+      }
+    }
+
+    // Merge Clusters
+    if (Array.isArray(parsedConfig.clusters)) {
+      for (const cl of parsedConfig.clusters) {
+        if (!cl || !cl.name) continue;
+        const idx = existingConfig.clusters.findIndex((c: any) => c && c.name === cl.name);
+        if (idx >= 0) {
+          existingConfig.clusters[idx] = cl;
+        } else {
+          existingConfig.clusters.push(cl);
+        }
+      }
+    }
+
+    // Merge Users
+    if (Array.isArray(parsedConfig.users)) {
+      for (const u of parsedConfig.users) {
+        if (!u || !u.name) continue;
+        const idx = existingConfig.users.findIndex((existingU: any) => existingU && existingU.name === u.name);
+        if (idx >= 0) {
+          existingConfig.users[idx] = u;
+        } else {
+          existingConfig.users.push(u);
+        }
+      }
+    }
+
+    // Merge Contexts
+    const importedContextNames: string[] = [];
+    if (Array.isArray(parsedConfig.contexts)) {
+      for (const ctx of parsedConfig.contexts) {
+        if (!ctx || !ctx.name) continue;
+        importedContextNames.push(ctx.name);
+        const idx = existingConfig.contexts.findIndex((existingCtx: any) => existingCtx && existingCtx.name === ctx.name);
+        if (idx >= 0) {
+          existingConfig.contexts[idx] = ctx;
+        } else {
+          existingConfig.contexts.push(ctx);
+        }
+      }
+    }
+
+    // Set Active Context
+    let targetActive = existingConfig['current-context'];
+    if (options?.setActive !== false) {
+      if (parsedConfig['current-context'] && existingConfig.contexts.some((c: any) => c && c.name === parsedConfig['current-context'])) {
+        targetActive = parsedConfig['current-context'];
+      } else if (importedContextNames.length > 0) {
+        targetActive = importedContextNames[0];
+      }
+      existingConfig['current-context'] = targetActive;
+    }
+
+    // Write file
+    fs.writeFileSync(kubePath, stringifyYaml(existingConfig), { encoding: 'utf8', mode: 0o600 });
+
+    // Reset caches
+    projectListCache.clear();
+    dynamicTokenCache.clear();
+    try {
+      const { KubeHttpClient } = await import('./kube-http-client.js');
+      KubeHttpClient.reset();
+    } catch {}
+
+    return {
+      success: true,
+      message: `Successfully imported ${importedContextNames.length} context(s) from kubeconfig.${targetActive ? ` Active context set to '${targetActive}'.` : ''}`,
+      importedContexts: importedContextNames,
+      activeContext: targetActive,
+      backupPath,
+    };
+  }
+
+  /**
+   * Tests connection to current active Kubernetes / OpenShift cluster.
+   */
+  static async testConnection(): Promise<{ success: boolean; message: string; version?: string; user?: string }> {
+    try {
+      const { KubeHttpClient } = await import('./kube-http-client.js');
+      KubeHttpClient.reset();
+      const config = await KubeHttpClient.getActiveConfig();
+      if (!config || !config.server) {
+        return { success: false, message: 'No active cluster configured.' };
+      }
+
+      let user: string | undefined;
+      let version: string | undefined;
+
+      // Try OpenShift User
+      try {
+        const uRes = await KubeHttpClient.requestJson('/apis/user.openshift.io/v1/users/~');
+        if (uRes && uRes.data?.metadata?.name) {
+          user = uRes.data.metadata.name;
+        }
+      } catch {}
+
+      // Try Version
+      try {
+        const vRes = await KubeHttpClient.requestJson('/version');
+        if (vRes && vRes.data?.gitVersion) {
+          version = vRes.data.gitVersion;
+        }
+      } catch {}
+
+      // Try core API
+      const apiRes = await KubeHttpClient.requestJson('/api/v1');
+      if (apiRes && apiRes.data) {
+        return {
+          success: true,
+          message: `Connected successfully to ${config.server}${version ? ` (Kubernetes ${version})` : ''}${user ? ` as user '${user}'` : ''}.`,
+          version,
+          user,
+        };
+      }
+
+      return { success: true, message: `Connected to ${config.server}.` };
+    } catch (err: any) {
+      return {
+        success: false,
+        message: err.message || 'Failed to connect to cluster.',
+      };
+    }
+  }
 }
+

@@ -18,6 +18,8 @@ import {
   Bug,
   Flame,
   Tag,
+  Radio,
+  ExternalLink,
 } from 'lucide-react';
 import { ResourceKind, ResourceItem } from '../../types/k8s.js';
 
@@ -83,6 +85,22 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         disabled: !selectedItem,
       });
       pills.push({
+        id: 'system-terminal',
+        label: 'System Terminal',
+        tooltip: 'Launch Pod Shell in OS Default Terminal (macOS Terminal, Windows Terminal, Linux)',
+        icon: ExternalLink,
+        color: 'hover:border-blue-500 hover:text-blue-300 hover:bg-blue-950/40 text-blue-400 border-blue-900/50 bg-blue-950/20',
+        disabled: !selectedItem,
+      });
+      pills.push({
+        id: 'port-forward',
+        label: 'Port Forward',
+        tooltip: 'Forward Pod Port to Localhost',
+        icon: Radio,
+        color: 'hover:border-teal-500 hover:text-teal-300 hover:bg-teal-950/40 text-teal-400 border-teal-900/50 bg-teal-950/20',
+        disabled: !selectedItem,
+      });
+      pills.push({
         id: 'logs',
         label: 'Logs',
         tooltip: 'Stream Live Pod Logs',
@@ -96,6 +114,17 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         tooltip: 'Debug Pod (Failure Diagnostics & oc debug container replica)',
         icon: Bug,
         color: 'hover:border-purple-500 hover:text-purple-300 hover:bg-purple-950/40 text-purple-400 border-purple-900/50 bg-purple-950/20',
+        disabled: !selectedItem,
+      });
+    }
+
+    if (currentKind === 'services' || currentKind === 'routes') {
+      pills.push({
+        id: 'port-forward',
+        label: 'Port Forward',
+        tooltip: `Forward ${currentKind === 'services' ? 'Service' : 'Route'} Port to Localhost`,
+        icon: Radio,
+        color: 'hover:border-cyan-500 hover:text-cyan-300 hover:bg-cyan-950/40 text-cyan-400 border-cyan-900/50 bg-cyan-950/20',
         disabled: !selectedItem,
       });
     }

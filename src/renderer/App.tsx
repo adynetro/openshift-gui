@@ -25,6 +25,7 @@ const ClusterOperatorEventsModal = lazy(() => import('./components/ClusterOperat
 const HelpModal = lazy(() => import('./components/HelpModal.js').then((m) => ({ default: m.HelpModal })));
 const BatchDeleteModal = lazy(() => import('./components/BatchDeleteModal.js').then((m) => ({ default: m.BatchDeleteModal })));
 const ImageRegistryPrunerModal = lazy(() => import('./components/ImageRegistryPrunerModal.js').then((m) => ({ default: m.ImageRegistryPrunerModal })));
+const PortForwardModal = lazy(() => import('./components/PortForwardModal.js').then((m) => ({ default: m.PortForwardModal })));
 
 import { ResourceKind, ResourceItem, KubeContext, ServerInfo, ProjectInfo, ImageStreamResource } from '../types/k8s.js';
 import { PreloaderAnimation, PreloadStep } from './components/PreloaderAnimation.js';
@@ -39,6 +40,7 @@ type ModalMode =
   | 'workload-details'
   | 'logs'
   | 'terminal'
+  | 'port-forward'
   | 'debug-pod'
   | 'debug-node'
   | 'netpol-designer'
@@ -634,6 +636,15 @@ export const App: React.FC = () => {
       case 'terminal':
         openModal('terminal', item);
         break;
+      case 'port-forward':
+        openModal('port-forward', item);
+        break;
+      case 'system-terminal':
+        if (item) {
+          (window as any).electronAPI.openDefaultTerminal(item.name, item.namespace || currentProject);
+          showToast(`Opening ${item.name} console in System Terminal`);
+        }
+        break;
       case 'debug-pod':
         openModal('debug-pod', item);
         break;
@@ -740,6 +751,7 @@ export const App: React.FC = () => {
         currentContext={currentContext}
         currentProject={currentProject}
         clusterServer={clusterInfo?.server || ''}
+        clusterName={clusterInfo?.clusterName}
         clusterUser={clusterInfo?.user || ''}
         isConnected={clusterInfo?.connected ?? true}
         isUnauthorized={isUnauthorized}
@@ -1009,6 +1021,18 @@ export const App: React.FC = () => {
             item={selectedItem}
             namespace={selectedItem.namespace || currentProject}
             onClose={closeModal}
+          />
+        )}
+
+        {/* Port Forwarding Modal for Services, Ingresses, Routes, Pods */}
+        {modalMode === 'port-forward' && selectedItem && (
+          <PortForwardModal
+            item={selectedItem}
+            namespace={selectedItem.namespace || currentProject}
+            onClose={closeModal}
+            onSuccess={(msg) => {
+              showToast(msg, 'success');
+            }}
           />
         )}
 

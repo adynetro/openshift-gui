@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { X, Terminal, Play, Pause, ArrowDown, Trash2, Copy, Search, Check, Sparkles, Layers, Box } from 'lucide-react';
+import { X, Terminal, Play, Pause, ArrowDown, Trash2, Copy, Search, Check, Sparkles, Layers, Box, Download, RefreshCw } from 'lucide-react';
 import { ResourceItem } from '../../types/k8s.js';
 import { useCurrentTheme, ThemeConfig } from '../utils/themes.js';
 
@@ -180,6 +180,38 @@ export const LogViewer: React.FC<LogViewerProps> = ({ item, namespace, onClose }
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const [isDownloading, setIsDownloading] = useState<boolean>(false);
+
+  const handleDownloadAllLogs = async () => {
+    setIsDownloading(true);
+    try {
+      const api = (window as any).electronAPI;
+      if (api?.downloadCompleteLogs) {
+        const res = await api.downloadCompleteLogs(item.name, namespace, item.kind, selectedContainer || undefined);
+        if (res.success) {
+          alert(`Logs downloaded successfully!\n\nFile: ${res.filePath}\nTotal Lines: ${res.lineCount}`);
+        } else if (res.message && !res.message.includes('cancelled')) {
+          alert(`Download failed: ${res.message}`);
+        }
+      } else {
+        const text = filteredLogs
+          .map((l) => `${l.pod ? `[${l.pod}] ` : ''}${l.timestamp ? `[${l.timestamp}] ` : ''}${l.raw}`)
+          .join('\n');
+        const blob = new Blob([text], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${item.name}-${selectedContainer || 'all'}-${new Date().toISOString().replace(/[:.]/g, '-')}.log`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (err: any) {
+      alert(`Error downloading logs: ${err.message}`);
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   // Syntax Colorizer for log lines matching active theme
@@ -474,6 +506,23 @@ export const LogViewer: React.FC<LogViewerProps> = ({ item, namespace, onClose }
               aria-label="Copy Logs"
             >
               {copied ? <Check size={14} /> : <Copy size={14} />}
+            </button>
+
+            {/* Download All Logs */}
+            <button
+              onClick={handleDownloadAllLogs}
+              disabled={isDownloading}
+              className="px-2.5 py-1.5 rounded-lg border transition-colors hover:brightness-110 flex items-center gap-1 text-xs font-mono disabled:opacity-50"
+              style={{
+                backgroundColor: `${theme.cssVars['--accent-cyan'] || '#06b6d4'}25`,
+                borderColor: `${theme.cssVars['--accent-cyan'] || '#06b6d4'}50`,
+                color: "var(--accent-cyan, #06b6d4)",
+              }}
+              title="Download Complete Un-truncated Logs to File (.log)"
+              aria-label="Download All Logs"
+            >
+              {isDownloading ? <RefreshCw size={13} className="animate-spin" /> : <Download size={13} />}
+              <span>{isDownloading ? 'Saving...' : 'Download Logs'}</span>
             </button>
 
             {/* Close Button */}

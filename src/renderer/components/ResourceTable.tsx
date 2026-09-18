@@ -30,6 +30,7 @@ import {
   Server,
   Workflow,
   Shield,
+  Radio,
 } from 'lucide-react';
 import { ResourceKind, ResourceItem, ImageStreamResource } from '../../types/k8s.js';
 
@@ -335,6 +336,8 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
               <>
                 <th className="py-3 px-3">Status</th>
                 <th className="py-3 px-3">Roles</th>
+                <th className="py-3 px-3">Memory (Gi)</th>
+                <th className="py-3 px-3">CPU</th>
                 <th className="py-3 px-3">Kubelet Version</th>
               </>
             )}
@@ -892,6 +895,10 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                   <>
                     <td className="py-2.5 px-3">{getStatusBadge(item.status, item.statusColor)}</td>
                     <td className="py-2.5 px-3 font-mono text-amber-300">{item.extra?.roles || 'worker'}</td>
+                    <td className="py-2.5 px-3 font-mono font-bold text-cyan-300" title={`Allocatable: ${item.extra?.allocatableMemory || '-'} / Capacity: ${item.extra?.memory || '-'}`}>
+                      {item.extra?.allocatableMemory ? `${item.extra.allocatableMemory} / ${item.extra.memory || '-'}` : (item.extra?.memory || '-')}
+                    </td>
+                    <td className="py-2.5 px-3 font-mono text-slate-300">{item.extra?.allocatableCpu || item.extra?.cpu || '-'}</td>
                     <td className="py-2.5 px-3 font-mono text-slate-400">{item.extra?.version || '-'}</td>
                   </>
                 )}
@@ -947,6 +954,21 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                 {kind !== 'events' && kind !== 'clusteroperators' && !isWorkload && kind !== 'pods' && (
                   <td className="py-2 px-4 text-right">
                     <div className="flex items-center justify-end gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
+
+                      {/* Port Forward Action for Services and Routes */}
+                      {(kind === 'services' || kind === 'routes') && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRowAction('port-forward', item);
+                          }}
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-cyan-950 text-cyan-400 border border-slate-700 hover:border-cyan-500 transition-colors"
+                          title="Port Forward to Localhost"
+                          aria-label="Port Forward"
+                        >
+                          <Radio size={14} />
+                        </button>
+                      )}
 
                       {/* Debug Action for Nodes */}
                       {kind === 'nodes' && (

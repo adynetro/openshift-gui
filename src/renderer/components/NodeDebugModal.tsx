@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { ResourceItem, NodeDebugDiagnostics } from '../../types/k8s.js';
 import { useCurrentTheme } from '../utils/themes.js';
+import { formatMemoryToGi } from '../../utils/formatters.js';
 
 interface NodeDebugModalProps {
   item: ResourceItem;
@@ -507,11 +508,11 @@ export const NodeDebugModal: React.FC<NodeDebugModalProps> = ({
                       </div>
 
                       <div className="p-3 rounded-lg bg-slate-900/60 border border-slate-800">
-                        <div className="text-slate-400 text-[11px]">Memory RAM</div>
+                        <div className="text-slate-400 text-[11px]">Memory RAM (Gi)</div>
                         <div className="text-lg font-bold text-emerald-300 mt-1">
-                          {diagnostics.allocatable.memory}
+                          {formatMemoryToGi(diagnostics.allocatable.memory)}
                         </div>
-                        <div className="text-[10px] text-slate-500 mt-0.5">Capacity: {diagnostics.capacity.memory}</div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">Capacity: {formatMemoryToGi(diagnostics.capacity.memory)}</div>
                       </div>
 
                       <div className="p-3 rounded-lg bg-slate-900/60 border border-slate-800">

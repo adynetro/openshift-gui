@@ -10,15 +10,52 @@ const token = execSync('printf "protocol=https\\nhost=github.com\\n" | git crede
 
 const repo = 'adynetro/openshift-gui';
 const tagName = `v${VERSION}`;
-const releaseName = `OpenShift GUI v${VERSION} - Multi-Container Auto-Discovery & Interactive Container Selector for Terminal`;
+const releaseName = `OpenShift GUI v${VERSION} - Ingress & Service Port Forwarding, GUI Cluster Login, Direct Replica Input, Default Terminal, Gi Memory & Full Log Export`;
 
-const releaseBody = `## 🚀 OpenShift GUI v${VERSION} - Multi-Container Pod Terminal Auto-Discovery
+const releaseBody = `## 🚀 OpenShift GUI v${VERSION} - Port Forwarding, GUI Login & Workload Scaler
 
-### 📦 Multi-Container Pod Terminal Auto-Discovery & Automatic Fallback
-- **Automatic Container Resolution**: When starting a terminal session without a container parameter on a multi-container pod, automatically detects the \`kubectl.kubernetes.io/default-container\` annotation or selects the primary container from \`spec.containers\`.
-- **Zero-Failure Error Recovery**: If the Kubernetes API server responds with \`a container name must be specified for pod ..., choose one of: [...]\`, the terminal service dynamically parses the available container names and automatically connects to the primary container without requiring user intervention.
-- **Interactive Container Selector Dropdown**: Added an interactive container dropdown in the **Pod Terminal** modal header, allowing instant 1-click switching between sidecars, controllers, and application containers (\`csi-attacher\`, \`vsphere-csi-controller\`, \`liveness-probe\`, \`vsphere-syncer\`, \`csi-provisioner\`, etc.).
-- **Dynamic Container Discovery**: Discovers all pod container names on-the-fly via pod YAML analysis and runtime terminal feedback.
+### 🔌 Ingress, Route & Service Port Forwarding Manager
+- **Live Background Port Forwarding**: Effortlessly forward ports from any Kubernetes/OpenShift **Service**, **Route**, or **Pod** directly to your local workstation.
+- **Port Auto-Detection**: Automatically detects target container and service ports (\`80\`, \`443\`, \`8080\`, \`8443\`, \`3000\`, \`5432\`, \`3306\`, etc.) and assigns optimal local ports.
+- **Interactive Management Modal**: Monitor active tunnels, copy \`localhost:<port>\` URLs with 1-click, open web endpoints directly in your default browser, and terminate individual or all active port-forward sessions cleanly.
+- **Quick Action Triggers**: Instant **Port Forward** action button on Services and Routes in the resource explorer and search bar.
+
+### 🔐 GUI Cluster Login & Kubeconfig Importer
+- **Smart \`oc login\` Command Parser**: Simply paste any \`oc login\` command (e.g. \`oc login https://api.cluster.example.com:6443 --token=sha256~... --insecure-skip-tls-verify=true\`) and OpenShift GUI automatically parses the server URL, token, username, password, namespace, and certificate options.
+- **Direct Bearer Token & Basic Auth**: Connect directly to remote OpenShift, Kubernetes, and Rancher clusters from the GUI without needing the \`oc\` CLI installed.
+- **Full Kubeconfig YAML / JSON Importer**: Paste raw YAML/JSON kubeconfig manifests into the GUI to safely merge clusters, users, and contexts into \`~/.kube/config\` with automatic timestamped backups.
+- **1-Click Context Activation**: Automatically switches the active context and synchronizes projects immediately after login or import.
+
+### 🔢 Direct Workload Replicas Input & Presets
+- **Editable Replica Input Textbox**: Directly type the exact desired replica count (e.g. \`0\`, \`5\`, \`25\`, \`100\`) into an interactive text box.
+- **Instant Scaling Presets**: 1-click quick presets for common replica targets: \`0 (Stop / Scale Down)\`, \`1\`, \`2\`, \`3\`, \`5\`, and \`10\`.
+- **Enhanced Keyboard Workflow**: Press \`Enter\` directly from the text box to execute scaling immediately.
+- **Dynamic Adaptive Range Slider**: Slider range automatically adjusts to match higher replica targets.
+
+### 💻 Open Pod Console in OS Default Terminal
+- **Native Host Terminal Launch**: Launch interactive pod shell sessions directly in your host operating system's native terminal emulator:
+  - **macOS**: Opens in macOS Terminal.app or iTerm2.
+  - **Windows**: Opens in Windows Terminal (\`wt.exe\`), PowerShell, or CMD.
+  - **Linux**: Opens in \`x-terminal-emulator\`, \`gnome-terminal\`, \`konsole\`, \`xfce4-terminal\`, \`alacritty\`, \`kitty\`, or \`xterm\`.
+- **Automatic Fallback Command Copy**: If no supported terminal emulator is found, automatically copies the connection command to clipboard and notifies the user.
+
+### 💾 Download Complete Un-Truncated Logs
+- **1-Click Log File Export**: Download the complete, un-truncated log history for any container, pod, or workload directly to a timestamped \`.log\` file.
+- **Streamlined Log Viewer Integration**: Dedicated **Download Logs** button in the Log Viewer modal header.
+
+### 📊 Normalized Memory Display in Gi (Not Ki)
+- **Human-Readable Gi Display**: All memory capacity, allocatable resources, node metrics, pod limits, and describe outputs are cleanly normalized to \`Gi\` (e.g. \`15.4 Gi\` / \`31.2 Gi\`) instead of raw, unreadable \`Ki\`.
+- **Node Diagnostics & Debug Cards**: Clear Gi capacity and allocatable gauges in Node Host Debug and Pod Diagnostics modals.
+
+### 🏷️ Friendly Cluster Name Context Display
+- **Display \`clusters.name\` Instead of Raw URL**: Top navigation bar, cluster switcher modal, and server cards prominently display the friendly cluster name (\`clusters[].name\` / \`context.cluster\`) rather than raw \`https://...\` server URLs.
+
+---
+
+### 📦 Multi-Container Pod Terminal Auto-Discovery & Zero-Failure Recovery
+- **Automatic Container Resolution**: Auto-detects \`kubectl.kubernetes.io/default-container\` annotation or selects primary container on multi-container pods.
+- **Zero-Failure Error Recovery**: Dynamically parses container names from API rejection responses and auto-reconnects.
+- **Interactive Container Selector Dropdown**: 1-click switching between sidecars, controllers, and application containers in the terminal modal header.
 
 ### 🖥️ Native Terminal WebSocket 400 Bad Request Fix & TTY Stream Synchronization
 - **Fixed TTY / Stderr Stream Conflict**: Resolved the \`HTTP 400 Bad Request\` error (\`cannot specify stderr with tty\`) by properly adhering to the Kubernetes Exec API specification where stderr is omitted when allocating a pseudo-terminal (\`tty: true\`).
