@@ -254,6 +254,10 @@ export function registerIpcHandlers(mainWindow: electron.BrowserWindow): void {
     TerminalService.writeData(sessionId, data);
   });
 
+  ipcMain.handle('terminal:resize', async (_event, sessionId: string, cols: number, rows: number) => {
+    TerminalService.resize(sessionId, cols, rows);
+  });
+
   ipcMain.handle('terminal:stop', async (_event, sessionId: string) => {
     TerminalService.stopSession(sessionId);
   });

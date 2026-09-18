@@ -39,6 +39,7 @@ export interface IpcApi {
   onLogLine: (callback: (data: { streamId: string; line: any }) => void) => () => void;
   startTerminal: (targetName: string, namespace: string, container?: string, mode?: 'exec' | 'debug-pod' | 'debug-node') => Promise<string>;
   writeTerminal: (sessionId: string, data: string) => Promise<void>;
+  resizeTerminal: (sessionId: string, cols: number, rows: number) => Promise<void>;
   stopTerminal: (sessionId: string) => Promise<void>;
   onTerminalData: (callback: (data: { sessionId: string; data: string }) => void) => () => void;
   getPodDebugInfo: (podName: string, namespace: string) => Promise<{ diagnostics?: any; error?: string }>;
@@ -127,6 +128,7 @@ const api: IpcApi = {
   },
   startTerminal: (target, ns, container, mode) => ipcRenderer.invoke('terminal:start', target, ns, container, mode),
   writeTerminal: (sessionId, data) => ipcRenderer.invoke('terminal:write', sessionId, data),
+  resizeTerminal: (sessionId, cols, rows) => ipcRenderer.invoke('terminal:resize', sessionId, cols, rows),
   stopTerminal: (sessionId) => ipcRenderer.invoke('terminal:stop', sessionId),
   onTerminalData: (callback) => {
     const sub = (_e: any, data: any) => callback(data);

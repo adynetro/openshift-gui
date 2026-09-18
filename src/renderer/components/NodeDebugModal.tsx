@@ -138,6 +138,12 @@ export const NodeDebugModal: React.FC<NodeDebugModalProps> = ({
       }
     });
 
+    const onResizeDispose = term.onResize((size) => {
+      if (sessionIdRef.current && api?.resizeTerminal) {
+        api.resizeTerminal(sessionIdRef.current, size.cols, size.rows);
+      }
+    });
+
     const removeListener = api?.onTerminalData
       ? api.onTerminalData((data: { sessionId: string; data: string }) => {
           if (!sessionIdRef.current || data.sessionId === sessionIdRef.current) {
@@ -154,6 +160,9 @@ export const NodeDebugModal: React.FC<NodeDebugModalProps> = ({
         setTermSessionId(newSessionId);
         setTermStatus('connected');
         term.focus();
+        if (term.cols && term.rows && api?.resizeTerminal) {
+          api.resizeTerminal(newSessionId, term.cols, term.rows);
+        }
       } catch (err: any) {
         setTermStatus('error');
         term.writeln(`\r\n\x1b[31m[Node debug session error: ${err.message || 'Failed to start debug session'}]\x1b[0m\r\n`);
@@ -166,6 +175,7 @@ export const NodeDebugModal: React.FC<NodeDebugModalProps> = ({
       clearTimeout(fitTimer);
       resizeObserver.disconnect();
       onDataDispose.dispose();
+      onResizeDispose.dispose();
       removeListener();
       if (sessionIdRef.current && api?.stopTerminal) {
         api.stopTerminal(sessionIdRef.current);

@@ -51,7 +51,7 @@ export class TerminalService {
       command: shellInit,
       stdin: true,
       stdout: true,
-      stderr: true,
+      stderr: false,
       tty: true,
     })
       .then((ws) => {
@@ -66,6 +66,28 @@ export class TerminalService {
 
         ws.on('open', () => {
           sendData(`\x1b[32m[Connected to ${targetName}${container ? ` (${container})` : ''} in namespace ${ns}]\x1b[0m\r\n`);
+        });
+
+        ws.on('unexpected-response', (_req, res) => {
+          const chunks: Buffer[] = [];
+          res.on('data', (chunk: Buffer) => chunks.push(chunk));
+          res.on('end', () => {
+            const raw = Buffer.concat(chunks).toString('utf8');
+            let msg = `HTTP ${res.statusCode} ${res.statusMessage || ''}`;
+            try {
+              const parsed = JSON.parse(raw);
+              if (parsed.message) {
+                msg = `${parsed.message} (HTTP ${res.statusCode})`;
+              } else if (parsed.reason) {
+                msg = `${parsed.reason} (HTTP ${res.statusCode})`;
+              }
+            } catch {
+              if (raw.trim()) {
+                msg = `${raw.trim()} (HTTP ${res.statusCode})`;
+              }
+            }
+            sendData(`\r\n\x1b[31m[WebSocket connection rejected: ${msg}]\x1b[0m\r\n`);
+          });
         });
 
         ws.on('message', (data: WebSocket.Data) => {
@@ -100,7 +122,8 @@ export class TerminalService {
         });
 
         ws.on('close', (code, reason) => {
-          sendData(`\r\n\x1b[33m[Session terminated (code ${code}${reason ? `: ${reason}` : ''})]\x1b[0m\r\n`);
+          const reasonStr = reason ? reason.toString() : '';
+          sendData(`\r\n\x1b[33m[Session terminated (code ${code}${reasonStr ? `: ${reasonStr}` : ''})]\x1b[0m\r\n`);
           this.sessions.delete(sessionId);
         });
 

@@ -10,16 +10,23 @@ const token = execSync('printf "protocol=https\\nhost=github.com\\n" | git crede
 
 const repo = 'adynetro/openshift-gui';
 const tagName = `v${VERSION}`;
-const releaseName = `OpenShift GUI v${VERSION} - Resilient Multi-Container Log Streaming, CrashLoop Recovery & Zero CLI Dependence`;
+const releaseName = `OpenShift GUI v${VERSION} - Terminal WebSocket 400 Fix, Windows CRLF Sanitization & Live Resizing`;
 
-const releaseBody = `## 🚀 OpenShift GUI v${VERSION} - Multi-Container Log Streaming & CrashLoop Recovery
+const releaseBody = `## 🚀 OpenShift GUI v${VERSION} - Terminal WebSocket Fix & Windows Compatibility
 
-### 📜 Resilient Multi-Container Log Streaming & CrashLoop Recovery
-- **Automatic Multi-Container Discovery**: Automatically discovers and streams all containers for multi-container pods and workloads without requiring manual selection.
-- **CrashLoopBackOff & Waiting Container Recovery**: When a container is waiting or crashlooping, displays the waiting state inline and automatically fetches previous container termination logs (\`previous=true\`).
-- **Comprehensive Workload Log Support**: Streams aggregated logs seamlessly for Deployments, DeploymentConfigs, StatefulSets, DaemonSets, ReplicaSets, and Jobs.
-- **Fail-Safe Error Reporting**: Captures API errors and JSON status messages safely without uncaught emitter exceptions, displaying diagnostic errors directly in the terminal log view.
-- **Dynamic Container Selector**: The UI container selector automatically populates with all active containers detected in the live log stream.
+### 🖥️ Native Terminal WebSocket 400 Bad Request Fix & TTY Stream Synchronization
+- **Fixed TTY / Stderr Stream Conflict**: Resolved the \`HTTP 400 Bad Request\` error (\`cannot specify stderr with tty\`) by properly adhering to the Kubernetes Exec API specification where stderr is omitted when allocating a pseudo-terminal (\`tty: true\`).
+- **Standardized Subprotocol Negotiation**: Enforced standard Kubernetes streaming subprotocols (\`v4.channel.k8s.io\`, \`v3.channel.k8s.io\`, \`v2.channel.k8s.io\`, \`channel.k8s.io\`) and removed unrecognized protocol strings that caused reverse proxies and ingress routers to reject WebSocket handshakes.
+- **Port Normalization for Ingress & Reverse Proxies**: Avoids sending redundant \`:443\` / \`:80\` in the WebSocket \`Host\` header, preventing route host mismatch rejections in OpenShift HAProxy/Envoy routers, ALBs, and Cloudflare proxies.
+- **Rich Rejection Error Reporting**: Integrated \`unexpected-response\` stream listener in \`TerminalService\` to extract and render exact API server error reasons directly in the terminal interface.
+
+### 🪟 Full Windows Kubeconfig & Token Sanitization
+- **Windows CRLF (\`\\r\\n\`) Stripping**: Automatically scrubs carriage returns and trailing line breaks from bearer authentication tokens, token files, and base64 certificates to ensure clean HTTP authorization headers without malformed header exceptions on Windows.
+- **Relative Certificate Path Resolution**: Automatically resolves relative \`certificate-authority\`, \`client-certificate\`, and \`client-key\` file paths relative to the kubeconfig directory across all operating systems.
+
+### 📐 Live Terminal Dynamic Resizing (Channel 4)
+- **Bidirectional Dimension Synchronization**: Added \`terminal:resize\` IPC handler and hooked up xterm.js \`onResize\` across **Pod Terminal**, **Pod Debug**, and **Node Host Debug** modals.
+- **Flawless Fullscreen & CLI Experience**: Remote TTY dimensions dynamically adjust to fit exact window width and height for interactive tools (\`top\`, \`htop\`, \`vim\`, \`nano\`, \`less\`, multi-column tables).
 
 ### ⚡ 100% Standalone Native REST & WebSocket Engine (Zero \`oc\` / \`kubectl\` Dependence)
 - **Zero CLI Binary Requirement**: OpenShift GUI does not require \`oc\` or \`kubectl\` binaries installed on the host operating system.

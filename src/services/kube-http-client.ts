@@ -246,7 +246,7 @@ export class KubeHttpClient {
 
     if (config.caData) {
       try {
-        agentOptions.ca = Buffer.from(config.caData, 'base64').toString('utf8');
+        agentOptions.ca = Buffer.from(config.caData.replace(/[\r\n\s]/g, ''), 'base64').toString('utf8');
       } catch {}
     } else if (config.caFile && fs.existsSync(config.caFile)) {
       try {
@@ -256,7 +256,7 @@ export class KubeHttpClient {
 
     if (config.clientCertData) {
       try {
-        agentOptions.cert = Buffer.from(config.clientCertData, 'base64').toString('utf8');
+        agentOptions.cert = Buffer.from(config.clientCertData.replace(/[\r\n\s]/g, ''), 'base64').toString('utf8');
       } catch {}
     } else if (config.clientCertFile && fs.existsSync(config.clientCertFile)) {
       try {
@@ -266,7 +266,7 @@ export class KubeHttpClient {
 
     if (config.clientKeyData) {
       try {
-        agentOptions.key = Buffer.from(config.clientKeyData, 'base64').toString('utf8');
+        agentOptions.key = Buffer.from(config.clientKeyData.replace(/[\r\n\s]/g, ''), 'base64').toString('utf8');
       } catch {}
     } else if (config.clientKeyFile && fs.existsSync(config.clientKeyFile)) {
       try {
@@ -659,13 +659,17 @@ export class KubeHttpClient {
 
     const ns = namespace && namespace !== 'all-projects' ? namespace : 'default';
     const params = new URLSearchParams();
+    const isTty = options.tty !== false;
     params.set('stdin', options.stdin !== false ? 'true' : 'false');
     params.set('stdout', options.stdout !== false ? 'true' : 'false');
-    params.set('stderr', options.stderr !== false ? 'true' : 'false');
-    params.set('tty', options.tty !== false ? 'true' : 'false');
+    // Kubernetes API strictly forbids setting stderr=true when tty=true (returns 400 Bad Request)
+    if (!isTty) {
+      params.set('stderr', options.stderr !== false ? 'true' : 'false');
+    }
+    params.set('tty', isTty ? 'true' : 'false');
 
-    if (options.container) {
-      params.set('container', options.container);
+    if (options.container && options.container.trim()) {
+      params.set('container', options.container.trim());
     }
 
     const cmdList = options.command && options.command.length > 0 ? options.command : ['sh', '-c', 'if command -v bash >/dev/null 2>&1; then exec bash; else exec sh; fi'];
@@ -677,22 +681,63 @@ export class KubeHttpClient {
     const urlInfo = buildKubeUrl(config.server, apiPath);
 
     const wsProtocol = urlInfo.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${wsProtocol}//${urlInfo.hostname}:${urlInfo.port}${urlInfo.fullPathWithQuery}`;
+    // Only include port in wsUrl if it's non-standard to prevent reverse proxies / load balancers from rejecting Host headers with :443 / :80
+    const isDefaultPort = (urlInfo.protocol === 'https:' && urlInfo.port === 443) || (urlInfo.protocol === 'http:' && urlInfo.port === 80);
+    const hostPort = isDefaultPort ? urlInfo.hostname : `${urlInfo.hostname}:${urlInfo.port}`;
+    const wsUrl = `${wsProtocol}//${hostPort}${urlInfo.fullPathWithQuery}`;
 
     const headers: Record<string, string> = {
       'User-Agent': 'OpenShiftGUI-Terminal/2.0',
     };
     if (config.token) {
-      headers['Authorization'] = `Bearer ${config.token}`;
+      const cleanToken = config.token.replace(/[\r\n]/g, '').trim();
+      if (cleanToken) {
+        headers['Authorization'] = `Bearer ${cleanToken}`;
+      }
     }
 
     const agent = this.cachedAgent || this.createAgent(config);
 
-    const ws = new WebSocket(wsUrl, ['v4.channel.k8s.io', 'v4.ws.k8s.io', 'channel.k8s.io'], {
+    // Standard Kubernetes remotecommand subprotocols
+    const subprotocols = ['v4.channel.k8s.io', 'v3.channel.k8s.io', 'v2.channel.k8s.io', 'channel.k8s.io'];
+
+    const wsOptions: WebSocket.ClientOptions = {
       agent,
       headers,
       rejectUnauthorized: !config.insecureSkipTlsVerify,
-    });
+    };
+
+    if (config.caData) {
+      try {
+        wsOptions.ca = Buffer.from(config.caData.replace(/[\r\n\s]/g, ''), 'base64').toString('utf8');
+      } catch {}
+    } else if (config.caFile && fs.existsSync(config.caFile)) {
+      try {
+        wsOptions.ca = fs.readFileSync(config.caFile, 'utf8');
+      } catch {}
+    }
+
+    if (config.clientCertData) {
+      try {
+        wsOptions.cert = Buffer.from(config.clientCertData.replace(/[\r\n\s]/g, ''), 'base64').toString('utf8');
+      } catch {}
+    } else if (config.clientCertFile && fs.existsSync(config.clientCertFile)) {
+      try {
+        wsOptions.cert = fs.readFileSync(config.clientCertFile, 'utf8');
+      } catch {}
+    }
+
+    if (config.clientKeyData) {
+      try {
+        wsOptions.key = Buffer.from(config.clientKeyData.replace(/[\r\n\s]/g, ''), 'base64').toString('utf8');
+      } catch {}
+    } else if (config.clientKeyFile && fs.existsSync(config.clientKeyFile)) {
+      try {
+        wsOptions.key = fs.readFileSync(config.clientKeyFile, 'utf8');
+      } catch {}
+    }
+
+    const ws = new WebSocket(wsUrl, subprotocols, wsOptions);
 
     return ws;
   }

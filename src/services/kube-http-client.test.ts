@@ -85,3 +85,19 @@ describe('getApiPathForResource', () => {
     assert.equal(nodePath.itemPath, '/api/v1/nodes/worker-1');
   });
 });
+
+describe('KubeHttpClient WebSocket URL & exec parameters', () => {
+  it('should format URL without redundant standard port :443/:80', () => {
+    const res = buildKubeUrl('https://api.cluster.example.com', '/api/v1/namespaces/default/pods/test/exec');
+    const isDefaultPort = (res.protocol === 'https:' && res.port === 443) || (res.protocol === 'http:' && res.port === 80);
+    const hostPort = isDefaultPort ? res.hostname : `${res.hostname}:${res.port}`;
+    assert.equal(hostPort, 'api.cluster.example.com');
+  });
+
+  it('should keep non-standard port like :6443 in hostPort', () => {
+    const res = buildKubeUrl('https://api.cluster.example.com:6443', '/api/v1/namespaces/default/pods/test/exec');
+    const isDefaultPort = (res.protocol === 'https:' && res.port === 443) || (res.protocol === 'http:' && res.port === 80);
+    const hostPort = isDefaultPort ? res.hostname : `${res.hostname}:${res.port}`;
+    assert.equal(hostPort, 'api.cluster.example.com:6443');
+  });
+});

@@ -290,12 +290,22 @@ export class KubeConfigService {
       token = userObj['auth-provider'].config['access-token'] || userObj['auth-provider'].config['id-token'];
     }
 
+    const kubeDir = path.dirname(kubePath);
+    const resolveConfigPath = (p?: string): string | undefined => {
+      if (!p || typeof p !== 'string') return undefined;
+      const clean = p.trim();
+      if (!clean) return undefined;
+      if (path.isAbsolute(clean)) return clean;
+      return path.resolve(kubeDir, clean);
+    };
+
     // Check token-file
     if (!token) {
-      const tokenFile = userObj?.['token-file'] || userObj?.tokenFile;
+      const rawTokenFile = userObj?.['token-file'] || userObj?.tokenFile;
+      const tokenFile = resolveConfigPath(rawTokenFile);
       if (tokenFile && fs.existsSync(tokenFile)) {
         try {
-          token = fs.readFileSync(tokenFile, 'utf8').trim();
+          token = fs.readFileSync(tokenFile, 'utf8');
         } catch {}
       }
     }
@@ -327,16 +337,26 @@ export class KubeConfigService {
       }
     }
 
+    if (typeof token === 'string') {
+      token = token.replace(/[\r\n]/g, '').trim();
+    }
+
+    const cleanB64 = (s?: string): string | undefined => {
+      if (!s || typeof s !== 'string') return undefined;
+      const clean = s.replace(/[\r\n\s]/g, '');
+      return clean || undefined;
+    };
+
     return {
       server: clusterObj.server,
-      caData: clusterObj['certificate-authority-data'],
-      caFile: clusterObj['certificate-authority'],
+      caData: cleanB64(clusterObj['certificate-authority-data']),
+      caFile: resolveConfigPath(clusterObj['certificate-authority']),
       insecureSkipTlsVerify: !!clusterObj['insecure-skip-tls-verify'],
-      token,
-      clientCertData: userObj?.['client-certificate-data'],
-      clientCertFile: userObj?.['client-certificate'],
-      clientKeyData: userObj?.['client-key-data'],
-      clientKeyFile: userObj?.['client-key'],
+      token: token || undefined,
+      clientCertData: cleanB64(userObj?.['client-certificate-data']),
+      clientCertFile: resolveConfigPath(userObj?.['client-certificate']),
+      clientKeyData: cleanB64(userObj?.['client-key-data']),
+      clientKeyFile: resolveConfigPath(userObj?.['client-key']),
       namespace: ctxObj.namespace || 'default',
     };
   }

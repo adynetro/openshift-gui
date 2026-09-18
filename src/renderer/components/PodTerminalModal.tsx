@@ -96,6 +96,12 @@ export const PodTerminalModal: React.FC<PodTerminalModalProps> = ({
       }
     });
 
+    const onResizeDispose = term.onResize((size) => {
+      if (sessionIdRef.current && api?.resizeTerminal) {
+        api.resizeTerminal(sessionIdRef.current, size.cols, size.rows);
+      }
+    });
+
     // Receive data from electron to xterm
     const removeListener = api?.onTerminalData ? api.onTerminalData((data: { sessionId: string; data: string }) => {
       if (!sessionIdRef.current || data.sessionId === sessionIdRef.current) {
@@ -113,6 +119,9 @@ export const PodTerminalModal: React.FC<PodTerminalModalProps> = ({
         setSessionId(newSessionId);
         setStatus('connected');
         term.focus();
+        if (term.cols && term.rows && api?.resizeTerminal) {
+          api.resizeTerminal(newSessionId, term.cols, term.rows);
+        }
       } catch (err: any) {
         setStatus('error');
         term.writeln(`\r\n\x1b[31m[Connection error: ${err.message || 'Failed to start terminal'}]\x1b[0m\r\n`);
@@ -144,6 +153,7 @@ export const PodTerminalModal: React.FC<PodTerminalModalProps> = ({
       resizeObserver.disconnect();
       window.removeEventListener('app-theme-changed', onThemeChange);
       onDataDispose.dispose();
+      onResizeDispose.dispose();
       removeListener();
       window.removeEventListener('resize', handleResize);
       if (sessionIdRef.current && api?.stopTerminal) {
