@@ -245,6 +245,10 @@ export function registerIpcHandlers(mainWindow: electron.BrowserWindow): void {
     return await OcClient.getNodeDebugInfo(nodeName);
   });
 
+  ipcMain.handle('kube:getPodContainers', async (_event, podName: string, namespace: string) => {
+    return await OcClient.getPodContainers(podName, namespace);
+  });
+
   // Interactive Terminal Handlers (Supports Pod Exec, Pod Debug replica, and Node Host Debugger)
   ipcMain.handle('terminal:start', async (_event, targetName: string, namespace: string, container?: string, mode: 'exec' | 'debug-pod' | 'debug-node' = 'exec') => {
     return TerminalService.startSession(targetName, namespace, container, mainWindow, mode);

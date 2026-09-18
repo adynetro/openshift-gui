@@ -1941,6 +1941,82 @@ spec:
   }
 
   /**
+   * Discovers and returns all containers (app, init, ephemeral) and the default container for a pod.
+   */
+  static async getPodContainers(
+    podName: string,
+    namespace: string
+  ): Promise<{
+    containers: string[];
+    initContainers: string[];
+    ephemeralContainers: string[];
+    allContainers: string[];
+    defaultContainer?: string;
+    resolvedNamespace: string;
+    error?: string;
+  }> {
+    try {
+      let ns = namespace && namespace !== 'all-projects' && namespace !== '__all__' ? namespace : '';
+      let podObj: any = null;
+
+      if (ns) {
+        const podRes = await KubeHttpClient.getResource('pods', podName, ns);
+        if (podRes.data && podRes.data.spec) {
+          podObj = podRes.data;
+        }
+      }
+
+      if (!podObj) {
+        // Search across cluster if namespace was omitted or pod was not in the specified namespace
+        const queryRes = await KubeHttpClient.requestJson<any>(`/api/v1/pods?fieldSelector=metadata.name=${encodeURIComponent(podName)}`);
+        if (queryRes.data?.items && queryRes.data.items.length > 0) {
+          podObj = queryRes.data.items[0];
+          ns = podObj.metadata?.namespace || ns;
+        }
+      }
+
+      if (!podObj) {
+        return {
+          containers: [],
+          initContainers: [],
+          ephemeralContainers: [],
+          allContainers: [],
+          resolvedNamespace: ns || 'default',
+          error: `Pod ${podName} not found`,
+        };
+      }
+
+      const containers: string[] = (podObj.spec?.containers || []).map((c: any) => c.name).filter(Boolean);
+      const initContainers: string[] = (podObj.spec?.initContainers || []).map((c: any) => c.name).filter(Boolean);
+      const ephemeralContainers: string[] = (podObj.spec?.ephemeralContainers || []).map((c: any) => c.name).filter(Boolean);
+      const allContainers = Array.from(new Set([...containers, ...initContainers, ...ephemeralContainers]));
+
+      const defaultContainer =
+        podObj.metadata?.annotations?.['kubectl.kubernetes.io/default-container'] ||
+        containers[0] ||
+        allContainers[0];
+
+      return {
+        containers,
+        initContainers,
+        ephemeralContainers,
+        allContainers,
+        defaultContainer,
+        resolvedNamespace: podObj.metadata?.namespace || ns || 'default',
+      };
+    } catch (err: any) {
+      return {
+        containers: [],
+        initContainers: [],
+        ephemeralContainers: [],
+        allContainers: [],
+        resolvedNamespace: namespace || 'default',
+        error: err.message || 'Failed to fetch pod containers',
+      };
+    }
+  }
+
+  /**
    * Fetches rich debugging diagnostics for a pod directly via REST.
    */
   static async getPodDebugInfo(

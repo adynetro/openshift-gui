@@ -44,6 +44,15 @@ export interface IpcApi {
   onTerminalData: (callback: (data: { sessionId: string; data: string }) => void) => () => void;
   getPodDebugInfo: (podName: string, namespace: string) => Promise<{ diagnostics?: any; error?: string }>;
   getNodeDebugInfo: (nodeName: string) => Promise<{ diagnostics?: any; error?: string }>;
+  getPodContainers: (podName: string, namespace: string) => Promise<{
+    containers: string[];
+    initContainers: string[];
+    ephemeralContainers: string[];
+    allContainers: string[];
+    defaultContainer?: string;
+    resolvedNamespace: string;
+    error?: string;
+  }>;
   pruneImages: (options: {
     keepTagRevisions?: number;
     keepYoungerThan?: string;
@@ -137,6 +146,7 @@ const api: IpcApi = {
   },
   getPodDebugInfo: (podName, ns) => ipcRenderer.invoke('debug:getPodInfo', podName, ns),
   getNodeDebugInfo: (nodeName) => ipcRenderer.invoke('debug:getNodeInfo', nodeName),
+  getPodContainers: (podName, ns) => ipcRenderer.invoke('kube:getPodContainers', podName, ns),
   pruneImages: (options) => ipcRenderer.invoke('kube:pruneImages', options),
   getImagePrunerCronJobYaml: (options) => ipcRenderer.invoke('kube:getImagePrunerCronJobYaml', options),
   getRegistryUrl: () => ipcRenderer.invoke('kube:getRegistryUrl'),

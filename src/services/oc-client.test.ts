@@ -28,4 +28,11 @@ describe("OcClient.sanitizeRegistryUrl", () => {
     assert.ok(Array.isArray(res.activeResources.items));
     assert.ok(typeof res.counts === 'object');
   });
+
+  it("should handle getPodContainers safely when cluster is not connected", async () => {
+    const res = await OcClient.getPodContainers("test-pod", "test-ns");
+    assert.ok(Array.isArray(res.containers));
+    assert.ok(Array.isArray(res.allContainers));
+    assert.equal(typeof res.resolvedNamespace, 'string');
+  });
 });

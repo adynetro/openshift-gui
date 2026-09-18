@@ -1,6 +1,7 @@
 import { BrowserWindow } from 'electron';
 import WebSocket from 'ws';
 import { KubeHttpClient } from './kube-http-client.js';
+import { OcClient } from './oc-client.js';
 
 interface TerminalSession {
   id: string;
@@ -37,7 +38,8 @@ export class TerminalService {
       }
     };
 
-    const ns = namespace && namespace !== 'all-projects' && namespace !== '__all__' ? namespace : 'default';
+    let resolvedNs = namespace && namespace !== 'all-projects' && namespace !== '__all__' ? namespace : 'default';
+    let resolvedContainer = container && container.trim() ? container.trim() : undefined;
 
     // Shell command to initialize standard interactive environment
     const shellInit = [
@@ -47,26 +49,24 @@ export class TerminalService {
     ];
 
     const connect = async () => {
-      let resolvedContainer = container && container.trim() ? container.trim() : undefined;
-
-      // If no container specified, fetch pod metadata to resolve default or first container
-      if (!resolvedContainer && mode === 'exec') {
+      // If no container specified or namespace needs resolution, resolve from cluster
+      if (!resolvedContainer || !namespace || namespace === 'all-projects' || namespace === '__all__') {
         try {
-          const podRes = await KubeHttpClient.getResource('pods', targetName, ns);
-          if (podRes.data) {
-            const defaultAnnot = podRes.data.metadata?.annotations?.['kubectl.kubernetes.io/default-container'];
-            const containers = podRes.data.spec?.containers || [];
-            if (defaultAnnot) {
-              resolvedContainer = defaultAnnot;
-            } else if (containers.length > 0 && containers[0]?.name) {
-              resolvedContainer = containers[0].name;
-            }
+          const podInfo = await OcClient.getPodContainers(targetName, namespace);
+          if (podInfo.resolvedNamespace) {
+            resolvedNs = podInfo.resolvedNamespace;
+          }
+          if (!resolvedContainer && podInfo.defaultContainer) {
+            resolvedContainer = podInfo.defaultContainer;
           }
         } catch {}
       }
 
+      let currentWs: WebSocket | null = null;
+      let isRetrying = false;
+
       const attachWebSocket = async (targetCont?: string): Promise<WebSocket> => {
-        const ws = await KubeHttpClient.createWebSocketExec(targetName, ns, {
+        const ws = await KubeHttpClient.createWebSocketExec(targetName, resolvedNs, {
           container: targetCont,
           command: shellInit,
           stdin: true,
@@ -75,17 +75,18 @@ export class TerminalService {
           tty: true,
         });
 
+        currentWs = ws;
         this.sessions.set(sessionId, {
           id: sessionId,
           ws,
           targetName,
-          namespace: ns,
+          namespace: resolvedNs,
           container: targetCont,
           mode,
         });
 
         ws.on('open', () => {
-          sendData(`\x1b[32m[Connected to ${targetName}${targetCont ? ` (${targetCont})` : ''} in namespace ${ns}]\x1b[0m\r\n`);
+          sendData(`\x1b[32m[Connected to ${targetName}${targetCont ? ` (${targetCont})` : ''} in namespace ${resolvedNs}]\x1b[0m\r\n`);
         });
 
         ws.on('unexpected-response', (_req, res) => {
@@ -110,11 +111,15 @@ export class TerminalService {
             // Check if error is due to missing container name in multi-container pod:
             // "a container name must be specified for pod ..., choose one of: [csi-attacher vsphere-csi-controller ...]"
             const containerMatch = msg.match(/choose one of:\s*\[([^\]]+)\]/i);
-            if (containerMatch && !targetCont) {
+            if (containerMatch && !targetCont && !isRetrying) {
               const candidates = containerMatch[1].trim().split(/\s+/).filter(Boolean);
               if (candidates.length > 0) {
+                isRetrying = true;
                 const autoCont = candidates[0];
-                sendData(`\r\n\x1b[33m[Multiple containers detected in pod. Automatically connecting to primary container '${autoCont}']\x1b[0m\r\n`);
+                sendData(`\r\n\x1b[33m[Multiple containers detected: [${candidates.join(', ')}]. Automatically connecting to '${autoCont}']\x1b[0m\r\n`);
+                try {
+                  ws.terminate();
+                } catch {}
                 attachWebSocket(autoCont).catch((retryErr) => {
                   sendData(`\r\n\x1b[31m[Retry connection error: ${retryErr.message || retryErr}]\x1b[0m\r\n`);
                 });
@@ -127,6 +132,7 @@ export class TerminalService {
         });
 
         ws.on('message', (data: WebSocket.Data) => {
+          if (ws !== currentWs) return;
           let buffer: Buffer;
           if (Buffer.isBuffer(data)) {
             buffer = data;
@@ -158,12 +164,14 @@ export class TerminalService {
         });
 
         ws.on('close', (code, reason) => {
+          if (ws !== currentWs || isRetrying) return;
           const reasonStr = reason ? reason.toString() : '';
           sendData(`\r\n\x1b[33m[Session terminated (code ${code}${reasonStr ? `: ${reasonStr}` : ''})]\x1b[0m\r\n`);
           this.sessions.delete(sessionId);
         });
 
         ws.on('error', (err) => {
+          if (ws !== currentWs || isRetrying) return;
           sendData(`\r\n\x1b[31m[WebSocket connection error: ${err.message}]\x1b[0m\r\n`);
           this.sessions.delete(sessionId);
         });

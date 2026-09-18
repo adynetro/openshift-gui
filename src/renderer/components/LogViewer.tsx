@@ -65,10 +65,37 @@ export const LogViewer: React.FC<LogViewerProps> = ({ item, namespace, onClose }
     item.kind === 'statefulsets' ||
     item.kind === 'daemonsets';
 
-  const containers: string[] =
-    item.raw?.spec?.template?.spec?.containers?.map((c: any) => c.name) ||
-    item.raw?.spec?.containers?.map((c: any) => c.name) ||
-    [];
+  const [discoveredContainers, setDiscoveredContainers] = useState<string[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const api = (window as any).electronAPI;
+    if (api?.getPodContainers && item.kind === 'pods') {
+      api.getPodContainers(item.name, namespace)
+        .then((res: any) => {
+          if (!isMounted || !res) return;
+          const list = res.allContainers || res.containers || [];
+          if (list.length > 0) {
+            setDiscoveredContainers(list);
+          }
+        })
+        .catch(() => {});
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [item.name, item.kind, namespace]);
+
+  const containers: string[] = Array.from(
+    new Set([
+      ...(item.raw?.spec?.template?.spec?.containers?.map((c: any) => c.name) || []),
+      ...(item.raw?.spec?.containers?.map((c: any) => c.name) || []),
+      ...(item.raw?.spec?.initContainers?.map((c: any) => c.name) || []),
+      ...(item.raw?.spec?.ephemeralContainers?.map((c: any) => c.name) || []),
+      ...(item.extra?.containers?.map((c: any) => (typeof c === 'string' ? c : c.name)) || []),
+      ...discoveredContainers,
+    ])
+  ).filter(Boolean);
 
   useEffect(() => {
     let unlisten: (() => void) | null = null;

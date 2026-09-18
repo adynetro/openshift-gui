@@ -40,12 +40,18 @@ export const PodTerminalModal: React.FC<PodTerminalModalProps> = ({
   const initialContainers: string[] = Array.from(
     new Set([
       ...(item.raw?.spec?.containers?.map((c: any) => c.name) || []),
+      ...(item.raw?.spec?.initContainers?.map((c: any) => c.name) || []),
+      ...(item.raw?.spec?.ephemeralContainers?.map((c: any) => c.name) || []),
       ...(item.raw?.spec?.template?.spec?.containers?.map((c: any) => c.name) || []),
+      ...(item.extra?.containers?.map((c: any) => (typeof c === 'string' ? c : c.name)) || []),
       ...(container ? [container] : []),
     ])
   ).filter(Boolean);
 
   const [availableContainers, setAvailableContainers] = useState<string[]>(initialContainers);
+  const [actualNamespace, setActualNamespace] = useState<string>(
+    item.namespace || (namespace && namespace !== 'all-projects' && namespace !== '__all__' ? namespace : '') || 'default'
+  );
   const [activeContainer, setActiveContainer] = useState<string>(
     container ||
     item.raw?.metadata?.annotations?.['kubectl.kubernetes.io/default-container'] ||
@@ -53,13 +59,32 @@ export const PodTerminalModal: React.FC<PodTerminalModalProps> = ({
     ''
   );
 
-  // Auto-fetch pod YAML to discover containers if not pre-populated in raw
+  // Auto-fetch pod containers directly via backend discovery API
   useEffect(() => {
+    let isMounted = true;
     const api = (window as any).electronAPI;
-    if (api?.getYaml && availableContainers.length <= 1) {
+
+    if (api?.getPodContainers) {
+      api.getPodContainers(item.name, namespace)
+        .then((res: any) => {
+          if (!isMounted || !res) return;
+          if (res.resolvedNamespace) {
+            setActualNamespace(res.resolvedNamespace);
+          }
+          const discovered: string[] = res.allContainers || res.containers || [];
+          if (discovered.length > 0) {
+            setAvailableContainers((prev) => Array.from(new Set([...prev, ...discovered])));
+            setActiveContainer((curr) => {
+              if (curr && discovered.includes(curr)) return curr;
+              return container || res.defaultContainer || discovered[0] || '';
+            });
+          }
+        })
+        .catch(() => {});
+    } else if (api?.getYaml) {
       api.getYaml('pods', item.name, namespace)
         .then((yamlStr: string) => {
-          if (!yamlStr) return;
+          if (!isMounted || !yamlStr) return;
           const nameMatches = yamlStr.matchAll(/^\s*-\s+name:\s+([a-zA-Z0-9_-]+)/gm);
           const discovered: string[] = [];
           for (const m of nameMatches) {
@@ -69,20 +94,36 @@ export const PodTerminalModal: React.FC<PodTerminalModalProps> = ({
           }
           if (discovered.length > 0) {
             setAvailableContainers((prev) => Array.from(new Set([...prev, ...discovered])));
-            if (!activeContainer) {
-              setActiveContainer(discovered[0]);
-            }
+            setActiveContainer((curr) => curr || discovered[0]);
           }
         })
         .catch(() => {});
     }
-  }, [item.name, namespace]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [item.name, namespace, container]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   useEffect(() => {
     if (!terminalRef.current) return;
 
+    // Clean any prior children in the canvas container
+    terminalRef.current.innerHTML = '';
+
     const currentTheme = getStoredTheme();
     setActiveTheme(currentTheme);
+    setStatus('connecting');
 
     // Initialize Xterm.js with consistent monospace font and active theme palette
     const term = new XTerm({
@@ -125,7 +166,7 @@ export const PodTerminalModal: React.FC<PodTerminalModalProps> = ({
     xtermInstance.current = term;
     fitAddonRef.current = fitAddon;
 
-    term.writeln('\x1b[36m⚡ Connecting to pod ' + item.name + (activeContainer ? ` (${activeContainer})` : '') + '...\x1b[0m\r\n');
+    term.writeln('\x1b[36m⚡ Connecting to pod ' + item.name + (activeContainer ? ` [container: ${activeContainer}]` : '') + '...\x1b[0m\r\n');
 
     const sessionIdRef = { current: '' };
     const api = (window as any).electronAPI;
@@ -147,10 +188,11 @@ export const PodTerminalModal: React.FC<PodTerminalModalProps> = ({
     const removeListener = api?.onTerminalData ? api.onTerminalData((data: { sessionId: string; data: string }) => {
       if (!sessionIdRef.current || data.sessionId === sessionIdRef.current) {
         term.write(data.data);
-        // Discover container names dynamically if reported in terminal output
-        const match = data.data.match(/choose one of:\s*\[([^\]]+)\]/i);
+
+        // Discover container names dynamically if reported in terminal error/reconnect output
+        const match = data.data.match(/choose one of:\s*\[([^\]]+)\]/i) || data.data.match(/Multiple containers detected:\s*\[([^\]]+)\]/i);
         if (match) {
-          const parsedConts = match[1].trim().split(/\s+/).filter(Boolean);
+          const parsedConts = match[1].trim().split(/[,\s]+/).filter(Boolean);
           if (parsedConts.length > 0) {
             setAvailableContainers((prev) => Array.from(new Set([...prev, ...parsedConts])));
             if (!activeContainer || !parsedConts.includes(activeContainer)) {
@@ -167,7 +209,7 @@ export const PodTerminalModal: React.FC<PodTerminalModalProps> = ({
           throw new Error('Terminal IPC API not available');
         }
         const targetCont = activeContainer || container || undefined;
-        const newSessionId = await api.startTerminal(item.name, namespace, targetCont);
+        const newSessionId = await api.startTerminal(item.name, actualNamespace, targetCont);
         sessionIdRef.current = newSessionId;
         setSessionId(newSessionId);
         setStatus('connected');
@@ -214,7 +256,7 @@ export const PodTerminalModal: React.FC<PodTerminalModalProps> = ({
       }
       term.dispose();
     };
-  }, [item.name, namespace, activeContainer]);
+  }, [item.name, actualNamespace, activeContainer]);
 
   const handleClear = () => {
     if (xtermInstance.current) {
@@ -286,11 +328,11 @@ export const PodTerminalModal: React.FC<PodTerminalModalProps> = ({
                   {status === 'connected' ? '● Live Session' : status === 'connecting' ? 'Connecting...' : 'Disconnected'}
                 </span>
                 <span className="px-2 py-0.2 rounded bg-slate-800/80 border border-slate-700 text-[10px] text-slate-300 font-mono">
-                  Project: {namespace}
+                  Project: {actualNamespace}
                 </span>
                 {availableContainers.length > 1 ? (
                   <div
-                    className="flex items-center gap-1.5 text-xs px-2 py-0.5 rounded border"
+                    className="flex items-center gap-1.5 text-xs px-2 py-0.5 rounded border shadow-sm"
                     style={{
                       backgroundColor: activeTheme.preview.bg,
                       borderColor: activeTheme.cssVars['--border-subtle'] || '#334155',
@@ -382,6 +424,12 @@ export const PodTerminalModal: React.FC<PodTerminalModalProps> = ({
             <span>Theme: <strong>{activeTheme.name}</strong></span>
             <span>•</span>
             <span>Target: <strong>{item.name}</strong></span>
+            {activeContainer ? (
+              <>
+                <span>•</span>
+                <span>Container: <strong className="text-purple-300">{activeContainer}</strong></span>
+              </>
+            ) : null}
           </div>
 
           <div>
