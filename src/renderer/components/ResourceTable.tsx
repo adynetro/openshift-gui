@@ -282,6 +282,16 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                 <th className="py-3 px-3">Status</th>
               </>
             )}
+            {kind === 'ingresses' && (
+              <>
+                <th className="py-3 px-3">Hosts & Ingress URL</th>
+                <th className="py-3 px-3">Path</th>
+                <th className="py-3 px-3">Ingress Class</th>
+                <th className="py-3 px-3">Service</th>
+                <th className="py-3 px-3">TLS</th>
+                <th className="py-3 px-3">Status</th>
+              </>
+            )}
             {kind === 'networkpolicies' && (
               <>
                 <th className="py-3 px-3">Policy Types</th>
@@ -694,6 +704,62 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                   </>
                 )}
 
+                {/* Ingress Columns with Clickable Direct External Links & Target Service Link */}
+                {kind === 'ingresses' && (
+                  <>
+                    <td className="py-2.5 px-3 font-mono text-cyan-300 truncate max-w-[260px]">
+                      {item.extra?.host && item.extra.host !== '-' ? (
+                        <button
+                          onClick={(e) => {
+                            const protocol = item.extra?.tls && item.extra.tls !== 'None' ? 'https' : 'http';
+                            const firstHost = (item.extra?.host || '').split(',')[0].trim();
+                            const fullUrl = `${protocol}://${firstHost}${item.extra?.path || '/'}`;
+                            handleOpenExternal(fullUrl, e);
+                          }}
+                          className="hover:underline text-cyan-400 hover:text-cyan-300 flex items-center gap-1.5 font-bold group/link"
+                          title={`Open ${item.extra.host} in browser`}
+                        >
+                          <span className="truncate">{item.extra.host}</span>
+                          <ExternalLink size={12} className="opacity-70 group-hover/link:opacity-100 shrink-0" />
+                        </button>
+                      ) : (
+                        <span>*</span>
+                      )}
+                    </td>
+                    <td className="py-2.5 px-3 font-mono text-slate-400">{item.extra?.path || '/'}</td>
+                    <td className="py-2.5 px-3 font-mono text-indigo-300 truncate max-w-[130px]" title={item.extra?.ingressClass}>
+                      {item.extra?.ingressClass || '-'}
+                    </td>
+                    <td className="py-2.5 px-3 font-mono text-slate-300">
+                      {item.extra?.targetService && item.extra.targetService !== '-' ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onNavigate && item.extra?.targetService) {
+                              onNavigate('services', item.extra.targetService, item.namespace);
+                            }
+                          }}
+                          className="font-mono text-cyan-300 hover:text-cyan-100 hover:underline flex items-center gap-1.5 cursor-pointer font-bold transition-colors"
+                          title={`Jump to Service ${item.extra.targetService}`}
+                        >
+                          <Network size={12} className="text-cyan-400 shrink-0" />
+                          <span>{item.extra.targetService}</span>
+                        </button>
+                      ) : (
+                        <span className="text-slate-500">-</span>
+                      )}
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <span className={`px-1.5 py-0.5 rounded font-mono text-[10px] ${
+                        item.extra?.tls === 'TLS' ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800' : 'bg-slate-800 text-slate-400'
+                      }`}>
+                        {item.extra?.tls || 'None'}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3">{getStatusBadge(item.status, item.statusColor)}</td>
+                  </>
+                )}
+
                 {/* NetworkPolicy Columns */}
                 {kind === 'networkpolicies' && (
                   <>
@@ -955,8 +1021,8 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                   <td className="py-2 px-4 text-right">
                     <div className="flex items-center justify-end gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
 
-                      {/* Port Forward Action for Services and Routes */}
-                      {(kind === 'services' || kind === 'routes') && (
+                      {/* Port Forward Action for Services, Routes, and Ingresses */}
+                      {(kind === 'services' || kind === 'routes' || kind === 'ingresses') && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();

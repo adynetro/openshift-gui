@@ -118,11 +118,12 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       });
     }
 
-    if (currentKind === 'services' || currentKind === 'routes') {
+    if (currentKind === 'services' || currentKind === 'routes' || currentKind === 'ingresses') {
+      const kindLabel = currentKind === 'services' ? 'Service' : currentKind === 'routes' ? 'Route' : 'Ingress';
       pills.push({
         id: 'port-forward',
         label: 'Port Forward',
-        tooltip: `Forward ${currentKind === 'services' ? 'Service' : 'Route'} Port to Localhost`,
+        tooltip: `Forward ${kindLabel} Port to Localhost`,
         icon: Radio,
         color: 'hover:border-cyan-500 hover:text-cyan-300 hover:bg-cyan-950/40 text-cyan-400 border-cyan-900/50 bg-cyan-950/20',
         disabled: !selectedItem,

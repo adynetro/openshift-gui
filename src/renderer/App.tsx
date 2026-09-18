@@ -724,6 +724,7 @@ export const App: React.FC = () => {
       else if (e.key === '5') setCurrentKind('statefulsets');
       else if (e.key === '6') setCurrentKind('daemonsets');
       else if (e.key === '7') setCurrentKind('routes');
+      else if (e.key === 'g') setCurrentKind('ingresses');
       else if (e.key === '8') setCurrentKind('services');
       else if (e.key === 'w') setCurrentKind('networkpolicies');
       else if (e.key === '9') setCurrentKind('pvc');

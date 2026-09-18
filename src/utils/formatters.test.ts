@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatAge, formatBytes, formatMemoryToGi, getStatusColor, padRight, truncate } from './formatters.js';
+import { formatAge, formatBytes, formatMemoryToGi, formatStorage, getStatusColor, padRight, truncate } from './formatters.js';
 
 describe('Formatters', () => {
   it('should format memory to Gi correctly', () => {
@@ -12,6 +12,19 @@ describe('Formatters', () => {
     assert.equal(formatMemoryToGi('2Ti'), '2048 Gi');
     assert.equal(formatMemoryToGi('-'), '-');
     assert.equal(formatMemoryToGi(undefined), '-');
+  });
+
+  it('should format ephemeral storage to Gi or Ti correctly', () => {
+    assert.equal(formatStorage('104857600Ki'), '100 Gi');
+    assert.equal(formatStorage('2147483648Ki'), '2 Ti');
+    assert.equal(formatStorage('50327464Ki'), '48 Gi');
+    assert.equal(formatStorage('512Mi'), '0.5 Gi');
+    assert.equal(formatStorage('100Gi'), '100 Gi');
+    assert.equal(formatStorage('2Ti'), '2 Ti');
+    assert.equal(formatStorage(107374182400), '100 Gi');
+    assert.equal(formatStorage(2199023255552), '2 Ti');
+    assert.equal(formatStorage('-'), '-');
+    assert.equal(formatStorage(undefined), '-');
   });
 
   it('should format age correctly', () => {

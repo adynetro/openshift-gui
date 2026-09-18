@@ -5,6 +5,7 @@ import {
   Layers2,
   Server,
   Network,
+  Globe,
   Image,
   FileText,
   Key,
@@ -64,6 +65,7 @@ const NAV_GROUPS: NavGroup[] = [
     title: 'Networking',
     items: [
       { kind: 'routes', label: 'Routes', icon: Network, hotkey: '7', badgeText: 'OpenShift', badgeColor: 'bg-red-950 text-red-300 border-red-800' },
+      { kind: 'ingresses', label: 'Ingresses', icon: Globe, hotkey: 'g', badgeText: 'K8s', badgeColor: 'bg-indigo-950 text-indigo-300 border-indigo-800' },
       { kind: 'services', label: 'Services', icon: Network, hotkey: '8' },
       { kind: 'networkpolicies', label: 'NetworkPolicies', icon: Shield, hotkey: 'w', badgeText: 'Security', badgeColor: 'bg-cyan-950 text-cyan-300 border-cyan-800' },
     ],

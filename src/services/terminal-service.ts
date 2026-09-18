@@ -14,6 +14,164 @@ interface TerminalSession {
 
 export class TerminalService {
   private static sessions = new Map<string, TerminalSession>();
+  private static createdDebugPods = new Set<string>();
+
+  /**
+   * Spawns or resolves an active privileged debug pod on a Kubernetes/OpenShift node.
+   */
+  private static async getOrCreateNodeDebugPod(
+    nodeName: string,
+    sendData: (text: string) => void
+  ): Promise<{ podName: string; namespace: string; cleanupOnExit: boolean }> {
+    sendData(`\x1b[33m[Discovering debug pod for node '${nodeName}'...]\x1b[0m\r\n`);
+
+    const cleanNode = nodeName.toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 40).replace(/^-+|-+$/g, '') || 'node';
+    const candidateNamespaces = ['default', 'openshift-debug', 'kube-system'];
+
+    // 1. Check if an active running debug pod already exists for this node
+    for (const ns of candidateNamespaces) {
+      try {
+        const existingPods = await KubeHttpClient.getResourceList('pods', ns);
+        if (existingPods.items && Array.isArray(existingPods.items)) {
+          const matchingRunning = existingPods.items.find(
+            (p: any) =>
+              p.spec?.nodeName === nodeName &&
+              (p.metadata?.name?.startsWith(`node-debugger-${cleanNode}`) ||
+               p.metadata?.labels?.app === 'node-debugger' ||
+               p.metadata?.labels?.['debug.openshift.io/node'] === cleanNode) &&
+              p.status?.phase === 'Running'
+          );
+          if (matchingRunning && matchingRunning.metadata?.name) {
+            sendData(`\x1b[32m[Connected to existing active debug pod '${matchingRunning.metadata.name}' in namespace '${ns}']\x1b[0m\r\n`);
+            return { podName: matchingRunning.metadata.name, namespace: ns, cleanupOnExit: false };
+          }
+        }
+      } catch {}
+    }
+
+    // 2. Discover cached image on target node to ensure zero ImagePullBackOff even in air-gapped clusters
+    let selectedImage = 'registry.access.redhat.com/ubi9/ubi:latest';
+    try {
+      const allPods = await KubeHttpClient.getResourceList('pods', '');
+      if (allPods.items && Array.isArray(allPods.items)) {
+        const podOnNode = allPods.items.find(
+          (p: any) => p.spec?.nodeName === nodeName && p.status?.phase === 'Running' && p.spec?.containers?.[0]?.image
+        );
+        if (podOnNode?.spec?.containers?.[0]?.image) {
+          selectedImage = podOnNode.spec.containers[0].image;
+        } else {
+          const anyRunning = allPods.items.find(
+            (p: any) => p.status?.phase === 'Running' && p.spec?.containers?.[0]?.image
+          );
+          if (anyRunning?.spec?.containers?.[0]?.image) {
+            selectedImage = anyRunning.spec.containers[0].image;
+          }
+        }
+      }
+    } catch {}
+
+    // 3. Create a privileged node debug pod
+    const debugPodName = `node-debugger-${cleanNode}-${Date.now().toString(36).slice(-4)}`;
+    const targetNs = 'default';
+
+    sendData(`\x1b[33m[Spawning privileged debug pod '${debugPodName}' on node '${nodeName}' with image '${selectedImage}'...]\x1b[0m\r\n`);
+
+    const podManifest = {
+      apiVersion: 'v1',
+      kind: 'Pod',
+      metadata: {
+        name: debugPodName,
+        namespace: targetNs,
+        labels: {
+          app: 'node-debugger',
+          node: cleanNode,
+          'debug.openshift.io/node': cleanNode,
+        },
+      },
+      spec: {
+        nodeName: nodeName,
+        hostPID: true,
+        hostNetwork: true,
+        hostIPC: true,
+        tolerations: [
+          { operator: 'Exists' },
+        ],
+        containers: [
+          {
+            name: 'debugger',
+            image: selectedImage,
+            command: ['/bin/sh', '-c', 'sleep 86400 || sleep 3600'],
+            securityContext: {
+              privileged: true,
+            },
+            volumeMounts: [
+              {
+                name: 'host-root',
+                mountPath: '/host',
+              },
+            ],
+          },
+        ],
+        volumes: [
+          {
+            name: 'host-root',
+            hostPath: {
+              path: '/',
+            },
+          },
+        ],
+        restartPolicy: 'Never',
+      },
+    };
+
+    let createRes = await KubeHttpClient.requestJson(`/api/v1/namespaces/${targetNs}/pods`, {
+      method: 'POST',
+      body: podManifest,
+    });
+
+    let resolvedPodNs = targetNs;
+
+    if (createRes.statusCode >= 400 || !createRes.data) {
+      // If default fails, try openshift-debug
+      const fallbackNs = 'openshift-debug';
+      podManifest.metadata.namespace = fallbackNs;
+      createRes = await KubeHttpClient.requestJson(`/api/v1/namespaces/${fallbackNs}/pods`, {
+        method: 'POST',
+        body: podManifest,
+      });
+      if (createRes.statusCode >= 400 || !createRes.data) {
+        throw new Error(`Failed to create debug pod on node ${nodeName}: ${createRes.error || `HTTP ${createRes.statusCode}`}`);
+      }
+      resolvedPodNs = fallbackNs;
+    }
+
+    this.createdDebugPods.add(`${resolvedPodNs}/${debugPodName}`);
+    sendData(`\x1b[32m[Debug pod '${debugPodName}' created in namespace '${resolvedPodNs}'. Waiting for container initialization...]\x1b[0m\r\n`);
+
+    // 4. Poll until running (up to 30 seconds)
+    const startTime = Date.now();
+    while (Date.now() - startTime < 30000) {
+      await new Promise((r) => setTimeout(r, 1000));
+      try {
+        const podStatusRes = await KubeHttpClient.getResource('pods', debugPodName, resolvedPodNs);
+        const phase = podStatusRes.data?.status?.phase;
+        if (phase === 'Running') {
+          sendData(`\x1b[32m[Debug pod '${debugPodName}' is Running on node '${nodeName}'. Connecting interactive shell...]\x1b[0m\r\n`);
+          return { podName: debugPodName, namespace: resolvedPodNs, cleanupOnExit: true };
+        } else if (phase === 'Failed') {
+          throw new Error(`Debug pod entered Failed state: ${podStatusRes.data?.status?.message || 'Failed'}`);
+        } else {
+          sendData(`\x1b[90m.\x1b[0m`);
+        }
+      } catch (pollErr: any) {
+        if (pollErr.message && pollErr.message.includes('Failed state')) {
+          throw pollErr;
+        }
+      }
+    }
+
+    return { podName: debugPodName, namespace: resolvedPodNs, cleanupOnExit: true };
+  }
 
   /**
    * Starts an interactive shell session in a pod or node using native Kubernetes WebSocket Exec.
@@ -38,35 +196,57 @@ export class TerminalService {
       }
     };
 
+    let resolvedTarget = targetName;
     let resolvedNs = namespace && namespace !== 'all-projects' && namespace !== '__all__' ? namespace : 'default';
     let resolvedContainer = container && container.trim() ? container.trim() : undefined;
+    let shouldCleanupPodOnExit = false;
 
     // Shell command to initialize standard interactive environment
-    const shellInit = [
-      'sh',
-      '-c',
-      'export TERM=xterm-256color; export PS1="[\\u@\\h \\W]\\$ "; if command -v bash >/dev/null 2>&1; then exec bash -i; elif command -v sh >/dev/null 2>&1; then exec sh -i; else exec /bin/sh -i; fi',
-    ];
+    const shellInit = mode === 'debug-node'
+      ? [
+          'sh',
+          '-c',
+          'export TERM=xterm-256color; export PS1="[\\u@\\h \\W]\\$ "; if [ -d /host/root ] && [ -x /host/bin/bash ]; then echo "\\033[36mℹ️  Host root filesystem is mounted at /host. Running chroot /host...\\033[0m\\r\\n"; chroot /host /bin/bash -i 2>/dev/null || chroot /host /bin/sh -i 2>/dev/null || exec /bin/sh -i; elif [ -d /host/bin ]; then chroot /host /bin/sh -i 2>/dev/null || exec /bin/sh -i; else exec /bin/sh -i; fi',
+        ]
+      : [
+          'sh',
+          '-c',
+          'export TERM=xterm-256color; export PS1="[\\u@\\h \\W]\\$ "; if command -v bash >/dev/null 2>&1; then exec bash -i; elif command -v sh >/dev/null 2>&1; then exec sh -i; else exec /bin/sh -i; fi',
+        ];
 
     const connect = async () => {
-      // If no container specified or namespace needs resolution, resolve from cluster
-      if (!resolvedContainer || !namespace || namespace === 'all-projects' || namespace === '__all__') {
+      // If mode is debug-node, resolve or spawn the privileged node debug pod
+      if (mode === 'debug-node') {
         try {
-          const podInfo = await OcClient.getPodContainers(targetName, namespace);
-          if (podInfo.resolvedNamespace) {
-            resolvedNs = podInfo.resolvedNamespace;
-          }
-          if (!resolvedContainer && podInfo.defaultContainer) {
-            resolvedContainer = podInfo.defaultContainer;
-          }
-        } catch {}
+          const debugPodInfo = await TerminalService.getOrCreateNodeDebugPod(targetName, sendData);
+          resolvedTarget = debugPodInfo.podName;
+          resolvedNs = debugPodInfo.namespace;
+          resolvedContainer = 'debugger';
+          shouldCleanupPodOnExit = debugPodInfo.cleanupOnExit;
+        } catch (nodeDebugErr: any) {
+          sendData(`\r\n\x1b[31m[Node Debugging Error: ${nodeDebugErr.message || nodeDebugErr}]\x1b[0m\r\n`);
+          return;
+        }
+      } else {
+        // If no container specified or namespace needs resolution, resolve from cluster
+        if (!resolvedContainer || !namespace || namespace === 'all-projects' || namespace === '__all__') {
+          try {
+            const podInfo = await OcClient.getPodContainers(targetName, namespace);
+            if (podInfo.resolvedNamespace) {
+              resolvedNs = podInfo.resolvedNamespace;
+            }
+            if (!resolvedContainer && podInfo.defaultContainer) {
+              resolvedContainer = podInfo.defaultContainer;
+            }
+          } catch {}
+        }
       }
 
       let currentWs: WebSocket | null = null;
       let isRetrying = false;
 
       const attachWebSocket = async (targetCont?: string): Promise<WebSocket> => {
-        const ws = await KubeHttpClient.createWebSocketExec(targetName, resolvedNs, {
+        const ws = await KubeHttpClient.createWebSocketExec(resolvedTarget, resolvedNs, {
           container: targetCont,
           command: shellInit,
           stdin: true,
@@ -79,14 +259,14 @@ export class TerminalService {
         this.sessions.set(sessionId, {
           id: sessionId,
           ws,
-          targetName,
+          targetName: resolvedTarget,
           namespace: resolvedNs,
           container: targetCont,
           mode,
         });
 
         ws.on('open', () => {
-          sendData(`\x1b[32m[Connected to ${targetName}${targetCont ? ` (${targetCont})` : ''} in namespace ${resolvedNs}]\x1b[0m\r\n`);
+          sendData(`\x1b[32m[Connected to ${mode === 'debug-node' ? `node ${targetName} via ${resolvedTarget}` : resolvedTarget}${targetCont ? ` (${targetCont})` : ''} in namespace ${resolvedNs}]\x1b[0m\r\n`);
         });
 
         ws.on('unexpected-response', (_req, res) => {
@@ -168,12 +348,22 @@ export class TerminalService {
           const reasonStr = reason ? reason.toString() : '';
           sendData(`\r\n\x1b[33m[Session terminated (code ${code}${reasonStr ? `: ${reasonStr}` : ''})]\x1b[0m\r\n`);
           this.sessions.delete(sessionId);
+          if (shouldCleanupPodOnExit && resolvedTarget.startsWith('node-debugger-')) {
+            KubeHttpClient.requestJson(`/api/v1/namespaces/${resolvedNs}/pods/${resolvedTarget}`, {
+              method: 'DELETE',
+            }).catch(() => {});
+          }
         });
 
         ws.on('error', (err) => {
           if (ws !== currentWs || isRetrying) return;
           sendData(`\r\n\x1b[31m[WebSocket connection error: ${err.message}]\x1b[0m\r\n`);
           this.sessions.delete(sessionId);
+          if (shouldCleanupPodOnExit && resolvedTarget.startsWith('node-debugger-')) {
+            KubeHttpClient.requestJson(`/api/v1/namespaces/${resolvedNs}/pods/${resolvedTarget}`, {
+              method: 'DELETE',
+            }).catch(() => {});
+          }
         });
 
         return ws;

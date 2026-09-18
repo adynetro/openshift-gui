@@ -145,6 +145,93 @@ export function formatMemoryToGi(val?: string | number): string {
   return `${Number(gi.toFixed(2))} Gi`;
 }
 
+/**
+ * Formats Kubernetes storage amounts (ephemeral-storage, disk capacity, PVCs) into Gi or Ti (Gb/Tb).
+ * Converts values like '104857600Ki' to '100 Gi', '2147483648Ki' to '2 Ti', '512Mi' to '0.5 Gi'.
+ */
+export function formatStorage(val?: string | number): string {
+  if (val === undefined || val === null || val === '' || val === '-') return '-';
+  if (typeof val === 'number') {
+    const bytes = val;
+    if (bytes >= 1024 * 1024 * 1024 * 1024) {
+      const ti = bytes / (1024 * 1024 * 1024 * 1024);
+      return `${Number(ti.toFixed(2))} Ti`;
+    }
+    const gi = bytes / (1024 * 1024 * 1024);
+    return `${Number(gi.toFixed(2))} Gi`;
+  }
+  const str = String(val).trim();
+  if (!str || str === '-') return '-';
+
+  // Parse numeric amount and unit suffix
+  const match = str.match(/^([0-9.]+)\s*([a-zA-Z]*)$/);
+  if (!match) return str;
+
+  const num = parseFloat(match[1]);
+  if (isNaN(num)) return str;
+
+  const unit = (match[2] || '').toLowerCase();
+  let bytes = 0;
+
+  switch (unit) {
+    case 'ki':
+    case 'kib':
+      bytes = num * 1024;
+      break;
+    case 'k':
+    case 'kb':
+      bytes = num * 1000;
+      break;
+    case 'mi':
+    case 'mib':
+      bytes = num * 1024 * 1024;
+      break;
+    case 'm':
+    case 'mb':
+      bytes = num * 1000 * 1000;
+      break;
+    case 'gi':
+    case 'gib':
+      bytes = num * 1024 * 1024 * 1024;
+      break;
+    case 'g':
+    case 'gb':
+      bytes = num * 1000 * 1000 * 1000;
+      break;
+    case 'ti':
+    case 'tib':
+      bytes = num * 1024 * 1024 * 1024 * 1024;
+      break;
+    case 't':
+    case 'tb':
+      bytes = num * 1000 * 1000 * 1000 * 1000;
+      break;
+    case 'pi':
+    case 'pib':
+      bytes = num * 1024 * 1024 * 1024 * 1024 * 1024;
+      break;
+    case 'p':
+    case 'pb':
+      bytes = num * 1000 * 1000 * 1000 * 1000 * 1000;
+      break;
+    case '':
+    case 'b':
+      bytes = num;
+      break;
+    default:
+      return str;
+  }
+
+  if (bytes >= 1024 * 1024 * 1024 * 1024) {
+    const ti = bytes / (1024 * 1024 * 1024 * 1024);
+    return `${Number(ti.toFixed(2))} Ti`;
+  }
+  const gi = bytes / (1024 * 1024 * 1024);
+  return `${Number(gi.toFixed(2))} Gi`;
+}
+
+export const formatStorageToGbOrTb = formatStorage;
+
 export function getStatusColor(status: string): 'green' | 'red' | 'yellow' | 'blue' | 'gray' | 'magenta' | 'cyan' {
   if (!status) return 'gray';
   const s = status.toLowerCase();

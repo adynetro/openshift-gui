@@ -10,9 +10,19 @@ const token = execSync('printf "protocol=https\\nhost=github.com\\n" | git crede
 
 const repo = 'adynetro/openshift-gui';
 const tagName = `v${VERSION}`;
-const releaseName = `OpenShift GUI v${VERSION} - Ingress & Service Port Forwarding, GUI Cluster Login, Direct Replica Input, Default Terminal, Gi Memory & Full Log Export`;
+const releaseName = `OpenShift GUI v${VERSION} - Node Host Debugger, Port Forwarding, GUI Cluster Login, Direct Replica Input & Gi Memory`;
 
-const releaseBody = `## 🚀 OpenShift GUI v${VERSION} - Port Forwarding, GUI Login & Workload Scaler
+const releaseBody = `## 🚀 OpenShift GUI v${VERSION} - Node Host Debugger, Port Forwarding & GUI Login
+
+### 🛠️ Node Host Debugger Pod Auto-Spawning & Zero 404 Resolution
+- **Privileged Host Debugger Pod**: When initiating host debug on any Kubernetes/OpenShift node, OpenShift GUI automatically discovers or provisions a privileged debug pod (\`node-debugger-<nodeName>\`) running directly on that specific node with host filesystem mounted at \`/host\`, full host networking, PID, IPC, and automatic \`chroot /host\` shell initiation.
+- **Air-Gapped & Enterprise Cluster Image Re-use**: Automatically scans and reuses container images already cached on the target node to prevent \`ImagePullBackOff\` or external registry dependencies.
+- **Automatic Lifecycle Clean-up**: Automatically removes temporary debug pods on terminal session termination to keep clusters clean.
+
+### 🌐 Native Kubernetes Ingresses Explorer & Routing
+- **Dedicated Ingresses View**: First-class support for Kubernetes Ingress resources under **Networking** (Hotkey: \`g\`) alongside OpenShift Routes, Services, and NetworkPolicies.
+- **Rich Ingress Insights**: View exposed hosts, routing paths, ingress classes, backend services, and TLS certificates with 1-click external browser launch and jump-to-service navigation.
+- **Ingress Port Forwarding**: Direct 1-click background port forwarding from any Ingress or Route to your local machine.
 
 ### 🔌 Ingress, Route & Service Port Forwarding Manager
 - **Live Background Port Forwarding**: Effortlessly forward ports from any Kubernetes/OpenShift **Service**, **Route**, or **Pod** directly to your local workstation.
@@ -43,9 +53,9 @@ const releaseBody = `## 🚀 OpenShift GUI v${VERSION} - Port Forwarding, GUI Lo
 - **1-Click Log File Export**: Download the complete, un-truncated log history for any container, pod, or workload directly to a timestamped \`.log\` file.
 - **Streamlined Log Viewer Integration**: Dedicated **Download Logs** button in the Log Viewer modal header.
 
-### 📊 Normalized Memory Display in Gi (Not Ki)
-- **Human-Readable Gi Display**: All memory capacity, allocatable resources, node metrics, pod limits, and describe outputs are cleanly normalized to \`Gi\` (e.g. \`15.4 Gi\` / \`31.2 Gi\`) instead of raw, unreadable \`Ki\`.
-- **Node Diagnostics & Debug Cards**: Clear Gi capacity and allocatable gauges in Node Host Debug and Pod Diagnostics modals.
+### 📊 Normalized Memory & Ephemeral Storage in Gi / Ti (Not Ki)
+- **Human-Readable Gi & Ti Display**: All memory and ephemeral-storage capacity, allocatable resources, node metrics, pod limits, container requests, and describe outputs are cleanly normalized to \`Gi\` and \`Ti\` (or \`Gb\` / \`Tb\`) instead of raw, unreadable \`Ki\` or byte counts.
+- **Node Diagnostics & Debug Cards**: Clear Gi and Ti capacity and allocatable gauges in Node Host Debug and Pod Diagnostics modals.
 
 ### 🏷️ Friendly Cluster Name Context Display
 - **Display \`clusters.name\` Instead of Raw URL**: Top navigation bar, cluster switcher modal, and server cards prominently display the friendly cluster name (\`clusters[].name\` / \`context.cluster\`) rather than raw \`https://...\` server URLs.

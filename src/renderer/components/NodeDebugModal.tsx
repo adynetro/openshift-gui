@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import { ResourceItem, NodeDebugDiagnostics } from '../../types/k8s.js';
 import { useCurrentTheme } from '../utils/themes.js';
-import { formatMemoryToGi } from '../../utils/formatters.js';
+import { formatMemoryToGi, formatStorage } from '../../utils/formatters.js';
 
 interface NodeDebugModalProps {
   item: ResourceItem;
@@ -524,11 +524,11 @@ export const NodeDebugModal: React.FC<NodeDebugModalProps> = ({
                       </div>
 
                       <div className="p-3 rounded-lg bg-slate-900/60 border border-slate-800">
-                        <div className="text-slate-400 text-[11px]">Ephemeral Storage</div>
+                        <div className="text-slate-400 text-[11px]">Ephemeral Storage (Gi/Ti)</div>
                         <div className="text-lg font-bold text-amber-300 mt-1">
-                          {diagnostics.allocatable.ephemeralStorage || '-'}
+                          {formatStorage(diagnostics.allocatable.ephemeralStorage)}
                         </div>
-                        <div className="text-[10px] text-slate-500 mt-0.5">Capacity: {diagnostics.capacity.ephemeralStorage || '-'}</div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">Capacity: {formatStorage(diagnostics.capacity.ephemeralStorage)}</div>
                       </div>
                     </div>
                   </div>

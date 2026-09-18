@@ -16,7 +16,7 @@ import {
   NodeDebugDiagnostics,
   ContainerDebugState,
 } from '../types/k8s.js';
-import { formatAge, getStatusColor, formatMemoryToGi } from '../utils/formatters.js';
+import { formatAge, getStatusColor, formatMemoryToGi, formatStorage } from '../utils/formatters.js';
 import { SemverSorter } from './semver-sorter.js';
 import { KubeHttpClient, getResourceApiPath, getApiPathForResource } from './kube-http-client.js';
 
@@ -188,16 +188,36 @@ function formatDescribeOutput(kind: string, name: string, namespace: string, dat
       }
       if (c.resources) {
         if (c.resources.requests) {
-          lines.push(`    Requests:    cpu=${c.resources.requests.cpu || '-'}, memory=${formatMemoryToGi(c.resources.requests.memory) || '-'}`);
+          const reqMem = formatMemoryToGi(c.resources.requests.memory);
+          const reqEph = c.resources.requests['ephemeral-storage'] ? `, ephemeral-storage=${formatStorage(c.resources.requests['ephemeral-storage'])}` : '';
+          lines.push(`    Requests:    cpu=${c.resources.requests.cpu || '-'}, memory=${reqMem || '-'}${reqEph}`);
         }
         if (c.resources.limits) {
-          lines.push(`    Limits:      cpu=${c.resources.limits.cpu || '-'}, memory=${formatMemoryToGi(c.resources.limits.memory) || '-'}`);
+          const limMem = formatMemoryToGi(c.resources.limits.memory);
+          const limEph = c.resources.limits['ephemeral-storage'] ? `, ephemeral-storage=${formatStorage(c.resources.limits['ephemeral-storage'])}` : '';
+          lines.push(`    Limits:      cpu=${c.resources.limits.cpu || '-'}, memory=${limMem || '-'}${limEph}`);
         }
       }
       if (c.env && c.env.length > 0) {
         lines.push(`    Environment: ${c.env.map((e: any) => `${e.name}=${e.value || (e.valueFrom ? '<valueFrom>' : '')}`).join(', ')}`);
       }
     }
+  }
+
+  // Node Capacity & Allocatable if describing a Node
+  if (status.capacity) {
+    lines.push(`Capacity:`);
+    lines.push(`  cpu:                ${status.capacity.cpu || '-'}`);
+    lines.push(`  ephemeral-storage:  ${formatStorage(status.capacity['ephemeral-storage']) || '-'}`);
+    lines.push(`  memory:             ${formatMemoryToGi(status.capacity.memory) || '-'}`);
+    lines.push(`  pods:               ${status.capacity.pods || '-'}`);
+  }
+  if (status.allocatable) {
+    lines.push(`Allocatable:`);
+    lines.push(`  cpu:                ${status.allocatable.cpu || '-'}`);
+    lines.push(`  ephemeral-storage:  ${formatStorage(status.allocatable['ephemeral-storage']) || '-'}`);
+    lines.push(`  memory:             ${formatMemoryToGi(status.allocatable.memory) || '-'}`);
+    lines.push(`  pods:               ${status.allocatable.pods || '-'}`);
   }
 
   // Conditions
@@ -433,7 +453,7 @@ export class OcClient {
 
         case 'routes': {
           // Supports both OpenShift Route and Kubernetes Ingress
-          const isRoute = raw.kind === 'Route' || raw.spec?.host !== undefined;
+          const isRoute = raw.kind === 'Route' || (raw.spec?.host !== undefined && !raw.spec?.rules);
           const host = isRoute ? raw.spec?.host || '' : raw.spec?.rules?.[0]?.host || '';
           const pathStr = isRoute ? raw.spec?.path || '' : raw.spec?.rules?.[0]?.http?.paths?.[0]?.path || '';
           const toService = isRoute ? raw.spec?.to?.name || '' : raw.spec?.rules?.[0]?.http?.paths?.[0]?.backend?.service?.name || '';
@@ -452,8 +472,43 @@ export class OcClient {
               host,
               path: pathStr,
               toService,
+              targetService: toService,
               tls,
               url: host ? `${isTls ? 'https' : 'http'}://${host}${pathStr}` : '',
+            },
+            labels: raw.metadata?.labels || {},
+            raw,
+          };
+        }
+
+        case 'ingresses': {
+          const rules = raw.spec?.rules || [];
+          const hosts = rules.map((r: any) => r.host).filter(Boolean);
+          const hostDisplay = hosts.length > 0 ? hosts.join(', ') : (raw.status?.loadBalancer?.ingress?.[0]?.hostname || raw.status?.loadBalancer?.ingress?.[0]?.ip || '*');
+          const firstHost = hosts[0] || raw.status?.loadBalancer?.ingress?.[0]?.hostname || raw.status?.loadBalancer?.ingress?.[0]?.ip || '';
+          const pathStr = rules[0]?.http?.paths?.[0]?.path || '/';
+          const targetService = rules[0]?.http?.paths?.[0]?.backend?.service?.name || raw.spec?.defaultBackend?.service?.name || '-';
+          const isTls = !!(raw.spec?.tls && Array.isArray(raw.spec.tls) && raw.spec.tls.length > 0);
+          const tls = isTls ? 'TLS' : 'None';
+          const ingressClass = raw.spec?.ingressClassName || raw.metadata?.annotations?.['kubernetes.io/ingress.class'] || '-';
+          const url = firstHost && firstHost !== '*' ? `${isTls ? 'https' : 'http'}://${firstHost}${pathStr}` : '';
+
+          return {
+            id: `${ns}/${name}`,
+            name,
+            namespace: ns,
+            kind,
+            status: hostDisplay && hostDisplay !== '*' ? 'Exposed' : 'Unexposed',
+            statusColor: (hostDisplay && hostDisplay !== '*' ? 'green' : 'yellow') as 'green' | 'yellow',
+            age,
+            extra: {
+              host: hostDisplay,
+              path: pathStr,
+              targetService,
+              toService: targetService,
+              tls,
+              ingressClass,
+              url,
             },
             labels: raw.metadata?.labels || {},
             raw,
@@ -622,6 +677,8 @@ export class OcClient {
               allocatableMemory: formatMemoryToGi(raw.status?.allocatable?.memory),
               cpu: raw.status?.capacity?.cpu || '-',
               allocatableCpu: raw.status?.allocatable?.cpu || '-',
+              ephemeralStorage: formatStorage(raw.status?.capacity?.['ephemeral-storage']),
+              allocatableEphemeralStorage: formatStorage(raw.status?.allocatable?.['ephemeral-storage']),
             },
             labels: raw.metadata?.labels || {},
             raw,
@@ -2214,14 +2271,14 @@ spec:
         cpu: nodeJson.status?.capacity?.cpu || '-',
         memory: formatMemoryToGi(nodeJson.status?.capacity?.memory),
         pods: nodeJson.status?.capacity?.pods || '-',
-        ephemeralStorage: nodeJson.status?.capacity?.['ephemeral-storage'] || '-',
+        ephemeralStorage: formatStorage(nodeJson.status?.capacity?.['ephemeral-storage']),
       };
 
       const allocatable = {
         cpu: nodeJson.status?.allocatable?.cpu || '-',
         memory: formatMemoryToGi(nodeJson.status?.allocatable?.memory),
         pods: nodeJson.status?.allocatable?.pods || '-',
-        ephemeralStorage: nodeJson.status?.allocatable?.['ephemeral-storage'] || '-',
+        ephemeralStorage: formatStorage(nodeJson.status?.allocatable?.['ephemeral-storage']),
       };
 
       const nodeInfo = nodeJson.status?.nodeInfo || {};
@@ -2300,6 +2357,7 @@ spec:
       'statefulsets',
       'daemonsets',
       'routes',
+      'ingresses',
       'services',
       'networkpolicies',
       'pvc',

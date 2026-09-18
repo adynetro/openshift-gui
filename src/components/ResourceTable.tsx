@@ -89,6 +89,7 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
         );
 
       case 'routes':
+      case 'ingresses':
         return (
           <Box borderStyle="bold" borderColor="gray">
             <Text bold color="white">
@@ -228,6 +229,7 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
         break;
 
       case 'routes':
+      case 'ingresses':
         content = (
           <Text>
             <Text color={isSelected ? 'cyan' : 'white'} bold={isSelected}>
