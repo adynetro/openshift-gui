@@ -1813,6 +1813,167 @@ spec:
     }
   }
 
+  // API Explorer: Discover all API groups and their resources
+  static async getApiGroups(): Promise<{
+    groups: Array<{
+      name: string; // e.g. 'apps', 'v1' (core), 'batch'
+      preferredVersion: string; // e.g. 'v1', 'v1beta1'
+      versions: string[]; // all available versions
+    }>;
+    error?: string;
+  }> {
+    try {
+      // 1. Fetch /api to get core API (v1)
+      const coreRes = await KubeHttpClient.requestJson<any>('/api');
+      let groups = [];
+      
+      if (!coreRes.error && coreRes.data?.versions?.includes('v1')) {
+        groups.push({
+          name: '', // core API has no group name in the path
+          preferredVersion: 'v1',
+          versions: coreRes.data.versions
+        });
+      }
+
+      // 2. Fetch /apis to get all API groups
+      const apisRes = await KubeHttpClient.requestJson<any>('/apis');
+      if (!apisRes.error && apisRes.data?.groups) {
+        const otherGroups = apisRes.data.groups.map((g: any) => ({
+          name: g.name,
+          preferredVersion: g.preferredVersion?.version || g.versions?.[0]?.version,
+          versions: g.versions?.map((v: any) => v.version) || []
+        }));
+        groups = [...groups, ...otherGroups];
+      }
+
+      return { groups };
+    } catch (err: any) {
+      return { groups: [], error: err.message || 'Failed to fetch API groups' };
+    }
+  }
+
+  static async getApiGroupResources(group: string, version: string): Promise<{
+    resources: Array<{
+      name: string;
+      singularName: string;
+      kind: string;
+      namespaced: boolean;
+      verbs: string[];
+      shortNames?: string[];
+      group: string;
+      version: string;
+      isCrd?: boolean;
+    }>;
+    error?: string;
+  }> {
+    try {
+      const endpoint = group === '' ? `/api/${version}` : `/apis/${group}/${version}`;
+      const res = await KubeHttpClient.requestJson<any>(endpoint);
+      
+      if (res.error) {
+        return { resources: [], error: res.error };
+      }
+
+      const resources = (res.data?.resources || [])
+        .filter((r: any) => r.verbs && r.verbs.includes('list') && !r.name.includes('/'))
+        .map((r: any) => ({
+          name: r.name,
+          singularName: r.singularName || r.name.replace(/s$/, ''),
+          kind: r.kind,
+          namespaced: r.namespaced,
+          verbs: r.verbs,
+          shortNames: r.shortNames,
+          group,
+          version,
+          isCrd: group !== '' && group.includes('.') // Crude heuristic for CRD
+        }));
+
+      return { resources };
+    } catch (err: any) {
+      return { resources: [], error: err.message || 'Failed to fetch API group resources' };
+    }
+  }
+
+  static async listAnyResource(group: string, version: string, plural: string, namespaced: boolean, namespace: string): Promise<{
+    items: any[];
+    error?: string;
+  }> {
+    try {
+      let endpoint = group === '' ? `/api/${version}` : `/apis/${group}/${version}`;
+      
+      if (namespaced && namespace && namespace !== 'all-projects') {
+        endpoint += `/namespaces/${namespace}`;
+      }
+      
+      endpoint += `/${plural}`;
+      
+      const res = await KubeHttpClient.requestJson<any>(endpoint);
+      
+      if (res.error) {
+        return { items: [], error: res.error };
+      }
+
+      return { items: res.data?.items || [] };
+    } catch (err: any) {
+      return { items: [], error: err.message || 'Failed to list resource' };
+    }
+  }
+
+  static async getAnyResource(group: string, version: string, plural: string, name: string, namespaced: boolean, namespace: string): Promise<{
+    data?: any;
+    error?: string;
+  }> {
+    try {
+      let endpoint = group === '' ? `/api/${version}` : `/apis/${group}/${version}`;
+      
+      if (namespaced && namespace && namespace !== 'all-projects') {
+        endpoint += `/namespaces/${namespace}`;
+      }
+      
+      endpoint += `/${plural}/${name}`;
+      
+      const res = await KubeHttpClient.requestJson<any>(endpoint);
+      
+      if (res.error) {
+        return { error: res.error };
+      }
+
+      return { data: res.data };
+    } catch (err: any) {
+      return { error: err.message || 'Failed to get resource' };
+    }
+  }
+
+  static async patchAnyResource(group: string, version: string, plural: string, name: string, namespaced: boolean, namespace: string, patch: any): Promise<{
+    success: boolean;
+    data?: any;
+    error?: string;
+  }> {
+    try {
+      let endpoint = group === '' ? `/api/${version}` : `/apis/${group}/${version}`;
+      
+      if (namespaced && namespace && namespace !== 'all-projects') {
+        endpoint += `/namespaces/${namespace}`;
+      }
+      
+      endpoint += `/${plural}/${name}`;
+      
+      const res = await KubeHttpClient.requestJson<any>(endpoint, {
+        method: 'PATCH',
+        body: JSON.stringify(patch),
+        contentType: 'application/merge-patch+json',
+      });
+      
+      if (res.error) {
+        return { success: false, error: res.error };
+      }
+
+      return { success: true, data: res.data };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to patch resource' };
+    }
+  }
+
   /**
    * Fetches all Custom Resource instances for a given CRD name.
    */

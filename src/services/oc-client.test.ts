@@ -35,4 +35,19 @@ describe("OcClient.sanitizeRegistryUrl", () => {
     assert.ok(Array.isArray(res.allContainers));
     assert.equal(typeof res.resolvedNamespace, 'string');
   });
+
+  it("should handle getApiGroups safely when cluster is not connected", async () => {
+    const res = await OcClient.getApiGroups();
+    assert.ok(Array.isArray(res.groups));
+  });
+
+  it("should handle getApiGroupResources safely", async () => {
+    const res = await OcClient.getApiGroupResources("apps", "v1");
+    assert.ok(Array.isArray(res.resources));
+  });
+
+  it("should handle listAnyResource safely", async () => {
+    const res = await OcClient.listAnyResource("apps", "v1", "deployments", true, "default");
+    assert.ok(Array.isArray(res.items));
+  });
 });

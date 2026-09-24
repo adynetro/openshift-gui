@@ -124,6 +124,27 @@ export function registerIpcHandlers(mainWindow: electron.BrowserWindow): void {
     return await OcClient.getCrdInstances(crdName, namespace);
   });
 
+  // API Explorer Handlers
+  ipcMain.handle('apiExplorer:getApiGroups', async () => {
+    return await OcClient.getApiGroups();
+  });
+
+  ipcMain.handle('apiExplorer:getGroupResources', async (_event, group: string, version: string) => {
+    return await OcClient.getApiGroupResources(group, version);
+  });
+
+  ipcMain.handle('apiExplorer:listInstances', async (_event, group: string, version: string, plural: string, namespaced: boolean, namespace: string) => {
+    return await OcClient.listAnyResource(group, version, plural, namespaced, namespace);
+  });
+
+  ipcMain.handle('apiExplorer:getResource', async (_event, group: string, version: string, plural: string, name: string, namespaced: boolean, namespace: string) => {
+    return await OcClient.getAnyResource(group, version, plural, name, namespaced, namespace);
+  });
+
+  ipcMain.handle('apiExplorer:patchResource', async (_event, group: string, version: string, plural: string, name: string, namespaced: boolean, namespace: string, patch: any) => {
+    return await OcClient.patchAnyResource(group, version, plural, name, namespaced, namespace, patch);
+  });
+
   // Cluster Operator Events Handler
   ipcMain.handle('operator:getEvents', async (_event, operatorName: string) => {
     return await OcClient.getClusterOperatorEvents(operatorName);

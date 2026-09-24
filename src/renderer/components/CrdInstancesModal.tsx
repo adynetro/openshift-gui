@@ -23,6 +23,7 @@ interface CrdInstancesModalProps {
   onEditInstance: (item: ResourceItem) => void;
   onDescribeInstance: (item: ResourceItem) => void;
   onDeleteInstance: (item: ResourceItem) => void;
+  onOpenApiExplorer?: () => void;
 }
 
 export const CrdInstancesModal: React.FC<CrdInstancesModalProps> = ({
@@ -32,6 +33,7 @@ export const CrdInstancesModal: React.FC<CrdInstancesModalProps> = ({
   onEditInstance,
   onDescribeInstance,
   onDeleteInstance,
+  onOpenApiExplorer,
 }) => {
   const [items, setItems] = useState<ResourceItem[]>([]);
   const [scope, setScope] = useState<string>('Namespaced');
@@ -131,6 +133,17 @@ export const CrdInstancesModal: React.FC<CrdInstancesModalProps> = ({
 
           {/* Search and Close */}
           <div className="flex items-center gap-3">
+            {onOpenApiExplorer && (
+              <button
+                onClick={onOpenApiExplorer}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono bg-purple-950/70 hover:bg-purple-900 border border-purple-800 text-purple-200 transition-colors shadow-sm"
+                title="Explore this CRD in API Object Explorer with deep list editing"
+              >
+                <Layers size={13} className="text-purple-400" />
+                <span>API Explorer</span>
+              </button>
+            )}
+
             <div className="relative w-64">
               <Search className="absolute left-2.5 top-2 text-[var(--text-muted,#94a3b8)]" size={14} />
               <input

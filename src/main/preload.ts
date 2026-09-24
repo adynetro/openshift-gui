@@ -122,6 +122,13 @@ export interface IpcApi {
     version?: string;
     user?: string;
   }>;
+
+  // API Explorer
+  getApiGroups: () => Promise<{ groups: Array<{ name: string; preferredVersion: string; versions: string[] }>; error?: string }>;
+  getApiGroupResources: (group: string, version: string) => Promise<{ resources: Array<{ name: string; singularName: string; kind: string; namespaced: boolean; verbs: string[]; shortNames?: string[]; group: string; version: string; isCrd?: boolean }>; error?: string }>;
+  listApiExplorerInstances: (group: string, version: string, plural: string, namespaced: boolean, namespace: string) => Promise<{ items: any[]; error?: string }>;
+  getApiExplorerResource: (group: string, version: string, plural: string, name: string, namespaced: boolean, namespace: string) => Promise<{ data?: any; error?: string }>;
+  patchApiExplorerResource: (group: string, version: string, plural: string, name: string, namespaced: boolean, namespace: string, patch: any) => Promise<{ success: boolean; data?: any; error?: string }>;
 }
 
 const api: IpcApi = {
@@ -193,6 +200,13 @@ const api: IpcApi = {
   loginCluster: (options) => ipcRenderer.invoke('kube:login', options),
   importKubeConfig: (yamlContent, setActive) => ipcRenderer.invoke('kube:importConfig', yamlContent, setActive),
   testConnection: () => ipcRenderer.invoke('kube:testConnection'),
+  
+  // API Explorer
+  getApiGroups: () => ipcRenderer.invoke('apiExplorer:getApiGroups'),
+  getApiGroupResources: (group, version) => ipcRenderer.invoke('apiExplorer:getGroupResources', group, version),
+  listApiExplorerInstances: (group, version, plural, namespaced, namespace) => ipcRenderer.invoke('apiExplorer:listInstances', group, version, plural, namespaced, namespace),
+  getApiExplorerResource: (group, version, plural, name, namespaced, namespace) => ipcRenderer.invoke('apiExplorer:getResource', group, version, plural, name, namespaced, namespace),
+  patchApiExplorerResource: (group, version, plural, name, namespaced, namespace, patch) => ipcRenderer.invoke('apiExplorer:patchResource', group, version, plural, name, namespaced, namespace, patch),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', api);

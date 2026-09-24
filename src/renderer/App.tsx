@@ -17,6 +17,7 @@ const SecretEditorModal = lazy(() => import('./components/SecretEditorModal.js')
 const NetworkPolicyDesignerModal = lazy(() => import('./components/NetworkPolicyDesignerModal.js').then((m) => ({ default: m.NetworkPolicyDesignerModal })));
 const ResizePvcModal = lazy(() => import('./components/ResizePvcModal.js').then((m) => ({ default: m.ResizePvcModal })));
 const CrdInstancesModal = lazy(() => import('./components/CrdInstancesModal.js').then((m) => ({ default: m.CrdInstancesModal })));
+const ApiExplorerModal = lazy(() => import('./components/ApiExplorerModal.js').then((m) => ({ default: m.ApiExplorerModal })));
 const PodTerminalModal = lazy(() => import('./components/PodTerminalModal.js').then((m) => ({ default: m.PodTerminalModal })));
 const AddAppWizardModal = lazy(() => import('./components/AddAppWizardModal.js').then((m) => ({ default: m.AddAppWizardModal })));
 const PodDebugModal = lazy(() => import('./components/PodDebugModal.js').then((m) => ({ default: m.PodDebugModal })));
@@ -50,6 +51,7 @@ type ModalMode =
   | 'edit-secret'
   | 'resize-pvc'
   | 'crd-instances'
+  | 'api-explorer'
   | 'describe'
   | 'scale'
   | 'restart'
@@ -630,6 +632,9 @@ export const App: React.FC = () => {
       case 'crd-instances':
         openModal('crd-instances', item);
         break;
+      case 'api-explorer':
+        openModal('api-explorer', null);
+        break;
       case 'logs':
         openModal('logs', item);
         break;
@@ -738,6 +743,10 @@ export const App: React.FC = () => {
       else if (e.key === 'o') setCurrentKind('clusteroperators');
       else if (e.key === 'e') setCurrentKind('events');
       else if (e.key === 'a') openModal('add-app');
+      else if (e.key === 'x') {
+        e.preventDefault();
+        openModal('api-explorer', null);
+      }
       else if (e.key === '?') openModal('help');
     };
 
@@ -777,6 +786,7 @@ export const App: React.FC = () => {
           onSelectKind={(kind) => setCurrentKind(kind)}
           counts={counts}
           onOpenHelp={() => openModal('help')}
+          onOpenApiExplorer={() => openModal('api-explorer', null)}
         />
 
         {/* Center Main Content Area */}
@@ -1130,6 +1140,19 @@ export const App: React.FC = () => {
             onEditInstance={(inst) => openModal('edit-yaml', inst)}
             onDescribeInstance={(inst) => openModal('describe', inst)}
             onDeleteInstance={(inst) => openModal('delete', inst)}
+            onOpenApiExplorer={() => openModal('api-explorer', selectedItem)}
+          />
+        )}
+
+        {/* API Object Explorer — Browse all resource types, drill into objects, edit inline */}
+        {modalMode === 'api-explorer' && (
+          <ApiExplorerModal
+            namespace={currentProject}
+            onClose={closeModal}
+            onEditYaml={(inst) => openModal('edit-yaml', inst)}
+            initialGroup={selectedItem?.extra?.group}
+            initialKind={selectedItem?.extra?.crdKind || (selectedItem?.kind === 'crd' ? selectedItem?.name : undefined)}
+            initialName={selectedItem?.extra?.crdKind ? selectedItem?.name : undefined}
           />
         )}
 

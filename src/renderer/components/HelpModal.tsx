@@ -47,6 +47,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
       items: [
         { key: "c", desc: "Open Context Switcher Modal" },
         { key: "p", desc: "Open Project / Namespace Switcher" },
+        { key: "x", desc: "Open API Object Explorer & CRD Deep-Dive" },
         { key: "/", desc: "Focus Instant Search / Autocomplete Bar" },
         { key: "?", desc: "Open Keyboard Shortcuts & Help" },
         { key: "Esc", desc: "Close Active Modal / Clear Selection" },

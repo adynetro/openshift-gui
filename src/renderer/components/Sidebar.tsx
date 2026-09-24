@@ -27,6 +27,7 @@ interface SidebarProps {
   onSelectKind: (kind: ResourceKind) => void;
   counts: Partial<Record<ResourceKind, number>>;
   onOpenHelp: () => void;
+  onOpenApiExplorer?: () => void;
 }
 
 interface NavItem {
@@ -103,8 +104,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectKind,
   counts,
   onOpenHelp,
+  onOpenApiExplorer,
 }) => {
-  const displayVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.0.5';
+  const displayVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.2.0';
 
   return (
     <aside
@@ -187,6 +189,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
         className="p-3 border-t space-y-2 shrink-0 transition-colors"
         style={{ borderColor: 'var(--border-color, #1e293b)' }}
       >
+        {/* API Explorer & CRDs Quick Button */}
+        {onOpenApiExplorer && (
+          <button
+            onClick={onOpenApiExplorer}
+            className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-purple-950/70 to-indigo-950/70 hover:from-purple-900/80 hover:to-indigo-900/80 text-purple-200 border border-purple-800/60 transition-all shadow-sm group"
+            title="Explore all Kubernetes & OpenShift API resources and CRDs (Press 'x')"
+          >
+            <div className="flex items-center space-x-2">
+              <Layers size={14} className="text-purple-400 group-hover:rotate-12 transition-transform" />
+              <span>API Explorer & CRDs</span>
+            </div>
+            <span
+              className="text-[10px] font-mono px-1.5 py-0.2 rounded border border-purple-800 bg-purple-950 text-purple-300 font-bold"
+            >
+              x
+            </span>
+          </button>
+        )}
+
         {/* Theme Selector placed right above Shortcuts & Help */}
         <div className="w-full">
           <ThemeSelector />

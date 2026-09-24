@@ -10,55 +10,34 @@ const token = execSync('printf "protocol=https\\nhost=github.com\\n" | git crede
 
 const repo = 'adynetro/openshift-gui';
 const tagName = `v${VERSION}`;
-const releaseName = `OpenShift GUI v${VERSION} - Node Host Debugger, Port Forwarding, GUI Cluster Login, Direct Replica Input & Gi Memory`;
+const releaseName = `OpenShift GUI v${VERSION} - API Object Explorer, CRD Browser & Deep List Editor`;
 
-const releaseBody = `## 🚀 OpenShift GUI v${VERSION} - Node Host Debugger, Port Forwarding & GUI Login
+const releaseBody = `## 🚀 OpenShift GUI v${VERSION} - API Object Explorer, CRD Browser & Deep List Editor
 
-### 🛠️ Node Host Debugger Pod Auto-Spawning & Zero 404 Resolution
-- **Privileged Host Debugger Pod**: When initiating host debug on any Kubernetes/OpenShift node, OpenShift GUI automatically discovers or provisions a privileged debug pod (\`node-debugger-<nodeName>\`) running directly on that specific node with host filesystem mounted at \`/host\`, full host networking, PID, IPC, and automatic \`chroot /host\` shell initiation.
-- **Air-Gapped & Enterprise Cluster Image Re-use**: Automatically scans and reuses container images already cached on the target node to prevent \`ImagePullBackOff\` or external registry dependencies.
-- **Automatic Lifecycle Clean-up**: Automatically removes temporary debug pods on terminal session termination to keep clusters clean.
+### 🧭 API Object Explorer & CRD Browser
+- **Dynamic API Group Discovery**: Dynamically scans and maps all Kubernetes and OpenShift API groups (\`/api\` and \`/apis\`), including standard core resources (\`apps\`, \`batch\`, \`networking.k8s.io\`, \`route.openshift.io\`, etc.) and all Custom Resource Definitions.
+- **Side-by-Side CRD Integration**: First-class browsing of third-party CRDs (Operators, Cert-Manager, ArgoCD, Knative, Istio, etc.) alongside core Kubernetes resources with a dedicated **CRDs Only** filter tab and purple CRD badges.
+- **Cluster & Namespaced Scoping**: Clear visual indicators for Namespaced vs Cluster-scoped resources with instant project-level or cluster-wide filtering.
+- **Resource Instances Overview**: Live instance listing showing status indicators, ages, namespace affiliations, and quick YAML handoff.
 
-### 🌐 Native Kubernetes Ingresses Explorer & Routing
-- **Dedicated Ingresses View**: First-class support for Kubernetes Ingress resources under **Networking** (Hotkey: \`g\`) alongside OpenShift Routes, Services, and NetworkPolicies.
-- **Rich Ingress Insights**: View exposed hosts, routing paths, ingress classes, backend services, and TLS certificates with 1-click external browser launch and jump-to-service navigation.
-- **Ingress Port Forwarding**: Direct 1-click background port forwarding from any Ingress or Route to your local machine.
+### 🔍 Deep Nested List & Object Drilldown
+- **Smart List Item Labeling**: Dissects opaque array indices into human-readable descriptor pills (e.g. \`containers[0] frontend\`, \`env[1] DB_HOST\`, \`ports[0] port 8080\`, \`volumeMounts[0] /data\`).
+- **Interactive Breadcrumb Navigation**: Full hierarchical path trail (\`root > spec > template > spec > containers > [0] > env\`) with 1-click jump-to-ancestor navigation.
+- **Focus / Zoom In**: 1-click zoom directly into any nested list or object to inspect, re-order, and edit complex configs without distraction or layout clutter.
+- **Interactive Search Filter**: Instant field search within inspected objects and lists to immediately locate specific keys (e.g., \`image\`, \`cpu\`, \`replicas\`).
 
-### 🔌 Ingress, Route & Service Port Forwarding Manager
-- **Live Background Port Forwarding**: Effortlessly forward ports from any Kubernetes/OpenShift **Service**, **Route**, or **Pod** directly to your local workstation.
-- **Port Auto-Detection**: Automatically detects target container and service ports (\`80\`, \`443\`, \`8080\`, \`8443\`, \`3000\`, \`5432\`, \`3306\`, etc.) and assigns optimal local ports.
-- **Interactive Management Modal**: Monitor active tunnels, copy \`localhost:<port>\` URLs with 1-click, open web endpoints directly in your default browser, and terminate individual or all active port-forward sessions cleanly.
-- **Quick Action Triggers**: Instant **Port Forward** action button on Services and Routes in the resource explorer and search bar.
+### ✏️ Inline Field & List Editing with Atomic Merge Patching
+- **Direct Primitive Editing**: Double-click or click pencil to edit strings, numbers, booleans, and nulls with automatic type coercion.
+- **1-Click Boolean Toggling**: Instant toggle switches for boolean parameters.
+- **Add / Remove List Items & Fields**: Effortlessly append new items to arrays or add new key-value pairs to objects directly from the tree view.
+- **Atomic JSON Merge Patch**: Tracks all pending modifications and commits changes to the Kubernetes cluster using native JSON Merge Patch (\`application/merge-patch+json\`).
+- **1-Click Full YAML Hand-Off**: Switch directly from the object tree explorer to the CodeMirror YAML Editor at any time.
 
-### 🔐 GUI Cluster Login & Kubeconfig Importer
-- **Smart \`oc login\` Command Parser**: Simply paste any \`oc login\` command (e.g. \`oc login https://api.cluster.example.com:6443 --token=sha256~... --insecure-skip-tls-verify=true\`) and OpenShift GUI automatically parses the server URL, token, username, password, namespace, and certificate options.
-- **Direct Bearer Token & Basic Auth**: Connect directly to remote OpenShift, Kubernetes, and Rancher clusters from the GUI without needing the \`oc\` CLI installed.
-- **Full Kubeconfig YAML / JSON Importer**: Paste raw YAML/JSON kubeconfig manifests into the GUI to safely merge clusters, users, and contexts into \`~/.kube/config\` with automatic timestamped backups.
-- **1-Click Context Activation**: Automatically switches the active context and synchronizes projects immediately after login or import.
-
-### 🔢 Direct Workload Replicas Input & Presets
-- **Editable Replica Input Textbox**: Directly type the exact desired replica count (e.g. \`0\`, \`5\`, \`25\`, \`100\`) into an interactive text box.
-- **Instant Scaling Presets**: 1-click quick presets for common replica targets: \`0 (Stop / Scale Down)\`, \`1\`, \`2\`, \`3\`, \`5\`, and \`10\`.
-- **Enhanced Keyboard Workflow**: Press \`Enter\` directly from the text box to execute scaling immediately.
-- **Dynamic Adaptive Range Slider**: Slider range automatically adjusts to match higher replica targets.
-
-### 💻 Open Pod Console in OS Default Terminal
-- **Native Host Terminal Launch**: Launch interactive pod shell sessions directly in your host operating system's native terminal emulator:
-  - **macOS**: Opens in macOS Terminal.app or iTerm2.
-  - **Windows**: Opens in Windows Terminal (\`wt.exe\`), PowerShell, or CMD.
-  - **Linux**: Opens in \`x-terminal-emulator\`, \`gnome-terminal\`, \`konsole\`, \`xfce4-terminal\`, \`alacritty\`, \`kitty\`, or \`xterm\`.
-- **Automatic Fallback Command Copy**: If no supported terminal emulator is found, automatically copies the connection command to clipboard and notifies the user.
-
-### 💾 Download Complete Un-Truncated Logs
-- **1-Click Log File Export**: Download the complete, un-truncated log history for any container, pod, or workload directly to a timestamped \`.log\` file.
-- **Streamlined Log Viewer Integration**: Dedicated **Download Logs** button in the Log Viewer modal header.
-
-### 📊 Normalized Memory & Ephemeral Storage in Gi / Ti (Not Ki)
-- **Human-Readable Gi & Ti Display**: All memory and ephemeral-storage capacity, allocatable resources, node metrics, pod limits, container requests, and describe outputs are cleanly normalized to \`Gi\` and \`Ti\` (or \`Gb\` / \`Tb\`) instead of raw, unreadable \`Ki\` or byte counts.
-- **Node Diagnostics & Debug Cards**: Clear Gi and Ti capacity and allocatable gauges in Node Host Debug and Pod Diagnostics modals.
-
-### 🏷️ Friendly Cluster Name Context Display
-- **Display \`clusters.name\` Instead of Raw URL**: Top navigation bar, cluster switcher modal, and server cards prominently display the friendly cluster name (\`clusters[].name\` / \`context.cluster\`) rather than raw \`https://...\` server URLs.
+### ⚡ Quick Navigation & Shortcuts
+- **Sidebar Access**: Dedicated **API Explorer & CRDs** button in the sidebar footer.
+- **Global Hotkey (\`x\`)**: Press \`x\` from any screen to open the API Explorer instantly.
+- **CRD Modal Jump**: Jump straight into the API Explorer from the CRD instances modal header.
+- **Shortcuts & Help Modal**: Documented \`x\` hotkey under the help modal.
 
 ---
 
