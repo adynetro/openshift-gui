@@ -695,7 +695,21 @@ export const ApiExplorerModal: React.FC<ApiExplorerModalProps> = ({
         );
         if (res.data) {
           setSelectedInstance(res.data);
-          setExpandedPaths(new Set(['metadata', 'spec', 'status']));
+          
+          // Auto-expand all infos when opening as requested by user
+          const allPaths = new Set<string>();
+          const walk = (obj: any, prefix: string) => {
+            if (obj && typeof obj === 'object') {
+              if (prefix) allPaths.add(prefix);
+              if (Array.isArray(obj)) {
+                obj.forEach((child, idx) => walk(child, prefix ? `${prefix}.${idx}` : `${idx}`));
+              } else {
+                Object.keys(obj).forEach((k) => walk(obj[k], prefix ? `${prefix}.${k}` : k));
+              }
+            }
+          };
+          walk(res.data, '');
+          setExpandedPaths(allPaths);
           setPendingPatches(new Map());
         } else if (res.error) {
           setError(res.error);
@@ -707,6 +721,49 @@ export const ApiExplorerModal: React.FC<ApiExplorerModalProps> = ({
       }
     },
     [selectedResource, namespace]
+  );
+
+  // ── Delete Resource (CRDs and any API resources) ──
+  const handleDeleteResource = useCallback(
+    async (item: any) => {
+      const name = item?.metadata?.name;
+      const rawNs = item?.metadata?.namespace;
+      const targetNs = rawNs && rawNs !== 'all-projects' && rawNs !== 'cluster'
+        ? rawNs
+        : (selectedResource?.namespaced && namespace && namespace !== 'all-projects' ? namespace : '');
+
+      if (!selectedResource || !name) return;
+
+      const confirmed = window.confirm(
+        `Are you sure you want to delete ${selectedResource.kind} '${name}'${targetNs ? ` in namespace '${targetNs}'` : ''}?`
+      );
+      if (!confirmed) return;
+
+      try {
+        const res = await (window as any).electronAPI.deleteApiExplorerResource(
+          selectedResource.group,
+          selectedResource.version,
+          selectedResource.name,
+          name,
+          selectedResource.namespaced,
+          targetNs
+        );
+
+        if (res.success) {
+          showToast(`Deleted ${selectedResource.kind}/${name}`);
+          if (selectedInstance?.metadata?.name === name) {
+            setSelectedInstance(null);
+            setPendingPatches(new Map());
+          }
+          refreshInstances();
+        } else {
+          showToast(res.message || 'Failed to delete resource', 'error');
+        }
+      } catch (err: any) {
+        showToast(err.message || 'Failed to delete resource', 'error');
+      }
+    },
+    [selectedResource, namespace, selectedInstance, refreshInstances, showToast]
   );
 
   // ── Handle Initial Selection (e.g. from CRD view or query) ──
@@ -1320,6 +1377,16 @@ export const ApiExplorerModal: React.FC<ApiExplorerModalProps> = ({
                   <span className="text-[11px] font-mono text-[var(--text-main,#f8fafc)] font-bold truncate flex-1" title={name}>
                     {name}
                   </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteResource(item);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-rose-950/80 text-[var(--text-muted,#94a3b8)] hover:text-rose-400 transition-all"
+                    title={`Delete ${selectedResource.kind} ${name}`}
+                  >
+                    <Trash2 size={12} />
+                  </button>
                 </div>
                 <div className="flex items-center gap-2 mt-0.5 ml-3">
                   {ns && (
@@ -1418,13 +1485,23 @@ export const ApiExplorerModal: React.FC<ApiExplorerModalProps> = ({
               >
                 <Copy size={13} />
               </button>
+              <button
+                onClick={() => handleDeleteResource(selectedInstance)}
+                className="p-1 rounded hover:bg-rose-950/80 text-[var(--text-muted,#94a3b8)] hover:text-rose-400 transition-colors"
+                title={`Delete ${selectedResource?.kind} ${name}`}
+              >
+                <Trash2 size={13} />
+              </button>
               {onEditYaml && (
                 <button
                   onClick={() => {
+                    const targetNs = ns && ns !== 'all-projects' && ns !== 'cluster'
+                      ? ns
+                      : (selectedResource?.namespaced && namespace && namespace !== 'all-projects' ? namespace : '');
                     const ri = {
-                      id: `${ns}/${name}`,
+                      id: `${targetNs || ''}/${name}`,
                       name,
-                      namespace: ns || namespace,
+                      namespace: targetNs,
                       kind: (selectedResource?.name as any) || kind.toLowerCase(),
                       status: '',
                       age: '',

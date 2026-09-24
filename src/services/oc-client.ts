@@ -800,12 +800,40 @@ export class OcClient {
    */
   static async getYaml(kind: string, name: string, namespace: string): Promise<string> {
     try {
-      const ns = namespace && namespace !== 'all-projects' ? namespace : 'default';
-      const res = await KubeHttpClient.getResource(kind, name, ns);
+      const ns = namespace && namespace !== 'all-projects' && namespace !== 'cluster' ? namespace : '';
+      let res = await KubeHttpClient.getResource(kind, name, ns);
       if (res.data) {
         return stringifyYaml(res.data);
       }
-      return `# Resource ${kind}/${name} not found in namespace ${ns}`;
+
+      // Check if kind is a CRD (contains '.' e.g. certificates.cert-manager.io)
+      if (kind.includes('.')) {
+        const parts = kind.split('.');
+        const plural = parts[0];
+        const group = parts.slice(1).join('.');
+        const groupRes = await KubeHttpClient.requestJson<any>(`/apis/${group}`);
+        const version = groupRes.data?.preferredVersion?.version || groupRes.data?.versions?.[0]?.version || 'v1';
+        const endpoint = ns
+          ? `/apis/${group}/${version}/namespaces/${ns}/${plural}/${name}`
+          : `/apis/${group}/${version}/${plural}/${name}`;
+        res = await KubeHttpClient.requestJson<any>(endpoint);
+        if (res.data) {
+          return stringifyYaml(res.data);
+        }
+      }
+
+      // If ns was empty and resource wasn't found, try searching across all namespaces
+      if (!ns) {
+        const listRes = await KubeHttpClient.requestJson<any>(getResourceApiPath(kind));
+        if (listRes.data?.items) {
+          const found = listRes.data.items.find((item: any) => item.metadata?.name === name);
+          if (found) {
+            return stringifyYaml(found);
+          }
+        }
+      }
+
+      return `# Resource ${kind}/${name} not found${ns ? ` in namespace ${ns}` : ''}`;
     } catch (err: any) {
       return `# Failed to fetch YAML: ${err.message}`;
     }
@@ -1971,6 +1999,37 @@ spec:
       return { success: true, data: res.data };
     } catch (err: any) {
       return { success: false, error: err.message || 'Failed to patch resource' };
+    }
+  }
+
+  static async deleteAnyResource(
+    group: string,
+    version: string,
+    plural: string,
+    name: string,
+    namespaced: boolean,
+    namespace: string
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      let endpoint = group === '' ? `/api/${version}` : `/apis/${group}/${version}`;
+
+      if (namespaced && namespace && namespace !== 'all-projects' && namespace !== 'cluster') {
+        endpoint += `/namespaces/${namespace}`;
+      }
+
+      endpoint += `/${plural}/${name}`;
+
+      const res = await KubeHttpClient.requestJson<any>(endpoint, {
+        method: 'DELETE',
+      });
+
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        return { success: true, message: `Successfully deleted ${name}` };
+      }
+
+      return { success: false, message: res.error || `Failed to delete ${name}` };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Failed to delete resource' };
     }
   }
 

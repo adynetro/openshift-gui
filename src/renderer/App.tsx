@@ -734,7 +734,10 @@ export const App: React.FC = () => {
       else if (e.key === 'w') setCurrentKind('networkpolicies');
       else if (e.key === '9') setCurrentKind('pvc');
       else if (e.key === '0') setCurrentKind('pv');
-      else if (e.key === 'k') setCurrentKind('crd');
+      else if (e.key === 'k' || e.key === 'x') {
+        e.preventDefault();
+        openModal('api-explorer', null);
+      }
       else if (e.key === 'i') setCurrentKind('imagestreams');
       else if (e.key === 'h') setCurrentKind('helm');
       else if (e.key === 'c') setCurrentKind('configmaps');
@@ -743,10 +746,6 @@ export const App: React.FC = () => {
       else if (e.key === 'o') setCurrentKind('clusteroperators');
       else if (e.key === 'e') setCurrentKind('events');
       else if (e.key === 'a') openModal('add-app');
-      else if (e.key === 'x') {
-        e.preventDefault();
-        openModal('api-explorer', null);
-      }
       else if (e.key === '?') openModal('help');
     };
 
@@ -1071,7 +1070,11 @@ export const App: React.FC = () => {
         {modalMode === 'edit-yaml' && selectedItem && (
           <EditYamlModal
             item={selectedItem}
-            namespace={selectedItem.namespace || currentProject}
+            namespace={
+              selectedItem.namespace && selectedItem.namespace !== 'all-projects' && selectedItem.namespace !== 'cluster'
+                ? selectedItem.namespace
+                : (currentProject !== 'all-projects' ? currentProject : '')
+            }
             onClose={closeModal}
             onSuccess={(msg) => {
               showToast(msg, 'success');

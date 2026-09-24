@@ -145,6 +145,10 @@ export function registerIpcHandlers(mainWindow: electron.BrowserWindow): void {
     return await OcClient.patchAnyResource(group, version, plural, name, namespaced, namespace, patch);
   });
 
+  ipcMain.handle('apiExplorer:deleteResource', async (_event, group: string, version: string, plural: string, name: string, namespaced: boolean, namespace: string) => {
+    return await OcClient.deleteAnyResource(group, version, plural, name, namespaced, namespace);
+  });
+
   // Cluster Operator Events Handler
   ipcMain.handle('operator:getEvents', async (_event, operatorName: string) => {
     return await OcClient.getClusterOperatorEvents(operatorName);

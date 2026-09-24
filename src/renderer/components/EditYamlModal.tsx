@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { X, Save, FileCode2, RefreshCw, AlertTriangle, CheckCircle2, Copy, Check, RotateCcw, ShieldCheck } from "lucide-react";
 import CodeMirror from "@uiw/react-codemirror";
 import { yaml } from "@codemirror/lang-yaml";
-import { parseAllDocuments } from "yaml";
+import { parseAllDocuments, stringify } from "yaml";
 import { ResourceItem } from "../../types/k8s.js";
 import { useCurrentTheme } from "../utils/themes.js";
 
@@ -32,6 +32,14 @@ export const EditYamlModal: React.FC<EditYamlModalProps> = ({
     async function loadData() {
       setLoading(true);
       try {
+        if (item.raw) {
+          const text = stringify(item.raw);
+          setYamlText(text);
+          setOriginalYaml(text);
+          setLoading(false);
+          return;
+        }
+
         let cmdKind: string = item.kind;
         if (cmdKind === "deploymentconfigs") cmdKind = "dc";
         if (cmdKind === "imagestreams") cmdKind = "is";
@@ -39,7 +47,11 @@ export const EditYamlModal: React.FC<EditYamlModalProps> = ({
         if (cmdKind === "daemonsets") cmdKind = "ds";
         if (cmdKind === "configmaps") cmdKind = "cm";
 
-        const text = await (window as any).electronAPI.getYaml(cmdKind, item.name, namespace);
+        const targetNs = item.namespace && item.namespace !== "all-projects" && item.namespace !== "cluster"
+          ? item.namespace
+          : (namespace && namespace !== "all-projects" ? namespace : "");
+
+        const text = await (window as any).electronAPI.getYaml(cmdKind, item.name, targetNs);
         setYamlText(text);
         setOriginalYaml(text);
       } catch (err: any) {
@@ -83,7 +95,10 @@ export const EditYamlModal: React.FC<EditYamlModalProps> = ({
     setStatusMessage(null);
 
     try {
-      const res = await (window as any).electronAPI.applyYaml(yamlText, namespace);
+      const targetNs = item.namespace && item.namespace !== "all-projects" && item.namespace !== "cluster"
+        ? item.namespace
+        : (namespace && namespace !== "all-projects" ? namespace : "");
+      const res = await (window as any).electronAPI.applyYaml(yamlText, targetNs);
       if (res.success) {
         onSuccess(res.message);
         onClose();

@@ -223,6 +223,7 @@ async function publishRelease() {
     const fullPath = path.join(releaseDir, f);
     return (
       fs.statSync(fullPath).isFile() &&
+      !f.startsWith('.') &&
       !f.endsWith('.blockmap') &&
       !f.endsWith('.yml') &&
       !f.endsWith('.yaml')
